@@ -1,7 +1,13 @@
 let warcraftLogsRedirected = false;
+let filterSettings = { minIlvl: 0, selectedClasses: [], selectedRoles: [], selectedRegions: [] };
 
 function isRaiderIoCharacterPage() {
     return window.location.pathname.includes("/characters/");
+}
+
+function isSearchPage() {
+    return window.location.href.includes("raider.io/search") &&
+           window.location.href.includes("recruitment.guild_raids");
 }
 
 function convertRaiderIoToWarcraftLogs(raiderIoUrl) {
@@ -55,28 +61,25 @@ function enforceSortingAndPublishedColumn() {
     }
 }
 
-function handleWarcraftLogsRedirection() {
-    if (warcraftLogsRedirected) return;
+function handleWarcraftLogsRedirection(enabled) {
+    if (!enabled || warcraftLogsRedirected) return;
 
-    // Uses openWarcraftLogsFromRaiderIO — the correct key for this setting
-    chrome.storage.sync.get("openWarcraftLogsFromRaiderIO", function(options) {
-        if (options.openWarcraftLogsFromRaiderIO && isRaiderIoCharacterPage()) {
-            setTimeout(() => {
-                if (warcraftLogsRedirected) return;
+    if (isRaiderIoCharacterPage()) {
+        setTimeout(() => {
+            if (warcraftLogsRedirected) return;
 
-                const warcraftLogsUrl = convertRaiderIoToWarcraftLogs(window.location.href);
-                if (warcraftLogsUrl) {
-                    // Open via background — window.open is blocked by the browser in content scripts
-                    sendMessageToBackground('openTab', { url: warcraftLogsUrl });
-                    warcraftLogsRedirected = true;
-                }
-            }, 500);
-        }
-    });
+            const warcraftLogsUrl = convertRaiderIoToWarcraftLogs(window.location.href);
+            if (warcraftLogsUrl) {
+                sendMessageToBackground('openTab', { url: warcraftLogsUrl });
+                warcraftLogsRedirected = true;
+            }
+        }, 500);
+    }
 }
 
 function hideAds() {
     const style = document.createElement('style');
+    // Selectors targeting Raider.IO ad containers — update if the site changes its markup
     style.textContent = `
         .advertisement,
         .ad-container,
@@ -91,23 +94,93 @@ function hideAds() {
     document.head.appendChild(style);
 }
 
-// Debounced observer — avoids firing on every single DOM mutation on the page
+// Normalise Raider.IO class title attribute to storage format.
+// "Death Knight" → "deathknight", "Demon Hunter" → "demon_hunter", others → lowercase.
+function normalizeRioClass(title) {
+    if (!title) return null;
+    const lower = title.toLowerCase();
+    if (lower === 'death knight') return 'deathknight';
+    if (lower === 'demon hunter') return 'demon_hunter';
+    return lower;
+}
+
+function getRowData(row) {
+    const cells = row.querySelectorAll('.rt-td');
+    if (cells.length < 6) return null;
+
+    // Cell 1: class icon — first slds-avatar title gives the class name
+    const playerClass = normalizeRioClass(cells[1]?.querySelector('.slds-avatar[title]')?.title ?? null);
+
+    // Cell 2: realm link text is "(US) Frostmourne" — extract the region prefix
+    const realmText = cells[2]?.querySelector('.rio-realm-link')?.textContent ?? '';
+    const region = realmText.match(/^\(([A-Z]+)\)/)?.[1] ?? null;
+
+    // Cell 4: item level number
+    const ilvlText = cells[4]?.querySelector('.slds-text-align--center')?.textContent.trim() ?? '';
+    const ilvl = parseFloat(ilvlText);
+
+    // Cell 5: main role icon carries a role CSS class
+    const roleCell = cells[5];
+    let role = null;
+    if (roleCell?.querySelector('.tank-lfg-rio')) role = 'tank';
+    else if (roleCell?.querySelector('.healer-lfg-rio')) role = 'healer';
+    else if (roleCell?.querySelector('.dps-lfg-rio')) role = 'dps';
+
+    return { playerClass, region, ilvl: isNaN(ilvl) ? null : ilvl, role };
+}
+
+function filterSearchRows() {
+    if (!isSearchPage()) return;
+
+    const { minIlvl, selectedClasses, selectedRoles, selectedRegions } = filterSettings;
+
+    for (const group of document.querySelectorAll('.rt-tr-group')) {
+        const row = group.querySelector('.rt-tr');
+        if (!row) continue;
+        const data = getRowData(row);
+        if (!data) continue;
+
+        const visible =
+            (minIlvl === 0 || data.ilvl === null || data.ilvl >= minIlvl) &&
+            (selectedClasses.length === 0 || data.playerClass === null || selectedClasses.includes(data.playerClass)) &&
+            (selectedRoles.length === 0 || data.role === null || selectedRoles.includes(data.role)) &&
+            (selectedRegions.length === 0 || data.region === null || selectedRegions.includes(data.region));
+
+        group.style.display = visible ? '' : 'none';
+    }
+}
+
 let observerTimer = null;
-function observePageChanges() {
+function observePageChanges(wclEnabled) {
     const observer = new MutationObserver(() => {
         clearTimeout(observerTimer);
         observerTimer = setTimeout(() => {
             enforceSortingAndPublishedColumn();
-            handleWarcraftLogsRedirection();
+            handleWarcraftLogsRedirection(wclEnabled);
+            filterSearchRows();
         }, 250);
     });
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
-enforceSortingAndPublishedColumn();
-observePageChanges();
-handleWarcraftLogsRedirection();
+chrome.storage.sync.get([
+    'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
+    'rioMinIlvl', 'rioSelectedClasses', 'rioSelectedRoles', 'rioSelectedRegions',
+], function(options) {
+    if (options.raiderioEnabled === false) return;
 
-chrome.storage.sync.get("hideRaiderIoAds", function(options) {
+    const wclEnabled = options.openWarcraftLogsFromRaiderIO !== false;
+    filterSettings = {
+        minIlvl: parseFloat(options.rioMinIlvl) || 0,
+        selectedClasses: options.rioSelectedClasses || [],
+        selectedRoles: options.rioSelectedRoles || [],
+        selectedRegions: options.rioSelectedRegions || [],
+    };
+
+    enforceSortingAndPublishedColumn();
+    observePageChanges(wclEnabled);
+    handleWarcraftLogsRedirection(wclEnabled);
+    filterSearchRows();
+
     if (options.hideRaiderIoAds) hideAds();
 });

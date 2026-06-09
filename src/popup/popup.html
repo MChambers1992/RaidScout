@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RaidRecruiter Plus</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+    <div class="popup-header">
+        <span class="popup-title">RaidRecruiter Plus</span>
+        <div class="badge-area" id="badgeArea">
+            <span id="badgeCount"></span>
+            <span class="badge-label">closed</span>
+            <button id="clearBadge" title="Reset counter">×</button>
+        </div>
+    </div>
+
+    <!-- WarcraftLogs -->
+    <div class="site-panel wcl" id="panel-warcraftlogs">
+        <div class="panel-header">
+            <div class="panel-header-left">
+                <span class="site-dot"></span>
+                <span class="panel-title">WarcraftLogs</span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="q-warcraftlogsEnabled">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="panel-body">
+            <div class="panel-body-content">
+                <div class="quick-row">
+                    <div class="quick-field">
+                        <label for="q-parseThreshold">Median parse %</label>
+                        <input type="number" id="q-parseThreshold" min="0" max="100" step="1">
+                    </div>
+                    <div class="quick-field">
+                        <label for="q-bestParseThreshold">Best parse %</label>
+                        <input type="number" id="q-bestParseThreshold" min="0" max="100" step="1">
+                    </div>
+                </div>
+                <div class="quick-label">Recruit search region</div>
+                <div class="quick-regions">
+                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="EU"> EU</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="US"> US</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="OC"> OC</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="KR"> KR</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="TW"> TW</label>
+                </div>
+                <div class="quick-row">
+                    <div class="quick-field">
+                        <label for="q-wclMinMythicKills">Min mythic kills</label>
+                        <input type="number" id="q-wclMinMythicKills" min="0" max="99" placeholder="—">
+                    </div>
+                    <div class="quick-field"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WoWProgress -->
+    <div class="site-panel wowp" id="panel-wowprogress">
+        <div class="panel-header">
+            <div class="panel-header-left">
+                <span class="site-dot"></span>
+                <span class="panel-title">WoWProgress</span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="q-wowprogressEnabled">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="panel-body">
+            <div class="panel-body-content">
+                <div class="quick-row">
+                    <div class="quick-field">
+                        <label for="q-minIlvl">Min ilvl</label>
+                        <input type="number" id="q-minIlvl" min="0" step="0.01" placeholder="—">
+                    </div>
+                    <div class="quick-field">
+                        <label for="q-maxIlvl">Max ilvl</label>
+                        <input type="number" id="q-maxIlvl" min="0" step="0.01" placeholder="—">
+                    </div>
+                </div>
+                <div class="quick-regions">
+                    <label class="quick-inline"><input type="checkbox" class="q-regionFilter" value="EU"> EU</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-regionFilter" value="US"> US</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-regionFilter" value="OC"> OC</label>
+                </div>
+                <div class="quick-row">
+                    <div class="quick-field">
+                        <label for="q-guildFilter">Guild status</label>
+                        <select id="q-guildFilter">
+                            <option value="any">Any</option>
+                            <option value="in">In a guild</option>
+                            <option value="out">Not in a guild</option>
+                        </select>
+                    </div>
+                </div>
+                <label class="quick-check">
+                    <input type="checkbox" id="q-openWarcraftLogsTab">
+                    Auto-open WarcraftLogs on character visit
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Raider.IO -->
+    <div class="site-panel rio" id="panel-raiderio">
+        <div class="panel-header">
+            <div class="panel-header-left">
+                <span class="site-dot"></span>
+                <span class="panel-title">Raider.IO</span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="q-raiderioEnabled">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="panel-body">
+            <div class="panel-body-content">
+                <label class="quick-check">
+                    <input type="checkbox" id="q-openWarcraftLogsFromRaiderIO">
+                    Auto-open WarcraftLogs on character visit
+                </label>
+                <label class="quick-check">
+                    <input type="checkbox" id="q-hideRaiderIoAds">
+                    Remove ads
+                </label>
+                <div class="quick-row">
+                    <div class="quick-field">
+                        <label for="q-rioMinIlvl">Min ilvl</label>
+                        <input type="number" id="q-rioMinIlvl" min="0" step="0.01" placeholder="—">
+                    </div>
+                </div>
+                <div class="quick-label">Region filter</div>
+                <div class="quick-regions">
+                    <label class="quick-inline"><input type="checkbox" class="q-rioRegionFilter" value="EU"> EU</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-rioRegionFilter" value="US"> US</label>
+                    <label class="quick-inline"><input type="checkbox" class="q-rioRegionFilter" value="OC"> OC</label>
+                </div>
+                <div class="quick-label">Role filter</div>
+                <div class="quick-regions">
+                    <label class="quick-inline role-tank"><input type="checkbox" class="q-rioRoleFilter" value="tank"> Tank</label>
+                    <label class="quick-inline role-healer"><input type="checkbox" class="q-rioRoleFilter" value="healer"> Healer</label>
+                    <label class="quick-inline role-dps"><input type="checkbox" class="q-rioRoleFilter" value="dps"> DPS</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guilds of WoW -->
+    <div class="site-panel gow" id="panel-guildsofwow">
+        <div class="panel-header">
+            <div class="panel-header-left">
+                <span class="site-dot"></span>
+                <span class="panel-title">Guilds of WoW</span>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="q-guildsofwowEnabled">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="panel-body">
+            <div class="panel-body-content">
+                <div class="quick-row">
+                    <div class="quick-field">
+                        <label for="q-gowMinIlvl">Min ilvl</label>
+                        <input type="number" id="q-gowMinIlvl" min="0" placeholder="—">
+                    </div>
+                    <div class="quick-field">
+                        <label for="q-gowMinMythicPlusScore">Min M+ score</label>
+                        <input type="number" id="q-gowMinMythicPlusScore" min="0" placeholder="—">
+                    </div>
+                </div>
+                <div class="quick-row">
+                    <div class="quick-field">
+                        <label for="q-gowMinMythicKills">Min mythic kills</label>
+                        <input type="number" id="q-gowMinMythicKills" min="0" max="99" placeholder="—">
+                    </div>
+                    <div class="quick-field"></div>
+                </div>
+                <div class="quick-label">Role filter</div>
+                <div class="quick-regions">
+                    <label class="quick-inline role-tank"><input type="checkbox" class="q-roleFilter" value="tank"> Tank</label>
+                    <label class="quick-inline role-healer"><input type="checkbox" class="q-roleFilter" value="healer"> Healer</label>
+                    <label class="quick-inline role-dps"><input type="checkbox" class="q-roleFilter" value="dps"> DPS</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="popup-footer">
+        <button id="openSettings">⚙ Full Settings</button>
+        <div class="saved-indicator" id="savedIndicator"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
