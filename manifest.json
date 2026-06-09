@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "RaidRecruiter Plus",
+  "version": "1.0",
+  "description": "Streamline your World of Warcraft guild recruitment process with this extension. Extends functionality on websites such as WarcraftLogs, WoWProgress, and more.",
+  "author": "Michael Chambers",
+  "icons": {
+    "128": "/img/logo-128.png",
+    "48": "/img/logo-48.png",
+    "16": "/img/logo-16.png"
+  },
+  "permissions": [
+    "activeTab",
+    "webNavigation",
+    "tabs",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.wowprogress.com/*",
+    "https://www.warcraftlogs.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "options_ui": {
+    "page": "src/options/options.html"
+  },
+  "action": {
+    "default_popup": "src/options/options.html",
+    "default_title": "Open Extension Options"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.warcraftlogs.com/*"
+      ],
+      "js": [
+        "src/content/common.js",
+        "src/content/warcraftlogs.js"
+      ]
+    },
+    {
+      "matches": [
+        "https://www.wowprogress.com/gearscore/*"
+      ],
+      "js": [
+        "src/content/common.js",
+        "src/content/wowprogress.js"
+      ]
+    },
+    {
+      "matches": [
+        "https://raider.io/*"
+      ],
+      "js": [
+        "src/content/common.js",
+        "src/content/raiderio.js"
+      ]
+    }
+  ]
+}

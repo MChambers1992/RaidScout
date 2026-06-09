@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "PowerShell(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "WebFetch(*)",
+      "WebSearch(*)"
+    ]
+  },
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "claude -p 'Review git diff HEAD and git status to understand what changed this session. Produce a concise change list. Then update CLAUDE.md and README.md (if it exists) to reflect any new features, changed behavior, architectural changes, or modified dependencies. Keep the documentation accurate and current.' --allowedTools Bash,Read,Edit,Write --dangerouslySkipPermissions",
+            "shell": "powershell",
+            "timeout": 120,
+            "statusMessage": "Updating docs before compaction..."
+          }
+        ]
+      }
+    ]
+  }
+}

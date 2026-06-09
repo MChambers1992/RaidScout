@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extension Options</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Extension Options</h1>
+
+        <!-- Dropdown for Selecting Option Category -->
+        <div class="dropdown-container">
+            <label for="categorySelect">Select Category:</label>
+            <select id="categorySelect">
+                <option value="warcraftlogs">Warcraft Logs</option>
+                <option value="wowprogress">WoWProgress</option>
+                <option value="raiderio">Raider.IO</option>
+                <option value="guildsofwow">Guilds of WoW</option>
+            </select>
+        </div>
+
+        <!-- Warcraft Logs Settings -->
+        <div class="category-content" id="warcraftlogs">
+            <h2>Warcraft Logs Settings</h2>
+            <div class="option">
+                <label for="parseThreshold">Minimum Parse Threshold</label>
+                <input type="number" id="parseThreshold" min="0" step="1">
+            </div>
+            <div class="option">
+                <label for="bestParseThreshold">Best Parse Threshold</label>
+                <input type="number" id="bestParseThreshold" min="0" step="1">
+            </div>
+        </div>
+
+        <!-- WoWProgress Settings -->
+        <div class="category-content" id="wowprogress">
+            <h2>WoWProgress Settings</h2>
+            <div class="option">
+                <input type="checkbox" id="openWarcraftLogsTab">
+                <label for="openWarcraftLogsTab">Open Warcraft Logs Tab</label>
+            </div>
+            <div class="option">
+                <label for="region">Region</label>
+                <select id="region">
+                    <option value="EU">EU</option>
+                    <option value="US">US</option>
+                    <option value="OC">OC</option>
+                </select>
+            </div>
+            <div class="option">
+                <label for="minIlvl">Minimum Item Level</label>
+                <input type="number" id="minIlvl" min="0" step="1">
+            </div>
+        </div>
+
+        <!-- Raider.IO Settings -->
+        <div class="category-content" id="raiderio">
+            <h2>Raider.IO Settings</h2>
+            <div class="option">
+                <input type="checkbox" id="openWarcraftLogsFromRaiderIO">
+                <label for="openWarcraftLogsFromRaiderIO">Open Warcraft Logs from Raider.IO</label>
+            </div>
+            <div class="option">
+                <input type="checkbox" id="hideRaiderIoAds">
+                <label for="hideRaiderIoAds">Remove Raider.IO Ads</label>
+            </div>
+        </div>
+
+        <!-- Guilds of WoW Settings -->
+        <div class="category-content" id="guildsofwow">
+            <h2>Guilds of WoW Settings</h2>
+            <p>Future settings for Guilds of WoW can be placed here.</p>
+        </div>
+
+        <!-- Save Button -->
+        <button id="saveButton">Save</button>
+        <p id="statusMessage"></p>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
