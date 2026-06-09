@@ -27,8 +27,8 @@
     "page": "src/options/options.html"
   },
   "action": {
-    "default_popup": "src/options/options.html",
-    "default_title": "Open Extension Options"
+    "default_popup": "src/popup/popup.html",
+    "default_title": "RaidRecruiter Plus"
   },
   "content_scripts": [
     {
@@ -56,6 +56,16 @@
       "js": [
         "src/content/common.js",
         "src/content/raiderio.js"
+      ]
+    },
+    {
+      "matches": [
+        "https://guildsofwow.com/*",
+        "https://www.guildsofwow.com/*"
+      ],
+      "js": [
+        "src/content/common.js",
+        "src/content/guildsofwow.js"
       ]
     }
   ]

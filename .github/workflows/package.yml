@@ -25,10 +25,10 @@ jobs:
 
       - name: Create zip
         run: |
-          cd "RaidRecruiter Plus"
-          zip -r "../${{ steps.version.outputs.name }}.zip" . \
+          zip -r "${{ steps.version.outputs.name }}.zip" . \
             --exclude "*.git*" \
             --exclude ".claude/*" \
+            --exclude ".github/*" \
             --exclude "CLAUDE.md"
 
       - name: Upload artifact
@@ -50,10 +50,10 @@ jobs:
 
       - name: Build zip
         run: |
-          cd "RaidRecruiter Plus"
-          zip -r "../raidrecruiter-plus-${{ github.ref_name }}.zip" . \
+          zip -r "raidrecruiter-plus-${{ github.ref_name }}.zip" . \
             --exclude "*.git*" \
             --exclude ".claude/*" \
+            --exclude ".github/*" \
             --exclude "CLAUDE.md"
 
       - name: Create GitHub Release

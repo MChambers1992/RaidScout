@@ -3,80 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extension Options</title>
+    <title>RaidRecruiter Plus</title>
     <link rel="stylesheet" href="options.css">
 </head>
 <body>
     <div class="container">
-        <h1>Extension Options</h1>
+        <h1>RaidRecruiter Plus</h1>
 
-        <!-- Dropdown for Selecting Option Category -->
-        <div class="dropdown-container">
-            <label for="categorySelect">Select Category:</label>
-            <select id="categorySelect">
-                <option value="warcraftlogs">Warcraft Logs</option>
-                <option value="wowprogress">WoWProgress</option>
-                <option value="raiderio">Raider.IO</option>
-                <option value="guildsofwow">Guilds of WoW</option>
-            </select>
+        <div class="tabs">
+            <button class="tab-btn" data-tab="warcraftlogs">WarcraftLogs</button>
+            <button class="tab-btn" data-tab="wowprogress">WoWProgress</button>
+            <button class="tab-btn" data-tab="raiderio">Raider.IO</button>
+            <button class="tab-btn" data-tab="guildsofwow">Guilds of WoW</button>
         </div>
 
-        <!-- Warcraft Logs Settings -->
+        <!-- WarcraftLogs Settings -->
         <div class="category-content" id="warcraftlogs">
-            <h2>Warcraft Logs Settings</h2>
+            <div class="section-header">
+                <h2>WarcraftLogs</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="warcraftlogsEnabled">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
             <div class="option">
-                <label for="parseThreshold">Minimum Parse Threshold</label>
-                <input type="number" id="parseThreshold" min="0" step="1">
+                <label for="parseThreshold">Median Parse Threshold</label>
+                <input type="number" id="parseThreshold" min="0" max="100" step="1">
+                <p class="hint">Median DPS parse % across all fights — tab closes if below this; also filters recruitment search results</p>
             </div>
             <div class="option">
                 <label for="bestParseThreshold">Best Parse Threshold</label>
-                <input type="number" id="bestParseThreshold" min="0" step="1">
+                <input type="number" id="bestParseThreshold" min="0" max="100" step="1">
+                <p class="hint">Highest single DPS parse on any fight — tab closes if below this</p>
+            </div>
+            <p class="subsection-label">Recruitment Search</p>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Region</span>
+                </div>
+                <p class="hint">Leave all unchecked to show all regions</p>
+                <div class="region-checks">
+                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="EU"> EU</label>
+                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="US"> US</label>
+                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="OC"> OC</label>
+                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="KR"> KR</label>
+                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="TW"> TW</label>
+                </div>
+            </div>
+            <div class="option">
+                <label for="wclMinMythicKills">Min. Mythic Kills</label>
+                <input type="number" id="wclMinMythicKills" min="0" max="99" step="1" placeholder="e.g. 6">
+                <p class="hint">Hides recruits below this current-tier mythic kill count</p>
+            </div>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Class Filter</span>
+                    <button type="button" id="clearWclClasses">Clear all</button>
+                </div>
+                <p class="hint">Leave all unchecked to show every class</p>
+                <div class="class-grid">
+                    <label class="class-label warrior"><input type="checkbox" class="wclClassFilter" value="warrior"> Warrior</label>
+                    <label class="class-label paladin"><input type="checkbox" class="wclClassFilter" value="paladin"> Paladin</label>
+                    <label class="class-label hunter"><input type="checkbox" class="wclClassFilter" value="hunter"> Hunter</label>
+                    <label class="class-label rogue"><input type="checkbox" class="wclClassFilter" value="rogue"> Rogue</label>
+                    <label class="class-label priest"><input type="checkbox" class="wclClassFilter" value="priest"> Priest</label>
+                    <label class="class-label shaman"><input type="checkbox" class="wclClassFilter" value="shaman"> Shaman</label>
+                    <label class="class-label mage"><input type="checkbox" class="wclClassFilter" value="mage"> Mage</label>
+                    <label class="class-label warlock"><input type="checkbox" class="wclClassFilter" value="warlock"> Warlock</label>
+                    <label class="class-label monk"><input type="checkbox" class="wclClassFilter" value="monk"> Monk</label>
+                    <label class="class-label druid"><input type="checkbox" class="wclClassFilter" value="druid"> Druid</label>
+                    <label class="class-label deathknight"><input type="checkbox" class="wclClassFilter" value="deathknight"> Death Knight</label>
+                    <label class="class-label demon_hunter"><input type="checkbox" class="wclClassFilter" value="demon_hunter"> Demon Hunter</label>
+                    <label class="class-label evoker"><input type="checkbox" class="wclClassFilter" value="evoker"> Evoker</label>
+                </div>
             </div>
         </div>
 
         <!-- WoWProgress Settings -->
         <div class="category-content" id="wowprogress">
-            <h2>WoWProgress Settings</h2>
+            <div class="section-header">
+                <h2>WoWProgress</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="wowprogressEnabled">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
             <div class="option">
                 <input type="checkbox" id="openWarcraftLogsTab">
-                <label for="openWarcraftLogsTab">Open Warcraft Logs Tab</label>
+                <label for="openWarcraftLogsTab">Auto-open WarcraftLogs on character visit</label>
+            </div>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Region</span>
+                </div>
+                <p class="hint">Leave all unchecked to show all regions</p>
+                <div class="region-checks">
+                    <label class="inline-check"><input type="checkbox" class="regionFilter" value="EU"> EU</label>
+                    <label class="inline-check"><input type="checkbox" class="regionFilter" value="US"> US</label>
+                    <label class="inline-check"><input type="checkbox" class="regionFilter" value="OC"> OC</label>
+                </div>
             </div>
             <div class="option">
-                <label for="region">Region</label>
-                <select id="region">
-                    <option value="EU">EU</option>
-                    <option value="US">US</option>
-                    <option value="OC">OC</option>
+                <label>Item Level</label>
+                <div class="range-inputs">
+                    <input type="number" id="minIlvl" min="0" step="0.01" placeholder="Min">
+                    <span class="range-sep">–</span>
+                    <input type="number" id="maxIlvl" min="0" step="0.01" placeholder="Max">
+                </div>
+            </div>
+            <div class="option">
+                <label for="guildFilter">Guild Status</label>
+                <select id="guildFilter">
+                    <option value="any">Any</option>
+                    <option value="in">In a guild</option>
+                    <option value="out">Not in a guild</option>
                 </select>
             </div>
-            <div class="option">
-                <label for="minIlvl">Minimum Item Level</label>
-                <input type="number" id="minIlvl" min="0" step="1">
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Class Filter</span>
+                    <button type="button" id="clearClasses">Clear all</button>
+                </div>
+                <p class="hint">Leave all unchecked to show every class</p>
+                <div class="class-grid">
+                    <label class="class-label warrior"><input type="checkbox" class="classFilter" value="warrior"> Warrior</label>
+                    <label class="class-label paladin"><input type="checkbox" class="classFilter" value="paladin"> Paladin</label>
+                    <label class="class-label hunter"><input type="checkbox" class="classFilter" value="hunter"> Hunter</label>
+                    <label class="class-label rogue"><input type="checkbox" class="classFilter" value="rogue"> Rogue</label>
+                    <label class="class-label priest"><input type="checkbox" class="classFilter" value="priest"> Priest</label>
+                    <label class="class-label shaman"><input type="checkbox" class="classFilter" value="shaman"> Shaman</label>
+                    <label class="class-label mage"><input type="checkbox" class="classFilter" value="mage"> Mage</label>
+                    <label class="class-label warlock"><input type="checkbox" class="classFilter" value="warlock"> Warlock</label>
+                    <label class="class-label monk"><input type="checkbox" class="classFilter" value="monk"> Monk</label>
+                    <label class="class-label druid"><input type="checkbox" class="classFilter" value="druid"> Druid</label>
+                    <label class="class-label deathknight"><input type="checkbox" class="classFilter" value="deathknight"> Death Knight</label>
+                    <label class="class-label demon_hunter"><input type="checkbox" class="classFilter" value="demon_hunter"> Demon Hunter</label>
+                    <label class="class-label evoker"><input type="checkbox" class="classFilter" value="evoker"> Evoker</label>
+                </div>
             </div>
         </div>
 
         <!-- Raider.IO Settings -->
         <div class="category-content" id="raiderio">
-            <h2>Raider.IO Settings</h2>
+            <div class="section-header">
+                <h2>Raider.IO</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="raiderioEnabled">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
             <div class="option">
                 <input type="checkbox" id="openWarcraftLogsFromRaiderIO">
-                <label for="openWarcraftLogsFromRaiderIO">Open Warcraft Logs from Raider.IO</label>
+                <label for="openWarcraftLogsFromRaiderIO">Auto-open WarcraftLogs on character visit</label>
             </div>
             <div class="option">
                 <input type="checkbox" id="hideRaiderIoAds">
                 <label for="hideRaiderIoAds">Remove Raider.IO Ads</label>
             </div>
+            <div class="option">
+                <label for="rioMinIlvl">Min. Item Level</label>
+                <input type="number" id="rioMinIlvl" min="0" step="0.01" placeholder="e.g. 280">
+                <p class="hint">Hides recruits on the search table below this item level</p>
+            </div>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Region</span>
+                </div>
+                <p class="hint">Leave all unchecked to show all regions</p>
+                <div class="region-checks">
+                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="EU"> EU</label>
+                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="US"> US</label>
+                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="OC"> OC</label>
+                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="KR"> KR</label>
+                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="TW"> TW</label>
+                </div>
+            </div>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Role Filter</span>
+                </div>
+                <p class="hint">Leave all unchecked to show all roles</p>
+                <div class="region-checks">
+                    <label class="inline-check role-tank"><input type="checkbox" class="rioRoleFilter" value="tank"> Tank</label>
+                    <label class="inline-check role-healer"><input type="checkbox" class="rioRoleFilter" value="healer"> Healer</label>
+                    <label class="inline-check role-dps"><input type="checkbox" class="rioRoleFilter" value="dps"> DPS</label>
+                </div>
+            </div>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Class Filter</span>
+                    <button type="button" id="clearRioClasses">Clear all</button>
+                </div>
+                <p class="hint">Leave all unchecked to show every class</p>
+                <div class="class-grid">
+                    <label class="class-label warrior"><input type="checkbox" class="rioClassFilter" value="warrior"> Warrior</label>
+                    <label class="class-label paladin"><input type="checkbox" class="rioClassFilter" value="paladin"> Paladin</label>
+                    <label class="class-label hunter"><input type="checkbox" class="rioClassFilter" value="hunter"> Hunter</label>
+                    <label class="class-label rogue"><input type="checkbox" class="rioClassFilter" value="rogue"> Rogue</label>
+                    <label class="class-label priest"><input type="checkbox" class="rioClassFilter" value="priest"> Priest</label>
+                    <label class="class-label shaman"><input type="checkbox" class="rioClassFilter" value="shaman"> Shaman</label>
+                    <label class="class-label mage"><input type="checkbox" class="rioClassFilter" value="mage"> Mage</label>
+                    <label class="class-label warlock"><input type="checkbox" class="rioClassFilter" value="warlock"> Warlock</label>
+                    <label class="class-label monk"><input type="checkbox" class="rioClassFilter" value="monk"> Monk</label>
+                    <label class="class-label druid"><input type="checkbox" class="rioClassFilter" value="druid"> Druid</label>
+                    <label class="class-label deathknight"><input type="checkbox" class="rioClassFilter" value="deathknight"> Death Knight</label>
+                    <label class="class-label demon_hunter"><input type="checkbox" class="rioClassFilter" value="demon_hunter"> Demon Hunter</label>
+                    <label class="class-label evoker"><input type="checkbox" class="rioClassFilter" value="evoker"> Evoker</label>
+                </div>
+            </div>
         </div>
 
         <!-- Guilds of WoW Settings -->
         <div class="category-content" id="guildsofwow">
-            <h2>Guilds of WoW Settings</h2>
-            <p>Future settings for Guilds of WoW can be placed here.</p>
+            <div class="section-header">
+                <h2>Guilds of WoW</h2>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="guildsofwowEnabled">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="option">
+                <label for="gowMinIlvl">Min. Item Level</label>
+                <input type="number" id="gowMinIlvl" min="0" step="1" placeholder="e.g. 280">
+            </div>
+            <div class="option">
+                <label for="gowMinMythicKills">Min. Mythic Kills</label>
+                <input type="number" id="gowMinMythicKills" min="0" max="99" step="1" placeholder="e.g. 6">
+                <p class="hint">Hides recruits below this current-tier mythic kill count</p>
+            </div>
+            <div class="option">
+                <label for="gowMinMythicPlusScore">Min. M+ Score</label>
+                <input type="number" id="gowMinMythicPlusScore" min="0" step="1" placeholder="e.g. 2000">
+            </div>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Role Filter</span>
+                </div>
+                <p class="hint">Leave all unchecked to show all roles</p>
+                <div class="region-checks">
+                    <label class="inline-check role-tank"><input type="checkbox" class="roleFilter" value="tank"> Tank</label>
+                    <label class="inline-check role-healer"><input type="checkbox" class="roleFilter" value="healer"> Healer</label>
+                    <label class="inline-check role-dps"><input type="checkbox" class="roleFilter" value="dps"> DPS</label>
+                </div>
+            </div>
+            <div class="option-group">
+                <div class="option-group-header">
+                    <span>Class Filter</span>
+                    <button type="button" id="clearGowClasses">Clear all</button>
+                </div>
+                <p class="hint">Leave all unchecked to show every class</p>
+                <div class="class-grid">
+                    <label class="class-label warrior"><input type="checkbox" class="gowClassFilter" value="warrior"> Warrior</label>
+                    <label class="class-label paladin"><input type="checkbox" class="gowClassFilter" value="paladin"> Paladin</label>
+                    <label class="class-label hunter"><input type="checkbox" class="gowClassFilter" value="hunter"> Hunter</label>
+                    <label class="class-label rogue"><input type="checkbox" class="gowClassFilter" value="rogue"> Rogue</label>
+                    <label class="class-label priest"><input type="checkbox" class="gowClassFilter" value="priest"> Priest</label>
+                    <label class="class-label shaman"><input type="checkbox" class="gowClassFilter" value="shaman"> Shaman</label>
+                    <label class="class-label mage"><input type="checkbox" class="gowClassFilter" value="mage"> Mage</label>
+                    <label class="class-label warlock"><input type="checkbox" class="gowClassFilter" value="warlock"> Warlock</label>
+                    <label class="class-label monk"><input type="checkbox" class="gowClassFilter" value="monk"> Monk</label>
+                    <label class="class-label druid"><input type="checkbox" class="gowClassFilter" value="druid"> Druid</label>
+                    <label class="class-label deathknight"><input type="checkbox" class="gowClassFilter" value="deathknight"> Death Knight</label>
+                    <label class="class-label demon_hunter"><input type="checkbox" class="gowClassFilter" value="demon_hunter"> Demon Hunter</label>
+                    <label class="class-label evoker"><input type="checkbox" class="gowClassFilter" value="evoker"> Evoker</label>
+                </div>
+            </div>
         </div>
 
-        <!-- Save Button -->
-        <button id="saveButton">Save</button>
-        <p id="statusMessage"></p>
+        <div class="save-area">
+            <button id="saveButton">Save</button>
+            <p id="statusMessage"></p>
+        </div>
     </div>
 
     <script src="options.js"></script>
