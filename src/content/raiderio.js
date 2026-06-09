@@ -41,23 +41,23 @@ function enforceSortingAndPublishedColumn() {
         return;
     }
 
-    const url = new URL(window.location.href);
-    const params = new URLSearchParams(url.search);
-    let needsReload = false;
+    // Use URLSearchParams only for checking — never for re-serialising the URL.
+    // params.toString() percent-encodes bracket characters ([→%5B), which breaks
+    // Raider.IO's own param parsing and causes it to apply stale session filters.
+    const href = window.location.href;
+    const params = new URLSearchParams(window.location.search);
+    const toAppend = [];
 
     if (!params.has("recruitment.guild_raids.profile.published_at[0][gte]")) {
-        params.set("recruitment.guild_raids.profile.published_at[0][gte]", "1");
-        needsReload = true;
+        toAppend.push("recruitment.guild_raids.profile.published_at%5B0%5D%5Bgte%5D=1");
     }
 
     if (!params.has("sort[recruitment.guild_raids.profile.published_at]")) {
-        params.set("sort[recruitment.guild_raids.profile.published_at]", "desc");
-        needsReload = true;
+        toAppend.push("sort%5Brecruitment.guild_raids.profile.published_at%5D=desc");
     }
 
-    if (needsReload) {
-        url.search = params.toString();
-        window.location.replace(url.toString());
+    if (toAppend.length > 0) {
+        window.location.replace(href + (href.includes('?') ? '&' : '?') + toAppend.join('&'));
     }
 }
 
