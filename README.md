@@ -1,4 +1,4 @@
-# RaidRecruiter Plus
+# RaidScout
 
 A Chrome extension that streamlines World of Warcraft guild recruitment by extending functionality across WarcraftLogs, WoWProgress, Raider.IO, and Guilds of WoW.
 
