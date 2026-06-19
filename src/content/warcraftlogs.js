@@ -67,22 +67,6 @@ function waitForPageLoad() {
 
 // ─── Recruitment search page: result filtering ────────────────────────────────
 
-const WCL_CLASS_MAP = {
-    'Warrior': 'warrior',
-    'Paladin': 'paladin',
-    'Hunter': 'hunter',
-    'Rogue': 'rogue',
-    'Priest': 'priest',
-    'Shaman': 'shaman',
-    'Mage': 'mage',
-    'Warlock': 'warlock',
-    'Monk': 'monk',
-    'Druid': 'druid',
-    'DeathKnight': 'deathknight',
-    'DemonHunter': 'demon_hunter',
-    'Evoker': 'evoker',
-};
-
 function getRecruitmentParseScore(card) {
     const span = card.querySelector('.recruitment-character-search-result-zone-metrics-tile__metrics .icon__label > span');
     return span ? parseFloat(span.textContent) : null;
@@ -98,7 +82,7 @@ function getRecruitmentClass(card) {
     if (!el) return null;
     for (const cls of el.classList) {
         if (cls !== 'character-name-faction-server-region-title__name') {
-            return WCL_CLASS_MAP[cls] ?? cls.toLowerCase();
+            return normalizeClassName(cls);
         }
     }
     return null;
@@ -112,7 +96,7 @@ function getRecruitmentMythicKills(card) {
 }
 
 function filterRecruitmentResults(options) {
-    const parseThreshold = options.parseThreshold || 0;
+    const parseThreshold = options.wclSearchParseThreshold || 0;
     const wclSelectedRegions = options.wclSelectedRegions || [];
     const wclSelectedClasses = options.wclSelectedClasses || [];
     const wclMinMythicKills = options.wclMinMythicKills || 0;
@@ -134,7 +118,7 @@ function filterRecruitmentResults(options) {
 }
 
 function initRecruitmentFiltering() {
-    const storageKeys = ['parseThreshold', 'wclSelectedRegions', 'wclSelectedClasses', 'wclMinMythicKills'];
+    const storageKeys = ['wclSearchParseThreshold', 'wclSelectedRegions', 'wclSelectedClasses', 'wclMinMythicKills'];
 
     function applyFilters() {
         chrome.storage.sync.get(storageKeys, filterRecruitmentResults);

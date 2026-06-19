@@ -33,8 +33,8 @@ function closeWowProgressTab(warcraftLogsUrl) {
 }
 
 chrome.webNavigation.onCompleted.addListener(function(details) {
-    chrome.storage.sync.get('openWarcraftLogsTab', function(options) {
-        if (options.openWarcraftLogsTab && isWowProgressCharacterPage(details.url)) {
+    chrome.storage.sync.get(['wowprogressEnabled', 'openWarcraftLogsTab'], function(options) {
+        if (options.wowprogressEnabled !== false && options.openWarcraftLogsTab && isWowProgressCharacterPage(details.url)) {
             chrome.tabs.create({ url: buildWarcraftLogsUrl(details.url) });
         }
     });

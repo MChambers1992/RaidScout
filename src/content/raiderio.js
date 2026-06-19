@@ -94,22 +94,11 @@ function hideAds() {
     document.head.appendChild(style);
 }
 
-// Normalise Raider.IO class title attribute to storage format.
-// "Death Knight" → "deathknight", "Demon Hunter" → "demon_hunter", others → lowercase.
-function normalizeRioClass(title) {
-    if (!title) return null;
-    const lower = title.toLowerCase();
-    if (lower === 'death knight') return 'deathknight';
-    if (lower === 'demon hunter') return 'demon_hunter';
-    return lower;
-}
-
 function getRowData(row) {
     const cells = row.querySelectorAll('.rt-td');
     if (cells.length < 6) return null;
 
-    // Cell 1: class icon — first slds-avatar title gives the class name
-    const playerClass = normalizeRioClass(cells[1]?.querySelector('.slds-avatar[title]')?.title ?? null);
+    const playerClass = normalizeClassName(cells[1]?.querySelector('.slds-avatar[title]')?.title ?? null);
 
     // Cell 2: realm link text is "(US) Frostmourne" — extract the region prefix
     const realmText = cells[2]?.querySelector('.rio-realm-link')?.textContent ?? '';

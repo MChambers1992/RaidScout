@@ -29,7 +29,7 @@
             <div class="option">
                 <label for="parseThreshold">Median Parse Threshold</label>
                 <input type="number" id="parseThreshold" min="0" max="100" step="1">
-                <p class="hint">Median DPS parse % across all fights — tab closes if below this; also filters recruitment search results</p>
+                <p class="hint">Median DPS parse % across all fights — tab closes if below this</p>
             </div>
             <div class="option">
                 <label for="bestParseThreshold">Best Parse Threshold</label>
@@ -37,6 +37,11 @@
                 <p class="hint">Highest single DPS parse on any fight — tab closes if below this</p>
             </div>
             <p class="subsection-label">Recruitment Search</p>
+            <div class="option">
+                <label for="wclSearchParseThreshold">Min. Parse %</label>
+                <input type="number" id="wclSearchParseThreshold" min="0" max="100" step="1" placeholder="e.g. 50">
+                <p class="hint">Hides recruits on the recruitment search below this parse %</p>
+            </div>
             <div class="option-group">
                 <div class="option-group-header">
                     <span>Region</span>
@@ -273,6 +278,11 @@
         <div class="save-area">
             <button id="saveButton">Save</button>
             <p id="statusMessage"></p>
+            <div class="settings-tools">
+                <button type="button" id="exportSettings">Export Settings</button>
+                <button type="button" id="importSettings">Import Settings</button>
+                <input type="file" id="importFile" accept=".json" hidden>
+            </div>
         </div>
     </div>
 
