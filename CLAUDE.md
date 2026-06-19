@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**RaidRecruiter Plus** is a Chrome extension designed to streamline World of Warcraft guild recruitment. It extends functionality across multiple recruitment-related websites: WarcraftLogs, WoWProgress, Raider.IO, and Guilds of WoW.
+**RaidScout** is a Chrome extension designed to streamline World of Warcraft guild recruitment. It extends functionality across multiple recruitment-related websites: WarcraftLogs, WoWProgress, Raider.IO, and Guilds of WoW.
 
 **Author:** Michael Chambers  
 **Current Version:** 1.0  
@@ -86,7 +86,7 @@ Background service workers require a manual **Inspect → reload** after code ch
 
 **Background service worker logs:**
 1. Go to `chrome://extensions/`
-2. Click the **Service Worker** link under RaidRecruiter Plus
+2. Click the **Service Worker** link under RaidScout
 
 **Testing each integration:**
 - **WarcraftLogs:** Navigate to any `warcraftlogs.com/character/...` page; watch console for parse metric detection
@@ -173,7 +173,7 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 ## File Structure
 
 ```
-RaidRecruiter Plus/
+RaidScout/
 ├── manifest.json              # Extension metadata, permissions, content script routes
 ├── CLAUDE.md                  # This file
 ├── README.md                  # User-facing documentation

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "RaidRecruiter Plus",
+  "name": "RaidScout",
   "version": "1.0",
   "description": "Streamline your World of Warcraft guild recruitment process with this extension. Extends functionality on websites such as WarcraftLogs, WoWProgress, and more.",
   "author": "Michael Chambers",
@@ -28,7 +28,7 @@
   },
   "action": {
     "default_popup": "src/popup/popup.html",
-    "default_title": "RaidRecruiter Plus"
+    "default_title": "RaidScout"
   },
   "content_scripts": [
     {
