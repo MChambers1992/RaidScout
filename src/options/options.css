@@ -373,3 +373,26 @@ button#saveButton:hover {
     color: #4caf50;
     text-align: center;
 }
+
+.settings-tools {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.settings-tools button {
+    flex: 1;
+    padding: 7px;
+    background-color: #3a3a3a;
+    color: #aaa;
+    border: 1px solid #4a4a4a;
+    border-radius: 5px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.settings-tools button:hover {
+    background-color: #4a4a4a;
+    color: #fff;
+}

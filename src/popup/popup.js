@@ -1,5 +1,5 @@
 const SETTINGS_KEYS = [
-    'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
+    'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
     'wowprogressEnabled', 'openWarcraftLogsTab', 'minIlvl', 'maxIlvl', 'selectedRegions', 'guildFilter',
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedRegions', 'rioSelectedRoles',
@@ -34,6 +34,8 @@ function applySettings(data) {
     document.getElementById('q-warcraftlogsEnabled').checked = data.warcraftlogsEnabled !== false;
     document.getElementById('q-parseThreshold').value = data.parseThreshold ?? 50;
     document.getElementById('q-bestParseThreshold').value = data.bestParseThreshold ?? 60;
+
+    document.getElementById('q-wclSearchParseThreshold').value = data.wclSearchParseThreshold || '';
 
     const savedWclRegions = data.wclSelectedRegions ?? [];
     document.querySelectorAll('.q-wclRegionFilter').forEach(cb => {
@@ -97,6 +99,7 @@ function saveAll() {
         warcraftlogsEnabled: document.getElementById('q-warcraftlogsEnabled').checked,
         parseThreshold: parseInt(document.getElementById('q-parseThreshold').value) || 50,
         bestParseThreshold: parseInt(document.getElementById('q-bestParseThreshold').value) || 60,
+        wclSearchParseThreshold: parseInt(document.getElementById('q-wclSearchParseThreshold').value) || 0,
         wclSelectedRegions,
         wclMinMythicKills: parseInt(document.getElementById('q-wclMinMythicKills').value) || 0,
 

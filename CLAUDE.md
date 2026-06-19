@@ -29,7 +29,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Responds to: `parseThresholdFailed`, `openTab`, `clearBadge`
 
 2. **Content Scripts** (injected per site via manifest `matches`)
-   - **`src/content/common.js`** — Shared `sendMessageToBackground(action, data)` utility; injected before every other content script
+   - **`src/content/common.js`** — Shared utilities injected before every other content script: `sendMessageToBackground(action, data)`, `normalizeClassName(name)`, and the `WOW_CLASS_NAMES` constant
    - **`src/content/warcraftlogs.js`** — Polls every 1s for DPS parse metrics; closes tab if below thresholds; 30s timeout cap
    - **`src/content/wowprogress.js`** — Filters player table rows by region, item level range, class, and guild status; uses MutationObserver + 2s polling
    - **`src/content/raiderio.js`** — Converts character URLs to WarcraftLogs; enforces search sorting/published-date params; hides ads via injected `<style>`
@@ -110,6 +110,10 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `warcraftlogsEnabled` | boolean | `true` | Enable/disable all WarcraftLogs features |
 | `parseThreshold` | number | `50` | Min median DPS parse % — tab auto-closes if below |
 | `bestParseThreshold` | number | `60` | Min best single DPS parse % — tab auto-closes if below |
+| `wclSearchParseThreshold` | number | `0` | Min parse % for recruitment search results (0 = no minimum) |
+| `wclSelectedRegions` | string[] | `[]` | Filter recruitment search by region — empty shows all |
+| `wclMinMythicKills` | number | `0` | Min mythic kills for recruitment search (0 = no minimum) |
+| `wclSelectedClasses` | string[] | `[]` | Filter recruitment search by class — empty shows all |
 
 ### WoWProgress
 
@@ -152,7 +156,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 
 Class names are stored in lowercase with underscores: `warrior`, `paladin`, `hunter`, `rogue`, `priest`, `shaman`, `mage`, `warlock`, `monk`, `druid`, `deathknight`, `demon_hunter`, `evoker`.
 
-WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img` alt text (e.g. `"Demon Hunter"`) normalised in `guildsofwow.js`. Raider.IO uses the `title` attribute on class icon spans (e.g. `"Death Knight"`) normalised by `normalizeRioClass()` in `raiderio.js`.
+WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img` alt text (e.g. `"Demon Hunter"`) and Raider.IO uses the `title` attribute on class icon spans (e.g. `"Death Knight"`). All sites normalise via the shared `normalizeClassName()` in `common.js`.
 
 ## Known Quirks & Non-Obvious Behaviors
 
@@ -192,7 +196,7 @@ RaidScout/
     │   ├── options.css        # Dark theme, WoW class colours, per-site accents
     │   └── options.js         # Load/save logic, tab navigation, disabled-state wiring
     └── content/
-        ├── common.js          # Shared sendMessageToBackground() utility
+        ├── common.js          # Shared utilities: messaging, class normalisation, constants
         ├── warcraftlogs.js    # Parse threshold monitoring + tab auto-close
         ├── wowprogress.js     # Player table filtering (region/ilvl/class/guild)
         ├── raiderio.js        # WarcraftLogs redirect, search sorting, ad hiding

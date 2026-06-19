@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
         warcraftlogsEnabled: true,
         parseThreshold: 50,
         bestParseThreshold: 60,
+        wclSearchParseThreshold: 0,
         wclSelectedRegions: [],
         wclMinMythicKills: 0,
         wclSelectedClasses: [],
@@ -55,6 +56,8 @@ document.addEventListener("DOMContentLoaded", function () {
         document.getElementById("warcraftlogsEnabled").checked = data.warcraftlogsEnabled ?? defaultSettings.warcraftlogsEnabled;
         document.getElementById("parseThreshold").value = data.parseThreshold ?? defaultSettings.parseThreshold;
         document.getElementById("bestParseThreshold").value = data.bestParseThreshold ?? defaultSettings.bestParseThreshold;
+
+        document.getElementById("wclSearchParseThreshold").value = data.wclSearchParseThreshold || "";
 
         const savedWclRegions = data.wclSelectedRegions ?? defaultSettings.wclSelectedRegions;
         document.querySelectorAll(".wclRegionFilter").forEach(cb => {
@@ -151,6 +154,48 @@ document.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll(".rioClassFilter").forEach(cb => cb.checked = false);
     });
 
+    document.getElementById("exportSettings").addEventListener("click", function () {
+        chrome.storage.sync.get(null, function (data) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "raidscout-settings.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    });
+
+    const importFile = document.getElementById("importFile");
+    document.getElementById("importSettings").addEventListener("click", function () {
+        importFile.click();
+    });
+
+    importFile.addEventListener("change", function () {
+        const file = this.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                chrome.storage.sync.set(data, function () {
+                    const status = document.getElementById("statusMessage");
+                    status.textContent = "✓ Settings imported";
+                    setTimeout(() => status.textContent = "", 2000);
+                    chrome.storage.sync.get(Object.keys(defaultSettings), function (d) {
+                        location.reload();
+                    });
+                });
+            } catch {
+                const status = document.getElementById("statusMessage");
+                status.textContent = "✗ Invalid settings file";
+                setTimeout(() => status.textContent = "", 3000);
+            }
+        };
+        reader.readAsText(file);
+        this.value = "";
+    });
+
     document.getElementById("saveButton").addEventListener("click", function () {
         const wclSelectedRegions = Array.from(document.querySelectorAll(".wclRegionFilter:checked")).map(cb => cb.value);
         const wclSelectedClasses = Array.from(document.querySelectorAll(".wclClassFilter:checked")).map(cb => cb.value);
@@ -166,6 +211,7 @@ document.addEventListener("DOMContentLoaded", function () {
             warcraftlogsEnabled: document.getElementById("warcraftlogsEnabled").checked,
             parseThreshold: parseInt(document.getElementById("parseThreshold").value) || defaultSettings.parseThreshold,
             bestParseThreshold: parseInt(document.getElementById("bestParseThreshold").value) || defaultSettings.bestParseThreshold,
+            wclSearchParseThreshold: parseInt(document.getElementById("wclSearchParseThreshold").value) || 0,
             wclSelectedRegions,
             wclMinMythicKills: parseInt(document.getElementById("wclMinMythicKills").value) || 0,
             wclSelectedClasses,

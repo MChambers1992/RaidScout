@@ -18,7 +18,10 @@
   ],
   "host_permissions": [
     "https://www.wowprogress.com/*",
-    "https://www.warcraftlogs.com/*"
+    "https://www.warcraftlogs.com/*",
+    "https://raider.io/*",
+    "https://guildsofwow.com/*",
+    "https://www.guildsofwow.com/*"
   ],
   "background": {
     "service_worker": "src/background.js"

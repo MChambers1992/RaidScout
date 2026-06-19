@@ -1,11 +1,3 @@
-// WoWProgress adds the WoW class as a CSS class on the .character element alongside "character".
-// If the selectors ever change, update this list and getPlayerClass() below.
-const WOW_CLASS_NAMES = [
-    'warrior', 'paladin', 'hunter', 'rogue', 'priest',
-    'shaman', 'mage', 'warlock', 'monk', 'druid',
-    'deathknight', 'demon_hunter', 'evoker'
-];
-
 function getPlayerClass(playerRow) {
     const characterEl = playerRow.querySelector(".character");
     if (!characterEl) return null;
@@ -38,10 +30,7 @@ function filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guild
         const classMatch = selectedClasses.length === 0 || playerClass === null || selectedClasses.includes(playerClass);
         const guildMatch = guildFilter === "any" || (guildFilter === "in" && inGuild) || (guildFilter === "out" && !inGuild);
 
-        if (regionMatch && ilvlMatch && classMatch && guildMatch) {
-            console.log(`✔ ${characterName} (${playerClass ?? "unknown"}, ilvl ${playerIlvl}, ${inGuild ? "guilded" : "unguilded"})`);
-        } else {
-            console.log(`❌ ${characterName} (${playerClass ?? "unknown"}, ilvl ${playerIlvl}, ${inGuild ? "guilded" : "unguilded"})`);
+        if (!(regionMatch && ilvlMatch && classMatch && guildMatch)) {
             playerRow.remove();
         }
     }

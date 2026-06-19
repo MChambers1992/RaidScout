@@ -1,16 +1,6 @@
-// Guilds of WoW uses "Death Knight" / "Demon Hunter" in img alt text;
-// normalise to match our storage format (deathknight / demon_hunter).
-function normalizeGowClass(altText) {
-    if (!altText) return null;
-    const lower = altText.toLowerCase();
-    if (lower === 'death knight') return 'deathknight';
-    if (lower === 'demon hunter') return 'demon_hunter';
-    return lower;
-}
-
 function getCardClass(card) {
     const classIcon = card.querySelector('img[src*="class-icons"]');
-    return normalizeGowClass(classIcon?.alt ?? null);
+    return normalizeClassName(classIcon?.alt ?? null);
 }
 
 function getCardRole(card) {
