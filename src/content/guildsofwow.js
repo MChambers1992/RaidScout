@@ -170,11 +170,7 @@ function applyWclScoring(wclSettings) {
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const GOW_WCL_KEYS = [
-    'gowWclEnabled', 'gowWclMinBest', 'gowWclMinMedian', 'gowWclHideUnknown',
-    'gowWclMinBestHealer', 'gowWclMinMedianHealer', 'gowWclMinBestTank', 'gowWclMinMedianTank',
-    'wclConcurrency',
-];
+const GOW_WCL_KEYS = ['gowWclEnabled', ...SHARED_WCL_KEYS];
 
 watchSettings(GOW_WCL_KEYS, (changes) => {
     const allCards = Array.from(document.querySelectorAll('#recruits-list .card'));
@@ -188,9 +184,7 @@ watchSettings(GOW_WCL_KEYS, (changes) => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get(
         ['gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedClasses', 'gowSelectedRoles',
-         'gowWclEnabled', 'gowWclMinBest', 'gowWclMinMedian', 'gowWclHideUnknown',
-         'gowWclMinBestHealer', 'gowWclMinMedianHealer', 'gowWclMinBestTank', 'gowWclMinMedianTank',
-         'wclConcurrency'],
+         'gowWclEnabled', ...SHARED_WCL_KEYS],
         function(options) {
             filterCards(
                 parseFloat(options.gowMinIlvl)          || 0,
@@ -200,16 +194,7 @@ function loadSettingsAndFilter() {
                 options.gowSelectedRoles   || []
             );
             if (options.gowWclEnabled) {
-                applyWclScoring({
-                    minBest:         parseInt(options.gowWclMinBest)         || 0,
-                    minMedian:       parseInt(options.gowWclMinMedian)       || 0,
-                    minBestHealer:   parseInt(options.gowWclMinBestHealer)   || 0,
-                    minMedianHealer: parseInt(options.gowWclMinMedianHealer) || 0,
-                    minBestTank:     parseInt(options.gowWclMinBestTank)     || 0,
-                    minMedianTank:   parseInt(options.gowWclMinMedianTank)   || 0,
-                    hideUnknown:     !!options.gowWclHideUnknown,
-                    concurrency:     getConcurrency(options),
-                });
+                applyWclScoring(buildWclSettings(options));
             }
         }
     );

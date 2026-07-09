@@ -136,8 +136,13 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | Key | Type | Default | Purpose |
 |-----|------|---------|---------|
 | `warcraftlogsEnabled` | boolean | `true` | Enable/disable all WarcraftLogs features |
-| `parseThreshold` | number | `50` | Min median DPS parse % — tab auto-closes if below |
-| `bestParseThreshold` | number | `60` | Min best single DPS parse % — tab auto-closes if below |
+| `parseThreshold` | number | `50` | **Shared** min median DPS parse % — drives tab auto-close AND proactive scoring (DPS/Tank) on all sites |
+| `bestParseThreshold` | number | `60` | **Shared** min best single DPS parse % — drives tab auto-close AND proactive scoring (DPS/Tank) on all sites |
+| `wclMinBestHealer` | number | `0` | **Shared** min best HPS parse % for healers (proactive scoring; 0 = no minimum) |
+| `wclMinMedianHealer` | number | `0` | **Shared** min median HPS parse % for healers (proactive scoring; 0 = no minimum) |
+| `wclMinBestTank` | number | `0` | **Shared** min best DPS parse % for tanks — falls back to `bestParseThreshold` when 0 |
+| `wclMinMedianTank` | number | `0` | **Shared** min median DPS parse % for tanks — falls back to `parseThreshold` when 0 |
+| `wclHideUnknown` | boolean | `false` | **Shared** also hide characters WCL has no parse data for (proactive scoring) |
 | `wclSearchParseThreshold` | number | `0` | Min parse % for recruitment search results (0 = no minimum) |
 | `wclSelectedRegions` | string[] | `[]` | Filter recruitment search by region — empty shows all |
 | `wclMinMythicKills` | number | `0` | Min mythic kills for recruitment search (0 = no minimum) |
@@ -158,10 +163,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `maxIlvl` | number | `0` | Maximum item level (float; 0 = no maximum) |
 | `guildFilter` | string | `"any"` | Guild status: `"any"` / `"in"` / `"out"` |
 | `selectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
-| `wpWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the WoWProgress player table |
-| `wpWclMinBest` | number | `0` | Min best DPS parse % — rows below are removed (0 = no minimum) |
-| `wpWclMinMedian` | number | `0` | Min median DPS parse % — rows below are removed (0 = no minimum) |
-| `wpWclHideUnknown` | boolean | `false` | Also remove characters WCL has no parse data for |
+| `wpWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the WoWProgress player table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
 
 > **Migration note:** The old `region` (string) key is still read as a fallback when `selectedRegions` is absent.
 
@@ -176,10 +178,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `rioSelectedRegions` | string[] | `[]` | Filter search rows by region (`"EU"` / `"US"` / `"OC"` / `"KR"` / `"TW"`) — empty shows all |
 | `rioSelectedRoles` | string[] | `[]` | Filter search rows by main role (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `rioSelectedClasses` | string[] | `[]` | Filter search rows by class — empty shows all (Full Settings only; not in popup) |
-| `rioWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the Raider.IO search table |
-| `rioWclMinBest` | number | `0` | Min best DPS parse % — rows below are hidden (0 = no minimum) |
-| `rioWclMinMedian` | number | `0` | Min median DPS parse % — rows below are hidden (0 = no minimum) |
-| `rioWclHideUnknown` | boolean | `false` | Also hide characters WCL has no parse data for |
+| `rioWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the Raider.IO search table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
 
 ### Guilds of WoW
 
@@ -191,10 +190,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `gowMinMythicPlusScore` | number | `0` | Minimum M+ score (0 = no minimum) |
 | `gowSelectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `gowSelectedRoles` | string[] | `[]` | Allowed roles (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
-| `gowWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the recruits list |
-| `gowWclMinBest` | number | `0` | Min best DPS parse % — cards below are hidden (0 = no minimum) |
-| `gowWclMinMedian` | number | `0` | Min median DPS parse % — cards below are hidden (0 = no minimum) |
-| `gowWclHideUnknown` | boolean | `false` | Also hide characters WCL has no parse data for |
+| `gowWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the recruits list (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
 
 ### WoW class name format
 

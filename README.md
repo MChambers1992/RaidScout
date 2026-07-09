@@ -124,17 +124,17 @@ This feature uses the official WarcraftLogs v2 API. The API is free; you just ne
 
 The Client ID syncs across your Chrome devices. The Client Secret is stored locally only and is never synced.
 
-### Step 3 — Enable proactive filtering per site
+### Step 3 — Set your thresholds once, then enable per site
 
-In Full Settings, open each site's tab (WoWProgress, Raider.IO, Guilds of WoW) and:
+Parse thresholds are configured a single time in the **WarcraftLogs** tab and apply everywhere. In Full Settings:
 
-1. Toggle on **Enable proactive WCL filtering**
-2. Set **Min. Best Parse %** and/or **Min. Median Parse %** for DPS characters
-3. Optionally set separate thresholds for healers and tanks (see [Per-role parse thresholds](#per-role-parse-thresholds))
-4. Decide whether to **Hide characters with no logs** (off by default — unlogged characters stay visible)
+1. On the **WarcraftLogs** tab, under **Proactive Score Filter**, set **Min. Best Parse %** and/or **Min. Median Parse %** for DPS characters
+2. Optionally set separate thresholds for healers and tanks (see [Per-role parse thresholds](#per-role-parse-thresholds))
+3. Decide whether to **Hide characters with no logs** (off by default — unlogged characters stay visible)
+4. On each site's tab (WoWProgress, Raider.IO, Guilds of WoW), toggle on **Enable proactive WCL filtering**
 5. Click **Save**
 
-Thresholds take effect immediately on any open list pages, no refresh needed.
+The same DPS thresholds also drive the WarcraftLogs tab auto-close. Thresholds take effect immediately on any open list pages, no refresh needed.
 
 ### How it behaves
 
@@ -172,8 +172,13 @@ Role is detected automatically from each candidate row. On Raider.IO it reads th
 | Setting | Default | Description |
 |---|---|---|
 | Enabled | On | Enable/disable all WarcraftLogs features |
-| Median Parse Threshold | 50 | Reactive: close tab if median DPS parse is below this |
-| Best Parse Threshold | 60 | Reactive: close tab if best single DPS parse is below this |
+| Min. Best Parse % (DPS/Tank) | 60 | **Shared** — closes an auto-opened WCL tab and hides list candidates below this best DPS parse, on every site |
+| Min. Median Parse % (DPS/Tank) | 50 | **Shared** — closes an auto-opened WCL tab and hides list candidates below this median DPS parse, on every site |
+| Min. Best HPS % (Healer) | — | **Shared** — minimum best HPS parse for healers (proactive scoring) |
+| Min. Median HPS % (Healer) | — | **Shared** — minimum median HPS parse for healers (proactive scoring) |
+| Min. Best % (Tank override) | — | **Shared** — overrides the DPS best threshold for tanks only |
+| Min. Median % (Tank override) | — | **Shared** — overrides the DPS median threshold for tanks only |
+| Hide characters with no logs | Off | **Shared** — also hide characters WarcraftLogs has no parse data for |
 | Recruitment search parse filter | — | Minimum parse % on the WarcraftLogs recruitment search page |
 | Min mythic kills (WCL search) | — | Minimum current-tier mythic kill count on the WCL recruitment search page |
 | Client ID | — | WarcraftLogs v2 API client ID (synced across devices) |
@@ -193,14 +198,7 @@ Role is detected automatically from each candidate row. On Raider.IO it reads th
 | Max Item Level | — | Hide players above this item level |
 | Guild Status | Any | Filter by in a guild / not in a guild / any |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold players |
-| Min Best % (DPS/Tank) | — | Minimum best DPS parse for DPS and tank characters |
-| Min Median % (DPS/Tank) | — | Minimum median DPS parse for DPS and tank characters |
-| Min Best HPS % (Healer) | — | Minimum best HPS parse for healer characters |
-| Min Median HPS % (Healer) | — | Minimum median HPS parse for healer characters |
-| Min Best % (Tank override) | — | Overrides DPS threshold for tanks only |
-| Min Median % (Tank override) | — | Overrides DPS threshold for tanks only |
-| Hide characters with no logs | Off | Also hide characters WarcraftLogs has no data for |
+| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold players. Thresholds are set once in the **WarcraftLogs** tab |
 
 ### Raider.IO tab
 
@@ -213,14 +211,7 @@ Role is detected automatically from each candidate row. On Raider.IO it reads th
 | Region Filter | All | Show only selected regions (uncheck all for any) |
 | Role Filter | All | Show only Tank / Healer / DPS rows (uncheck all for any) |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold rows |
-| Min Best % (DPS/Tank) | — | Minimum best DPS parse for DPS and tank characters |
-| Min Median % (DPS/Tank) | — | Minimum median DPS parse for DPS and tank characters |
-| Min Best HPS % (Healer) | — | Minimum best HPS parse for healer characters |
-| Min Median HPS % (Healer) | — | Minimum median HPS parse for healer characters |
-| Min Best % (Tank override) | — | Overrides DPS threshold for tanks only |
-| Min Median % (Tank override) | — | Overrides DPS threshold for tanks only |
-| Hide characters with no logs | Off | Also hide characters WarcraftLogs has no data for |
+| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold rows. Thresholds are set once in the **WarcraftLogs** tab |
 
 ### Guilds of WoW tab
 
@@ -232,14 +223,7 @@ Role is detected automatically from each candidate row. On Raider.IO it reads th
 | Min M+ Score | — | Hide recruits below this M+ score |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
 | Role Filter | All | Show only Tank / Healer / DPS cards (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold cards |
-| Min Best % (DPS/Tank) | — | Minimum best DPS parse for DPS and tank characters |
-| Min Median % (DPS/Tank) | — | Minimum median DPS parse for DPS and tank characters |
-| Min Best HPS % (Healer) | — | Minimum best HPS parse for healer characters |
-| Min Median HPS % (Healer) | — | Minimum median HPS parse for healer characters |
-| Min Best % (Tank override) | — | Overrides DPS threshold for tanks only |
-| Min Median % (Tank override) | — | Overrides DPS threshold for tanks only |
-| Hide characters with no logs | Off | Also hide characters WarcraftLogs has no data for |
+| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold cards. Thresholds are set once in the **WarcraftLogs** tab |
 
 All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs Client Secret and score cache (which are machine-local).
 

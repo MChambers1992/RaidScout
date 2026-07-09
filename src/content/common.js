@@ -108,6 +108,34 @@ function getConcurrency(options) {
     return (isNaN(n) || n < 1 || n > 8) ? 4 : n;
 }
 
+// ─── Shared proactive-scoring thresholds ───────────────────────────────────────
+// Parse thresholds are configured ONCE in the WarcraftLogs section and drive
+// proactive scoring on every site; each site only toggles the feature on/off.
+// The DPS Best/Median values are the same `bestParseThreshold`/`parseThreshold`
+// used by the WarcraftLogs tab auto-close, so there is a single source of truth.
+const SHARED_WCL_KEYS = [
+    'bestParseThreshold', 'parseThreshold',
+    'wclMinBestHealer', 'wclMinMedianHealer',
+    'wclMinBestTank', 'wclMinMedianTank',
+    'wclHideUnknown', 'wclConcurrency',
+];
+
+// Build the role-aware settings object consumed by thresholdsForRole /
+// failsWclThresholds from a storage snapshot. The per-site enable flag is
+// handled by each caller; this only carries the shared thresholds.
+function buildWclSettings(options) {
+    return {
+        minBest:         parseInt(options.bestParseThreshold) || 0,
+        minMedian:       parseInt(options.parseThreshold)     || 0,
+        minBestHealer:   parseInt(options.wclMinBestHealer)   || 0,
+        minMedianHealer: parseInt(options.wclMinMedianHealer) || 0,
+        minBestTank:     parseInt(options.wclMinBestTank)     || 0,
+        minMedianTank:   parseInt(options.wclMinMedianTank)   || 0,
+        hideUnknown:     !!options.wclHideUnknown,
+        concurrency:     getConcurrency(options),
+    };
+}
+
 // ─── Inline parse badge ────────────────────────────────────────────────────────
 // Rendered on each scored row/card so users see the number, not just a binary hide.
 // State: 'pending' | 'no-logs' | 'error' | 'rate-limited' | { best, median }
