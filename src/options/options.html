@@ -66,15 +66,44 @@
                 <input type="number" id="wclConcurrency" min="1" max="8" step="1" placeholder="4">
                 <p class="hint">How many WarcraftLogs API requests to run in parallel when scoring a list page. Lower = less API pressure, higher = faster results. Default 4.</p>
             </div>
+            <p class="subsection-label">Proactive Score Filter (all sites)</p>
+            <p class="hint">Set your parse thresholds once here. They drive proactive WCL filtering on WoWProgress, Raider.IO and Guilds of WoW — switch it on per-site in each section. The DPS values also auto-close a WarcraftLogs character tab opened from those sites when the parse is below threshold.</p>
+            <p class="subsection-label" style="font-size:10px;margin-top:12px;">DPS &amp; Tank thresholds</p>
             <div class="option">
-                <label for="parseThreshold">Median Parse Threshold</label>
-                <input type="number" id="parseThreshold" min="0" max="100" step="1">
-                <p class="hint">Median DPS parse % across all fights — tab closes if below this</p>
+                <label for="bestParseThreshold">Min. Best Parse %</label>
+                <input type="number" id="bestParseThreshold" min="0" max="100" step="1" placeholder="e.g. 60">
+                <p class="hint">Highest single DPS parse on any fight</p>
             </div>
             <div class="option">
-                <label for="bestParseThreshold">Best Parse Threshold</label>
-                <input type="number" id="bestParseThreshold" min="0" max="100" step="1">
-                <p class="hint">Highest single DPS parse on any fight — tab closes if below this</p>
+                <label for="parseThreshold">Min. Median Parse %</label>
+                <input type="number" id="parseThreshold" min="0" max="100" step="1" placeholder="e.g. 50">
+                <p class="hint">Median DPS parse % across all fights</p>
+            </div>
+            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Healer thresholds (HPS metric)</p>
+            <div class="option">
+                <label for="wclMinBestHealer">Min. Best HPS Parse %</label>
+                <input type="number" id="wclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60">
+            </div>
+            <div class="option">
+                <label for="wclMinMedianHealer">Min. Median HPS Parse %</label>
+                <input type="number" id="wclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50">
+            </div>
+            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Tank-specific thresholds (optional override)</p>
+            <div class="option">
+                <label for="wclMinBestTank">Min. Best DPS Parse % (Tank)</label>
+                <input type="number" id="wclMinBestTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
+            </div>
+            <div class="option">
+                <label for="wclMinMedianTank">Min. Median DPS Parse % (Tank)</label>
+                <input type="number" id="wclMinMedianTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
+            </div>
+            <div class="option toggle-inline">
+                <label for="wclHideUnknown">Hide characters with no logs</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="wclHideUnknown">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">When on, characters WarcraftLogs has no parse data for are hidden on list pages too.</p>
             </div>
             <p class="subsection-label">Recruitment Search</p>
             <div class="option">
@@ -193,42 +222,7 @@
                     <input type="checkbox" id="wpWclEnabled">
                     <span class="toggle-slider"></span>
                 </label>
-                <p class="hint">Looks up each listed character's parse via the WarcraftLogs API and hides those below your thresholds. DPS/Tank use DPS metric; Healers use HPS. Requires API credentials above.</p>
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">DPS &amp; Tank thresholds</p>
-            <div class="option">
-                <label for="wpWclMinBest">Min. Best Parse %</label>
-                <input type="number" id="wpWclMinBest" min="0" max="100" step="1" placeholder="e.g. 60">
-            </div>
-            <div class="option">
-                <label for="wpWclMinMedian">Min. Median Parse %</label>
-                <input type="number" id="wpWclMinMedian" min="0" max="100" step="1" placeholder="e.g. 50">
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Healer thresholds (HPS metric)</p>
-            <div class="option">
-                <label for="wpWclMinBestHealer">Min. Best HPS Parse %</label>
-                <input type="number" id="wpWclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60">
-            </div>
-            <div class="option">
-                <label for="wpWclMinMedianHealer">Min. Median HPS Parse %</label>
-                <input type="number" id="wpWclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50">
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Tank-specific thresholds (optional override)</p>
-            <div class="option">
-                <label for="wpWclMinBestTank">Min. Best DPS Parse % (Tank)</label>
-                <input type="number" id="wpWclMinBestTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option">
-                <label for="wpWclMinMedianTank">Min. Median DPS Parse % (Tank)</label>
-                <input type="number" id="wpWclMinMedianTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option toggle-inline">
-                <label for="wpWclHideUnknown">Hide characters with no logs</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wpWclHideUnknown">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">When on, characters WarcraftLogs has no parse data for are hidden too.</p>
+                <p class="hint">Looks up each listed character's parse via the WarcraftLogs API and hides those below your thresholds. Parse thresholds (DPS, Healer HPS, Tank) are configured once in the <strong>WarcraftLogs</strong> section and require API credentials there.</p>
             </div>
         </div>
 
@@ -307,42 +301,7 @@
                     <input type="checkbox" id="rioWclEnabled">
                     <span class="toggle-slider"></span>
                 </label>
-                <p class="hint">Looks up each search row's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the search row — healers use HPS metric automatically.</p>
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">DPS &amp; Tank thresholds</p>
-            <div class="option">
-                <label for="rioWclMinBest">Min. Best Parse %</label>
-                <input type="number" id="rioWclMinBest" min="0" max="100" step="1" placeholder="e.g. 60">
-            </div>
-            <div class="option">
-                <label for="rioWclMinMedian">Min. Median Parse %</label>
-                <input type="number" id="rioWclMinMedian" min="0" max="100" step="1" placeholder="e.g. 50">
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Healer thresholds (HPS metric)</p>
-            <div class="option">
-                <label for="rioWclMinBestHealer">Min. Best HPS Parse %</label>
-                <input type="number" id="rioWclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60">
-            </div>
-            <div class="option">
-                <label for="rioWclMinMedianHealer">Min. Median HPS Parse %</label>
-                <input type="number" id="rioWclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50">
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Tank-specific thresholds (optional override)</p>
-            <div class="option">
-                <label for="rioWclMinBestTank">Min. Best DPS Parse % (Tank)</label>
-                <input type="number" id="rioWclMinBestTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option">
-                <label for="rioWclMinMedianTank">Min. Median DPS Parse % (Tank)</label>
-                <input type="number" id="rioWclMinMedianTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option toggle-inline">
-                <label for="rioWclHideUnknown">Hide characters with no logs</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="rioWclHideUnknown">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">When on, characters WarcraftLogs has no parse data for are hidden too.</p>
+                <p class="hint">Looks up each search row's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the search row — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
             </div>
         </div>
 
@@ -408,42 +367,7 @@
                     <input type="checkbox" id="gowWclEnabled">
                     <span class="toggle-slider"></span>
                 </label>
-                <p class="hint">Looks up each recruit's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the recruit card — healers use HPS metric automatically.</p>
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">DPS &amp; Tank thresholds</p>
-            <div class="option">
-                <label for="gowWclMinBest">Min. Best Parse %</label>
-                <input type="number" id="gowWclMinBest" min="0" max="100" step="1" placeholder="e.g. 60">
-            </div>
-            <div class="option">
-                <label for="gowWclMinMedian">Min. Median Parse %</label>
-                <input type="number" id="gowWclMinMedian" min="0" max="100" step="1" placeholder="e.g. 50">
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Healer thresholds (HPS metric)</p>
-            <div class="option">
-                <label for="gowWclMinBestHealer">Min. Best HPS Parse %</label>
-                <input type="number" id="gowWclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60">
-            </div>
-            <div class="option">
-                <label for="gowWclMinMedianHealer">Min. Median HPS Parse %</label>
-                <input type="number" id="gowWclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50">
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Tank-specific thresholds (optional override)</p>
-            <div class="option">
-                <label for="gowWclMinBestTank">Min. Best DPS Parse % (Tank)</label>
-                <input type="number" id="gowWclMinBestTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option">
-                <label for="gowWclMinMedianTank">Min. Median DPS Parse % (Tank)</label>
-                <input type="number" id="gowWclMinMedianTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option toggle-inline">
-                <label for="gowWclHideUnknown">Hide characters with no logs</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gowWclHideUnknown">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">When on, characters WarcraftLogs has no parse data for are hidden too.</p>
+                <p class="hint">Looks up each recruit's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the recruit card — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
             </div>
         </div>
 

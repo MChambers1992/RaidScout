@@ -183,8 +183,7 @@ function applyWclScoring() {
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const RIO_WCL_KEYS = ['rioWclEnabled', 'rioWclMinBest', 'rioWclMinMedian', 'rioWclHideUnknown',
-    'rioWclMinBestHealer', 'rioWclMinMedianHealer', 'rioWclMinBestTank', 'rioWclMinMedianTank', 'wclConcurrency'];
+const RIO_WCL_KEYS = ['rioWclEnabled', ...SHARED_WCL_KEYS];
 
 watchSettings(RIO_WCL_KEYS, () => {
     const allGroups = Array.from(document.querySelectorAll('.rt-tr-group'));
@@ -193,17 +192,7 @@ watchSettings(RIO_WCL_KEYS, () => {
 
     // Re-read all WCL settings from storage so no key is missed
     chrome.storage.sync.get(RIO_WCL_KEYS, (options) => {
-        wclSettings = {
-            enabled:         !!options.rioWclEnabled,
-            minBest:         parseInt(options.rioWclMinBest)          || 0,
-            minMedian:       parseInt(options.rioWclMinMedian)        || 0,
-            minBestHealer:   parseInt(options.rioWclMinBestHealer)    || 0,
-            minMedianHealer: parseInt(options.rioWclMinMedianHealer)  || 0,
-            minBestTank:     parseInt(options.rioWclMinBestTank)      || 0,
-            minMedianTank:   parseInt(options.rioWclMinMedianTank)    || 0,
-            hideUnknown:     !!options.rioWclHideUnknown,
-            concurrency:     getConcurrency(options),
-        };
+        wclSettings = { enabled: !!options.rioWclEnabled, ...buildWclSettings(options) };
         filterSearchRows();
     });
 });
@@ -226,9 +215,7 @@ function observePageChanges(wclEnabled) {
 chrome.storage.sync.get([
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedClasses', 'rioSelectedRoles', 'rioSelectedRegions',
-    'rioWclEnabled', 'rioWclMinBest', 'rioWclMinMedian', 'rioWclHideUnknown',
-    'rioWclMinBestHealer', 'rioWclMinMedianHealer', 'rioWclMinBestTank', 'rioWclMinMedianTank',
-    'wclConcurrency',
+    'rioWclEnabled', ...SHARED_WCL_KEYS,
 ], function(options) {
     if (options.raiderioEnabled === false) return;
 
@@ -239,17 +226,7 @@ chrome.storage.sync.get([
         selectedRoles:   options.rioSelectedRoles    || [],
         selectedRegions: options.rioSelectedRegions  || [],
     };
-    wclSettings = {
-        enabled:          !!options.rioWclEnabled,
-        minBest:          parseInt(options.rioWclMinBest)          || 0,
-        minMedian:        parseInt(options.rioWclMinMedian)        || 0,
-        minBestHealer:    parseInt(options.rioWclMinBestHealer)    || 0,
-        minMedianHealer:  parseInt(options.rioWclMinMedianHealer)  || 0,
-        minBestTank:      parseInt(options.rioWclMinBestTank)      || 0,
-        minMedianTank:    parseInt(options.rioWclMinMedianTank)    || 0,
-        hideUnknown:      !!options.rioWclHideUnknown,
-        concurrency:      getConcurrency(options),
-    };
+    wclSettings = { enabled: !!options.rioWclEnabled, ...buildWclSettings(options) };
 
     enforceSortingAndPublishedColumn();
     observePageChanges(wclEnabled);
