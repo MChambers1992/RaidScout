@@ -37,7 +37,12 @@ jobs:
             --exclude "*.git*" \
             --exclude ".claude/*" \
             --exclude ".github/*" \
-            --exclude "CLAUDE.md"
+            --exclude "CLAUDE.md" \
+            --exclude "TODO.md" \
+            --exclude "CHANGELOG.md" \
+            --exclude "tests/*" \
+            --exclude "node_modules/*" \
+            --exclude "package*.json"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -1,0 +1,25 @@
+{
+  "name": "work_raidscout",
+  "version": "1.0.0",
+  "description": "A Chrome extension that streamlines World of Warcraft guild recruitment by extending functionality across WarcraftLogs, WoWProgress, Raider.IO, and Guilds of WoW.",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MChambers1992/RaidScout.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MChambers1992/RaidScout/issues"
+  },
+  "homepage": "https://github.com/MChambers1992/RaidScout#readme",
+  "devDependencies": {
+    "vitest": "^4.1.9"
+  },
+  "type": "module"
+}

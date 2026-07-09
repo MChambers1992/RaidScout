@@ -1,247 +1,158 @@
-document.addEventListener("DOMContentLoaded", function () {
-    // Tab navigation
-    const tabBtns = document.querySelectorAll(".tab-btn");
-    const categories = document.querySelectorAll(".category-content");
+// options.js — Full Settings page
+// Uses settings-schema.js (injected before this file) for load/save.
 
-    function showCategory(category) {
-        categories.forEach(cat => cat.style.display = "none");
-        document.getElementById(category).style.display = "block";
-        tabBtns.forEach(btn => btn.classList.toggle("active", btn.dataset.tab === category));
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ── Tab navigation ────────────────────────────────────────────────────────
+    const tabBtns    = document.querySelectorAll('.tab-btn');
+    const categories = document.querySelectorAll('.category-content');
+
+    function showCategory(cat) {
+        categories.forEach(c => c.style.display = 'none');
+        document.getElementById(cat).style.display = 'block';
+        tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === cat));
     }
 
-    const savedCategory = localStorage.getItem("selectedCategory") || "warcraftlogs";
+    const savedCategory = localStorage.getItem('selectedCategory') || 'warcraftlogs';
     showCategory(savedCategory);
+    tabBtns.forEach(btn => btn.addEventListener('click', function () {
+        localStorage.setItem('selectedCategory', this.dataset.tab);
+        showCategory(this.dataset.tab);
+    }));
 
-    tabBtns.forEach(btn => {
-        btn.addEventListener("click", function () {
-            localStorage.setItem("selectedCategory", this.dataset.tab);
-            showCategory(this.dataset.tab);
+    // ── Load settings ─────────────────────────────────────────────────────────
+    chrome.storage.sync.get(ALL_KEYS, function (data) {
+        loadFromData(data);
+
+        // Secret is local-only — read separately
+        chrome.storage.local.get('wclClientSecret', function (local) {
+            document.getElementById('wclClientSecret').value = local.wclClientSecret || '';
+        });
+        // Debug flag is also local
+        chrome.storage.local.get('wclDebug', function (local) {
+            document.getElementById('wclDebug').checked = !!local.wclDebug;
+        });
+
+        // Rate-limit status
+        chrome.runtime.sendMessage({ action: 'getRateLimitStatus' }, function (status) {
+            if (status?.limited) {
+                const secs = Math.ceil(status.remainingMs / 1000);
+                document.getElementById('wclRateLimitStatus').textContent =
+                    `⚠ Rate limited — retry in ${secs}s`;
+            }
         });
     });
 
-    const defaultSettings = {
-        warcraftlogsEnabled: true,
-        parseThreshold: 50,
-        bestParseThreshold: 60,
-        wclSearchParseThreshold: 0,
-        wclSelectedRegions: [],
-        wclMinMythicKills: 0,
-        wclSelectedClasses: [],
-
-        wowprogressEnabled: true,
-        openWarcraftLogsTab: true,
-        selectedRegions: ["EU"],
-        minIlvl: 0,
-        maxIlvl: 0,
-        guildFilter: "any",
-        selectedClasses: [],
-
-        raiderioEnabled: true,
-        openWarcraftLogsFromRaiderIO: true,
-        hideRaiderIoAds: true,
-        rioMinIlvl: 0,
-        rioSelectedRegions: [],
-        rioSelectedRoles: [],
-        rioSelectedClasses: [],
-
-        guildsofwowEnabled: true,
-        gowMinIlvl: 0,
-        gowMinMythicKills: 0,
-        gowMinMythicPlusScore: 0,
-        gowSelectedClasses: [],
-        gowSelectedRoles: [],
+    // ── Checkbox group clear buttons ──────────────────────────────────────────
+    const clearMap = {
+        clearWclClasses:  '.wclClassFilter',
+        clearClasses:     '.classFilter',
+        clearGowClasses:  '.gowClassFilter',
+        clearRioClasses:  '.rioClassFilter',
     };
+    for (const [id, sel] of Object.entries(clearMap)) {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', () =>
+            document.querySelectorAll(sel).forEach(cb => cb.checked = false));
+    }
 
-    chrome.storage.sync.get(Object.keys(defaultSettings), function (data) {
-        document.getElementById("warcraftlogsEnabled").checked = data.warcraftlogsEnabled ?? defaultSettings.warcraftlogsEnabled;
-        document.getElementById("parseThreshold").value = data.parseThreshold ?? defaultSettings.parseThreshold;
-        document.getElementById("bestParseThreshold").value = data.bestParseThreshold ?? defaultSettings.bestParseThreshold;
-
-        document.getElementById("wclSearchParseThreshold").value = data.wclSearchParseThreshold || "";
-
-        const savedWclRegions = data.wclSelectedRegions ?? defaultSettings.wclSelectedRegions;
-        document.querySelectorAll(".wclRegionFilter").forEach(cb => {
-            cb.checked = savedWclRegions.includes(cb.value);
-        });
-
-        document.getElementById("wclMinMythicKills").value = data.wclMinMythicKills || "";
-
-        const savedWclClasses = data.wclSelectedClasses ?? defaultSettings.wclSelectedClasses;
-        document.querySelectorAll(".wclClassFilter").forEach(cb => {
-            cb.checked = savedWclClasses.includes(cb.value);
-        });
-
-        document.getElementById("wowprogressEnabled").checked = data.wowprogressEnabled ?? defaultSettings.wowprogressEnabled;
-        document.getElementById("openWarcraftLogsTab").checked = data.openWarcraftLogsTab ?? defaultSettings.openWarcraftLogsTab;
-
-        const savedRegions = data.selectedRegions ?? defaultSettings.selectedRegions;
-        document.querySelectorAll(".regionFilter").forEach(cb => {
-            cb.checked = savedRegions.includes(cb.value);
-        });
-
-        document.getElementById("minIlvl").value = data.minIlvl || "";
-        document.getElementById("maxIlvl").value = data.maxIlvl || "";
-        document.getElementById("guildFilter").value = data.guildFilter ?? defaultSettings.guildFilter;
-
-        const savedClasses = data.selectedClasses ?? defaultSettings.selectedClasses;
-        document.querySelectorAll(".classFilter").forEach(cb => {
-            cb.checked = savedClasses.includes(cb.value);
-        });
-
-        document.getElementById("raiderioEnabled").checked = data.raiderioEnabled ?? defaultSettings.raiderioEnabled;
-        document.getElementById("openWarcraftLogsFromRaiderIO").checked = data.openWarcraftLogsFromRaiderIO ?? defaultSettings.openWarcraftLogsFromRaiderIO;
-        document.getElementById("hideRaiderIoAds").checked = data.hideRaiderIoAds ?? defaultSettings.hideRaiderIoAds;
-        document.getElementById("rioMinIlvl").value = data.rioMinIlvl || "";
-
-        const savedRioRegions = data.rioSelectedRegions ?? defaultSettings.rioSelectedRegions;
-        document.querySelectorAll(".rioRegionFilter").forEach(cb => {
-            cb.checked = savedRioRegions.includes(cb.value);
-        });
-
-        const savedRioRoles = data.rioSelectedRoles ?? defaultSettings.rioSelectedRoles;
-        document.querySelectorAll(".rioRoleFilter").forEach(cb => {
-            cb.checked = savedRioRoles.includes(cb.value);
-        });
-
-        const savedRioClasses = data.rioSelectedClasses ?? defaultSettings.rioSelectedClasses;
-        document.querySelectorAll(".rioClassFilter").forEach(cb => {
-            cb.checked = savedRioClasses.includes(cb.value);
-        });
-
-        document.getElementById("guildsofwowEnabled").checked = data.guildsofwowEnabled ?? defaultSettings.guildsofwowEnabled;
-        document.getElementById("gowMinIlvl").value = data.gowMinIlvl || "";
-        document.getElementById("gowMinMythicKills").value = data.gowMinMythicKills || "";
-        document.getElementById("gowMinMythicPlusScore").value = data.gowMinMythicPlusScore || "";
-
-        const savedGowClasses = data.gowSelectedClasses ?? defaultSettings.gowSelectedClasses;
-        document.querySelectorAll(".gowClassFilter").forEach(cb => {
-            cb.checked = savedGowClasses.includes(cb.value);
-        });
-
-        const savedRoles = data.gowSelectedRoles ?? defaultSettings.gowSelectedRoles;
-        document.querySelectorAll(".roleFilter").forEach(cb => {
-            cb.checked = savedRoles.includes(cb.value);
-        });
-
-        // Apply initial disabled state now that toggles have their correct values
-        [
-            ['warcraftlogsEnabled', 'warcraftlogs'],
-            ['wowprogressEnabled',  'wowprogress'],
-            ['raiderioEnabled',     'raiderio'],
-            ['guildsofwowEnabled',  'guildsofwow'],
-        ].forEach(([toggleId, sectionId]) => {
-            const toggle  = document.getElementById(toggleId);
-            const section = document.getElementById(sectionId);
-            const sync = () => section.classList.toggle('section-disabled', !toggle.checked);
-            sync();
-            toggle.addEventListener('change', sync);
+    // ── Clear cache ───────────────────────────────────────────────────────────
+    document.getElementById('clearWclScoreCache').addEventListener('click', function () {
+        chrome.runtime.sendMessage({ action: 'clearWclScoreCache' }, function () {
+            showStatus('✓ Cached scores cleared', 2000);
         });
     });
 
-    document.getElementById("clearWclClasses").addEventListener("click", function () {
-        document.querySelectorAll(".wclClassFilter").forEach(cb => cb.checked = false);
-    });
+    // ── Test credentials ──────────────────────────────────────────────────────
+    document.getElementById('testWclCredentials').addEventListener('click', function () {
+        const btn      = this;
+        const statusEl = document.getElementById('wclTestStatus');
+        btn.disabled   = true;
+        statusEl.textContent = 'Testing…';
+        statusEl.style.color = '#aaa';
 
-    document.getElementById("clearClasses").addEventListener("click", function () {
-        document.querySelectorAll(".classFilter").forEach(cb => cb.checked = false);
-    });
-
-    document.getElementById("clearGowClasses").addEventListener("click", function () {
-        document.querySelectorAll(".gowClassFilter").forEach(cb => cb.checked = false);
-    });
-
-    document.getElementById("clearRioClasses").addEventListener("click", function () {
-        document.querySelectorAll(".rioClassFilter").forEach(cb => cb.checked = false);
-    });
-
-    document.getElementById("exportSettings").addEventListener("click", function () {
-        chrome.storage.sync.get(null, function (data) {
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "raidscout-settings.json";
-            a.click();
-            URL.revokeObjectURL(url);
+        const secret = document.getElementById('wclClientSecret').value.trim();
+        chrome.runtime.sendMessage({ action: 'storeWclSecret', secret }, function () {
+            chrome.runtime.sendMessage({ action: 'testWclCredentials' }, function (result) {
+                btn.disabled = false;
+                if (result?.ok) {
+                    statusEl.style.color = '#4caf50';
+                    statusEl.textContent = '✓ Connected successfully';
+                } else {
+                    statusEl.style.color = '#f04040';
+                    statusEl.textContent = '✗ ' + (result?.error || 'Connection failed');
+                }
+            });
         });
     });
 
-    const importFile = document.getElementById("importFile");
-    document.getElementById("importSettings").addEventListener("click", function () {
-        importFile.click();
+    // ── Export / Import ───────────────────────────────────────────────────────
+    document.getElementById('exportSettings').addEventListener('click', function () {
+        chrome.storage.sync.get(null, function (syncData) {
+            // Include local-only settings as a clearly-labelled sub-object
+            chrome.storage.local.get(['wclDebug', 'wclCacheTtlHours'], function (localData) {
+                const exportData = {
+                    _version: 2,
+                    _note: 'wclClientSecret is machine-local and is not exported.',
+                    sync: syncData,
+                    localSettings: localData,
+                };
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                a.href     = url;
+                a.download = 'raidscout-settings.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        });
     });
 
-    importFile.addEventListener("change", function () {
+    const importFile = document.getElementById('importFile');
+    document.getElementById('importSettings').addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', function () {
         const file = this.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = function (e) {
             try {
-                const data = JSON.parse(e.target.result);
-                chrome.storage.sync.set(data, function () {
-                    const status = document.getElementById("statusMessage");
-                    status.textContent = "✓ Settings imported";
-                    setTimeout(() => status.textContent = "", 2000);
-                    chrome.storage.sync.get(Object.keys(defaultSettings), function (d) {
-                        location.reload();
-                    });
+                const raw = JSON.parse(e.target.result);
+                // Support both v1 (flat) and v2 (nested) export formats
+                const syncData  = raw._version === 2 ? raw.sync        : raw;
+                const localData = raw._version === 2 ? raw.localSettings : {};
+
+                chrome.storage.sync.set(syncData, function () {
+                    if (localData && Object.keys(localData).length) {
+                        chrome.storage.local.set(localData);
+                    }
+                    showStatus('✓ Settings imported', 2000);
+                    setTimeout(() => location.reload(), 400);
                 });
             } catch {
-                const status = document.getElementById("statusMessage");
-                status.textContent = "✗ Invalid settings file";
-                setTimeout(() => status.textContent = "", 3000);
+                showStatus('✗ Invalid settings file', 3000);
             }
         };
         reader.readAsText(file);
-        this.value = "";
+        this.value = '';
     });
 
-    document.getElementById("saveButton").addEventListener("click", function () {
-        const wclSelectedRegions = Array.from(document.querySelectorAll(".wclRegionFilter:checked")).map(cb => cb.value);
-        const wclSelectedClasses = Array.from(document.querySelectorAll(".wclClassFilter:checked")).map(cb => cb.value);
-        const selectedRegions = Array.from(document.querySelectorAll(".regionFilter:checked")).map(cb => cb.value);
-        const selectedClasses = Array.from(document.querySelectorAll(".classFilter:checked")).map(cb => cb.value);
-        const gowSelectedClasses = Array.from(document.querySelectorAll(".gowClassFilter:checked")).map(cb => cb.value);
-        const gowSelectedRoles = Array.from(document.querySelectorAll(".roleFilter:checked")).map(cb => cb.value);
-        const rioSelectedRegions = Array.from(document.querySelectorAll(".rioRegionFilter:checked")).map(cb => cb.value);
-        const rioSelectedRoles = Array.from(document.querySelectorAll(".rioRoleFilter:checked")).map(cb => cb.value);
-        const rioSelectedClasses = Array.from(document.querySelectorAll(".rioClassFilter:checked")).map(cb => cb.value);
-
-        chrome.storage.sync.set({
-            warcraftlogsEnabled: document.getElementById("warcraftlogsEnabled").checked,
-            parseThreshold: parseInt(document.getElementById("parseThreshold").value) || defaultSettings.parseThreshold,
-            bestParseThreshold: parseInt(document.getElementById("bestParseThreshold").value) || defaultSettings.bestParseThreshold,
-            wclSearchParseThreshold: parseInt(document.getElementById("wclSearchParseThreshold").value) || 0,
-            wclSelectedRegions,
-            wclMinMythicKills: parseInt(document.getElementById("wclMinMythicKills").value) || 0,
-            wclSelectedClasses,
-
-            wowprogressEnabled: document.getElementById("wowprogressEnabled").checked,
-            openWarcraftLogsTab: document.getElementById("openWarcraftLogsTab").checked,
-            selectedRegions,
-            minIlvl: parseFloat(document.getElementById("minIlvl").value) || 0,
-            maxIlvl: parseFloat(document.getElementById("maxIlvl").value) || 0,
-            guildFilter: document.getElementById("guildFilter").value,
-            selectedClasses,
-
-            raiderioEnabled: document.getElementById("raiderioEnabled").checked,
-            openWarcraftLogsFromRaiderIO: document.getElementById("openWarcraftLogsFromRaiderIO").checked,
-            hideRaiderIoAds: document.getElementById("hideRaiderIoAds").checked,
-            rioMinIlvl: parseFloat(document.getElementById("rioMinIlvl").value) || 0,
-            rioSelectedRegions,
-            rioSelectedRoles,
-            rioSelectedClasses,
-
-            guildsofwowEnabled: document.getElementById("guildsofwowEnabled").checked,
-            gowMinIlvl: parseFloat(document.getElementById("gowMinIlvl").value) || 0,
-            gowMinMythicKills: parseInt(document.getElementById("gowMinMythicKills").value) || 0,
-            gowMinMythicPlusScore: parseInt(document.getElementById("gowMinMythicPlusScore").value) || 0,
-            gowSelectedClasses,
-            gowSelectedRoles,
-        }, function () {
-            const status = document.getElementById("statusMessage");
-            status.textContent = "✓ Settings saved";
-            setTimeout(() => status.textContent = "", 2000);
+    // ── Save ──────────────────────────────────────────────────────────────────
+    document.getElementById('saveButton').addEventListener('click', function () {
+        const toSync = collectFromDom();
+        chrome.storage.sync.set(toSync, function () {
+            // Secret and debug flag go to local storage
+            const secret = document.getElementById('wclClientSecret').value.trim();
+            chrome.runtime.sendMessage({ action: 'storeWclSecret', secret }, function () {
+                chrome.storage.local.set({ wclDebug: document.getElementById('wclDebug').checked });
+            });
+            showStatus('✓ Settings saved', 2000);
         });
     });
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function showStatus(msg, ms) {
+        const el = document.getElementById('statusMessage');
+        el.textContent = msg;
+        setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, ms);
+    }
 });

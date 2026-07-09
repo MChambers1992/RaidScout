@@ -1,9 +1,12 @@
 const SETTINGS_KEYS = [
     'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
     'wowprogressEnabled', 'openWarcraftLogsTab', 'minIlvl', 'maxIlvl', 'selectedRegions', 'guildFilter',
+    'wpWclEnabled',
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedRegions', 'rioSelectedRoles',
+    'rioWclEnabled',
     'guildsofwowEnabled', 'gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedRoles',
+    'gowWclEnabled',
 ];
 
 const SITE_PANEL_MAP = {
@@ -22,14 +25,14 @@ function getSiteFromUrl(url) {
 }
 
 function loadBadge() {
-    chrome.action.getBadgeText({}, text => {
-        if (text && text !== '') {
-            document.getElementById('badgeCount').textContent = text;
+    chrome.runtime.sendMessage({ action: 'getClosedTabCount' }, function (res) {
+        const count = res?.count ?? 0;
+        if (count > 0) {
+            document.getElementById('badgeCount').textContent = String(count);
             document.getElementById('badgeArea').classList.add('visible');
         }
     });
 }
-
 function applySettings(data) {
     document.getElementById('q-warcraftlogsEnabled').checked = data.warcraftlogsEnabled !== false;
     document.getElementById('q-parseThreshold').value = data.parseThreshold ?? 50;
@@ -48,6 +51,7 @@ function applySettings(data) {
     document.getElementById('q-maxIlvl').value = data.maxIlvl || '';
     document.getElementById('q-guildFilter').value = data.guildFilter ?? 'any';
     document.getElementById('q-openWarcraftLogsTab').checked = data.openWarcraftLogsTab !== false;
+    document.getElementById('q-wpWclEnabled').checked = !!data.wpWclEnabled;
 
     const savedRegions = data.selectedRegions ?? ['EU'];
     document.querySelectorAll('.q-regionFilter').forEach(cb => {
@@ -57,6 +61,7 @@ function applySettings(data) {
     document.getElementById('q-raiderioEnabled').checked = data.raiderioEnabled !== false;
     document.getElementById('q-openWarcraftLogsFromRaiderIO').checked = data.openWarcraftLogsFromRaiderIO !== false;
     document.getElementById('q-hideRaiderIoAds').checked = data.hideRaiderIoAds !== false;
+    document.getElementById('q-rioWclEnabled').checked = !!data.rioWclEnabled;
     document.getElementById('q-rioMinIlvl').value = data.rioMinIlvl || '';
 
     const savedRioRegions = data.rioSelectedRegions ?? [];
@@ -70,6 +75,7 @@ function applySettings(data) {
     });
 
     document.getElementById('q-guildsofwowEnabled').checked = data.guildsofwowEnabled !== false;
+    document.getElementById('q-gowWclEnabled').checked = !!data.gowWclEnabled;
     document.getElementById('q-gowMinIlvl').value = data.gowMinIlvl || '';
     document.getElementById('q-gowMinMythicKills').value = data.gowMinMythicKills || '';
     document.getElementById('q-gowMinMythicPlusScore').value = data.gowMinMythicPlusScore || '';
@@ -105,6 +111,7 @@ function saveAll() {
 
         wowprogressEnabled: document.getElementById('q-wowprogressEnabled').checked,
         openWarcraftLogsTab: document.getElementById('q-openWarcraftLogsTab').checked,
+        wpWclEnabled: document.getElementById('q-wpWclEnabled').checked,
         minIlvl: parseFloat(document.getElementById('q-minIlvl').value) || 0,
         maxIlvl: parseFloat(document.getElementById('q-maxIlvl').value) || 0,
         selectedRegions,
@@ -116,12 +123,14 @@ function saveAll() {
         rioMinIlvl: parseFloat(document.getElementById('q-rioMinIlvl').value) || 0,
         rioSelectedRegions,
         rioSelectedRoles,
+        rioWclEnabled: document.getElementById('q-rioWclEnabled').checked,
 
         guildsofwowEnabled: document.getElementById('q-guildsofwowEnabled').checked,
         gowMinIlvl: parseFloat(document.getElementById('q-gowMinIlvl').value) || 0,
         gowMinMythicKills: parseInt(document.getElementById('q-gowMinMythicKills').value) || 0,
         gowMinMythicPlusScore: parseInt(document.getElementById('q-gowMinMythicPlusScore').value) || 0,
         gowSelectedRoles,
+        gowWclEnabled: document.getElementById('q-gowWclEnabled').checked,
     }, showSaved);
 }
 
@@ -136,6 +145,16 @@ function showSaved() {
 document.addEventListener('DOMContentLoaded', function () {
     chrome.storage.sync.get(SETTINGS_KEYS, applySettings);
     loadBadge();
+
+    // Rate-limit indicator
+    chrome.runtime.sendMessage({ action: 'getRateLimitStatus' }, function (status) {
+        const bar = document.getElementById('wclStatusBar');
+        if (bar && status?.limited) {
+            const secs = Math.ceil(status.remainingMs / 1000);
+            bar.textContent = `🚦 WCL rate limited — ${secs}s remaining`;
+            bar.style.display = 'block';
+        }
+    });
 
     // Detect current tab's site and expand its panel
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
