@@ -29,3 +29,6 @@ yarn-error.log*
 *.key
 *.pem
 secrets.*
+
+# Exported settings (contains the WarcraftLogs Client ID)
+raidscout-settings.json

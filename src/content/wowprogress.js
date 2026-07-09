@@ -1,5 +1,7 @@
+// wowprogress.js — content script for wowprogress.com
+
 function getPlayerClass(playerRow) {
-    const characterEl = playerRow.querySelector(".character");
+    const characterEl = playerRow.querySelector('.character');
     if (!characterEl) return null;
     for (const cls of characterEl.classList) {
         if (WOW_CLASS_NAMES.includes(cls)) return cls;
@@ -10,66 +12,187 @@ function getPlayerClass(playerRow) {
     return null;
 }
 
+// WoWProgress shows role via a class icon — attempt to derive from spec icon name
+// in the character link tooltip or title. Falls back to null (treated as DPS).
+function getPlayerRole(playerRow) {
+    const icon = playerRow.querySelector('img[src*="spec_icon"], img[alt*="Healer"], img[alt*="Tank"]');
+    if (!icon) return null;
+    const alt = (icon.alt || '').toLowerCase();
+    if (alt.includes('heal')) return 'healer';
+    if (alt.includes('tank')) return 'tank';
+    return 'dps';
+}
+
 function filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter) {
-    const playerRows = document.querySelectorAll(".rating tr");
+    const rows = assertSelector('.rating', document, 'WoWProgress rating table')
+        ? document.querySelectorAll('.rating tr')
+        : [];
 
-    for (let i = 1; i < playerRows.length; i++) {
-        const playerRow = playerRows[i];
-        const realmElement = playerRow.querySelector(".realm");
-        const ilvlElement = playerRow.querySelector("td.center");
-        const characterName = playerRow.querySelector(".character")?.textContent ?? "unknown";
+    let hiddenCount = 0;
+    const allRows = Array.from(rows).slice(1);
 
-        const playerIlvl = ilvlElement ? parseFloat(ilvlElement.textContent.trim()) : null;
-        const playerClass = getPlayerClass(playerRow);
-        const inGuild = playerRow.querySelector(".guild") !== null;
+    for (const playerRow of allRows) {
+        const realmElement = playerRow.querySelector('.realm');
+        const ilvlElement  = playerRow.querySelector('td.center');
+        const playerIlvl   = ilvlElement ? parseFloat(ilvlElement.textContent.trim()) : null;
+        const playerClass  = getPlayerClass(playerRow);
+        const inGuild      = playerRow.querySelector('.guild') !== null;
 
         const regionMatch = !realmElement ? false :
             selectedRegions.length === 0 || selectedRegions.some(r => realmElement.textContent.includes(r));
         const ilvlMatch = playerIlvl === null ||
             (playerIlvl >= minIlvl && (maxIlvl === 0 || playerIlvl <= maxIlvl));
         const classMatch = selectedClasses.length === 0 || playerClass === null || selectedClasses.includes(playerClass);
-        const guildMatch = guildFilter === "any" || (guildFilter === "in" && inGuild) || (guildFilter === "out" && !inGuild);
+        const guildMatch = guildFilter === 'any' || (guildFilter === 'in' && inGuild) || (guildFilter === 'out' && !inGuild);
 
         if (!(regionMatch && ilvlMatch && classMatch && guildMatch)) {
             playerRow.remove();
+            hiddenCount++;
         }
     }
 }
 
+// ─── WCL identity extraction ───────────────────────────────────────────────────
+
+function getWowProgressCharacter(playerRow) {
+    const link = playerRow.querySelector('a[href*="/character/"]');
+    if (!link) return null;
+    const parts = link.getAttribute('href').split('/').filter(Boolean);
+    const idx = parts.indexOf('character');
+    if (idx === -1 || parts.length < idx + 4) return null;
+    const role = getPlayerRole(playerRow);
+    return {
+        region: parts[idx + 1].toLowerCase(),
+        realm:  parts[idx + 2].replace(/\s/g, '-').toLowerCase(),
+        name:   decodeURIComponent(parts[idx + 3].split('?')[0]),
+        role:   role || 'dps',
+    };
+}
+
+// ─── WCL scoring ──────────────────────────────────────────────────────────────
+// WoWProgress: we HIDE scored rows (not remove) so they can be revealed if
+// WCL settings change later in the session. The original standard-filter pass
+// removes rows that fail non-WCL criteria; WCL-scored rows that fail are hidden.
+
+let wclThresholds = { minBest: 0, minMedian: 0, hideUnknown: false };
+let wclSummaryAnchor = null;
+
+function applyWclScoring(wclSettings) {
+    wclThresholds = wclSettings;
+    const rows = Array.from(document.querySelectorAll('.rating tr'))
+        .slice(1)
+        .filter(row => row.isConnected && !row.dataset.wclScored);
+
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+        const nameCell = row.querySelector('.character');
+        if (nameCell) setBadgeState(nameCell, 'pending', null, wclThresholds, null);
+    }
+
+    let hiddenByWcl = document.querySelectorAll('.rating tr[data-wcl-hidden="true"]').length;
+    const totalScored = rows.length + hiddenByWcl;
+    // Re-resolve the anchor each page: WoWProgress paginates by swapping the
+    // table inside .ratingContainer, so a cached anchor becomes detached and
+    // upsertFilterSummary would throw on its null parentNode.
+    if (!wclSummaryAnchor || !wclSummaryAnchor.isConnected) {
+        wclSummaryAnchor = document.querySelector('.rating');
+    }
+    upsertFilterSummary(wclSummaryAnchor, hiddenByWcl, totalScored);
+
+    runWithConcurrency(rows, async (row) => {
+        row.dataset.wclScored = 'pending';
+        const character = getWowProgressCharacter(row);
+        const nameCell  = row.querySelector('.character');
+
+        if (!character) {
+            row.dataset.wclScored = 'done';
+            if (nameCell) setBadgeState(nameCell, 'error', { error: 'Could not read character link' }, wclThresholds, null);
+            return;
+        }
+
+        const score = await requestWclScore(character);
+        row.dataset.wclScored = 'done';
+        if (!row.isConnected) return;
+
+        let badgeState = 'score';
+        if (score.error && score.rateLimitMs) badgeState = 'rate-limited';
+        else if (score.error)                 badgeState = 'error';
+        else if (score.notFound || (score.best === null && score.median === null)) badgeState = 'no-logs';
+
+        if (nameCell) setBadgeState(nameCell, badgeState, score, wclThresholds, character.role);
+
+        if (failsWclThresholds(score, wclThresholds, character.role)) {
+            row.dataset.wclHidden = 'true';
+            row.style.display = 'none';
+            hiddenByWcl++;
+        }
+        upsertFilterSummary(wclSummaryAnchor, hiddenByWcl, totalScored);
+    }, wclSettings.concurrency || 4);
+}
+
+// ─── Live settings re-evaluation ──────────────────────────────────────────────
+
+const WP_WCL_KEYS = [
+    'wpWclEnabled', 'wpWclMinBest', 'wpWclMinMedian', 'wpWclHideUnknown',
+    'wpWclMinBestHealer', 'wpWclMinMedianHealer', 'wpWclMinBestTank', 'wpWclMinMedianTank',
+    'wclConcurrency',
+];
+
+watchSettings(WP_WCL_KEYS, () => {
+    // Clear all WCL markers so the next filter pass re-scores everything
+    const rows = document.querySelectorAll('.rating tr[data-wcl-scored]');
+    clearWclMarkers(Array.from(rows));
+    loadSettingsAndFilter();
+});
+
+// ─── Main filter pass ─────────────────────────────────────────────────────────
+
 function loadSettingsAndFilter() {
-    chrome.storage.sync.get(["selectedRegions", "region", "minIlvl", "maxIlvl", "selectedClasses", "guildFilter"], function(options) {
-        // Graceful migration from old single-region key
-        const selectedRegions = options.selectedRegions ?? (options.region ? [options.region] : ["EU"]);
-        const minIlvl = parseFloat(options.minIlvl) || 0;
-        const maxIlvl = parseFloat(options.maxIlvl) || 0;
+    chrome.storage.sync.get([
+        'selectedRegions', 'region', 'minIlvl', 'maxIlvl', 'selectedClasses', 'guildFilter',
+        'wpWclEnabled', 'wpWclMinBest', 'wpWclMinMedian', 'wpWclHideUnknown',
+        'wpWclMinBestHealer', 'wpWclMinMedianHealer', 'wpWclMinBestTank', 'wpWclMinMedianTank',
+        'wclConcurrency',
+    ], function(options) {
+        const selectedRegions = options.selectedRegions ?? (options.region ? [options.region] : ['EU']);
+        const minIlvl         = parseFloat(options.minIlvl) || 0;
+        const maxIlvl         = parseFloat(options.maxIlvl) || 0;
         const selectedClasses = options.selectedClasses || [];
-        const guildFilter = options.guildFilter || "any";
+        const guildFilter     = options.guildFilter || 'any';
         filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter);
+
+        if (options.wpWclEnabled) {
+            applyWclScoring({
+                minBest:          parseInt(options.wpWclMinBest)          || 0,
+                minMedian:        parseInt(options.wpWclMinMedian)        || 0,
+                minBestHealer:    parseInt(options.wpWclMinBestHealer)    || 0,
+                minMedianHealer:  parseInt(options.wpWclMinMedianHealer)  || 0,
+                minBestTank:      parseInt(options.wpWclMinBestTank)      || 0,
+                minMedianTank:    parseInt(options.wpWclMinMedianTank)    || 0,
+                hideUnknown:      !!options.wpWclHideUnknown,
+                concurrency:      getConcurrency(options),
+            });
+        }
     });
 }
 
 function observeTableChanges() {
-    const tableContainer = document.querySelector(".ratingContainer");
+    const tableContainer = assertSelector('.ratingContainer', document, 'WoWProgress ratingContainer');
     if (!tableContainer) return;
 
-    const observer = new MutationObserver((mutationsList) => {
-        for (const mutation of mutationsList) {
-            if (mutation.type === "childList") {
-                loadSettingsAndFilter();
-                break;
-            }
-        }
+    const observer = new MutationObserver(mutations => {
+        if (mutations.some(m => m.type === 'childList')) loadSettingsAndFilter();
     });
-
     observer.observe(tableContainer, { childList: true, subtree: true });
     loadSettingsAndFilter();
 }
 
 function handlePageNavigation() {
     setInterval(() => {
-        const table = document.querySelector(".ratingContainer table");
+        const table = document.querySelector('.ratingContainer table');
         if (table && !table.dataset.filtered) {
-            table.dataset.filtered = "true";
+            table.dataset.filtered = 'true';
             observeTableChanges();
         }
     }, 2000);
@@ -77,20 +200,20 @@ function handlePageNavigation() {
 
 function hasRequiredParameters() {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.has("lang") && urlParams.has("raids_week");
+    return urlParams.has('lang') && urlParams.has('raids_week');
 }
 
 function appendRequiredParameters(url) {
     const urlParams = new URLSearchParams(url.search);
-    urlParams.set("lang", "en");
-    urlParams.set("raids_week", "2");
-    urlParams.set("sortby", "ts");
+    urlParams.set('lang', 'en');
+    urlParams.set('raids_week', '2');
+    urlParams.set('sortby', 'ts');
     return `${url.pathname}?${urlParams.toString()}`;
 }
 
 function redirectRealmPageIfNeeded() {
     const url = new URL(window.location.href);
-    if (url.pathname.includes("/gearscore/") && url.search.includes("lfg=1")) {
+    if (url.pathname.includes('/gearscore/') && url.search.includes('lfg=1')) {
         if (!hasRequiredParameters()) {
             window.location.href = appendRequiredParameters(url);
         }
@@ -98,8 +221,8 @@ function redirectRealmPageIfNeeded() {
 }
 
 function isTargetPage() {
-    const segments = new URL(window.location.href).pathname.split("/");
-    return segments.length === 3 && segments[1] === "gearscore";
+    const segments = new URL(window.location.href).pathname.split('/');
+    return segments.length === 3 && segments[1] === 'gearscore';
 }
 
 chrome.storage.sync.get('wowprogressEnabled', function(options) {

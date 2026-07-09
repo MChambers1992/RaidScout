@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
   "name": "RaidScout",
-  "version": "1.0",
+  "version": "1.3.0",
   "description": "Streamline your World of Warcraft guild recruitment process with this extension. Extends functionality on websites such as WarcraftLogs, WoWProgress, and more.",
   "author": "Michael Chambers",
   "icons": {
-    "128": "/img/logo-128.png",
+    "16": "/img/logo-16.png",
     "48": "/img/logo-48.png",
-    "16": "/img/logo-16.png"
+    "128": "/img/logo-128.png"
   },
   "permissions": [
     "activeTab",
@@ -24,7 +24,8 @@
     "https://www.guildsofwow.com/*"
   ],
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
   "options_ui": {
     "page": "src/options/options.html"
@@ -71,5 +72,6 @@
         "src/content/guildsofwow.js"
       ]
     }
-  ]
+  ],
+  "version_name": "1.3.0 — Per-role thresholds, API reactive flow, settings schema"
 }

@@ -105,6 +105,10 @@
                     <input type="checkbox" id="q-openWarcraftLogsTab">
                     Auto-open WarcraftLogs on character visit
                 </label>
+                <label class="quick-check">
+                    <input type="checkbox" id="q-wpWclEnabled">
+                    Proactive WCL parse filter
+                </label>
             </div>
         </div>
     </div>
@@ -149,6 +153,10 @@
                     <label class="quick-inline role-healer"><input type="checkbox" class="q-rioRoleFilter" value="healer"> Healer</label>
                     <label class="quick-inline role-dps"><input type="checkbox" class="q-rioRoleFilter" value="dps"> DPS</label>
                 </div>
+                <label class="quick-check">
+                    <input type="checkbox" id="q-rioWclEnabled">
+                    Proactive WCL parse filter
+                </label>
             </div>
         </div>
     </div>
@@ -190,6 +198,10 @@
                     <label class="quick-inline role-healer"><input type="checkbox" class="q-roleFilter" value="healer"> Healer</label>
                     <label class="quick-inline role-dps"><input type="checkbox" class="q-roleFilter" value="dps"> DPS</label>
                 </div>
+                <label class="quick-check">
+                    <input type="checkbox" id="q-gowWclEnabled">
+                    Proactive WCL parse filter
+                </label>
             </div>
         </div>
     </div>
@@ -197,6 +209,7 @@
     <div class="popup-footer">
         <button id="openSettings">⚙ Full Settings</button>
         <div class="saved-indicator" id="savedIndicator"></div>
+        <div id="wclStatusBar" style="font-size:11px;color:#f09020;padding:4px 8px;display:none;"></div>
     </div>
 
     <script src="popup.js"></script>
