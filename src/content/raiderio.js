@@ -68,6 +68,33 @@ function hideAds() {
     document.head.appendChild(style);
 }
 
+// The results table's cells (.rt-td) come with `overflow: hidden;
+// white-space: nowrap` from react-table, so a badge appended after the
+// character name gets hard-clipped at the cell edge once the row is full.
+// Shrinking the badge to fit the cell's typical free space and falling back
+// to `overflow: visible` (rather than growing the row — the table is
+// virtualized and relies on a fixed row height, so resizing rows would
+// misalign them) keeps the parse text fully readable without touching the
+// table's own layout.
+const RIO_BADGE_CSS_ID = 'raidscout-rio-badge-styles';
+function ensureRioBadgeStyles() {
+    if (document.getElementById(RIO_BADGE_CSS_ID)) return;
+    const style = document.createElement('style');
+    style.id = RIO_BADGE_CSS_ID;
+    style.textContent = `
+        .rt-tr-group .rt-td:first-child {
+            overflow: visible !important;
+        }
+        .rt-tr-group .rs-badge {
+            font-size: 9px;
+            padding: 1px 4px;
+            gap: 2px;
+            margin-left: 4px;
+        }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+}
+
 // ─── Row data extraction ───────────────────────────────────────────────────────
 
 function getRowData(row) {
@@ -140,6 +167,8 @@ async function applyWclScoring() {
         .filter(g => g.style.display !== 'none' && !g.dataset.wclScored);
 
     if (groups.length === 0) return;
+
+    ensureRioBadgeStyles();
 
     // Show pending badges
     for (const group of groups) {

@@ -31,6 +31,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - WCL recruitment search class filter not responding to live settings changes.
+- **Raider.IO parse badge clipping** — The inline WCL parse badge on the recruitment search table was getting hard-clipped by react-table's `overflow: hidden` cell styling. `raiderio.js` now injects a scoped stylesheet that shrinks the badge and switches that cell's overflow to visible, without resizing rows (the table is virtualized on a fixed row height, so growing rows would misalign them).
 
 ---
 
