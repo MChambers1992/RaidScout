@@ -132,6 +132,10 @@ function filterRecruitmentResults(options) {
     const wclMinMythicKills  = options.wclMinMythicKills   || 0;
 
     document.querySelectorAll('.recruitment-search-result').forEach(card => {
+        // WCL-hidden cards stay hidden regardless of the flat threshold filter
+        // below (matches the same guard used on WoWProgress/Raider.IO/GoW).
+        if (card.dataset.wclHidden === 'true') { card.style.display = 'none'; return; }
+
         const parseScore  = getRecruitmentParseScore(card);
         const region      = getRecruitmentRegion(card);
         const charClass   = getRecruitmentClass(card);
@@ -145,10 +149,93 @@ function filterRecruitmentResults(options) {
 
         card.style.display = hide ? 'none' : '';
     });
+
+    if (options.wclSearchProactive) applyProactiveScoring(options);
+}
+
+// ─── Proactive scoring on recruitment search (shares common.js flow) ──────────
+// Optional layer on top of the flat wclSearchParseThreshold filter above: reuses
+// the same requestWclScore/failsWclThresholds/badge machinery as WoWProgress,
+// Raider.IO and GoW, so results get role-aware (DPS/Healer/Tank) thresholds and
+// the same inline badges. Requires API credentials; off by default.
+
+function getRecruitmentCharacter(card) {
+    const link = card.querySelector('a[href*="/character/"]');
+    if (!link) return null;
+    const parts = link.getAttribute('href').split('?')[0].split('/').filter(Boolean);
+    const idx = parts.indexOf('character');
+    if (idx === -1 || parts.length < idx + 4) return null;
+    return {
+        region: parts[idx + 1].toLowerCase(),
+        realm:  parts[idx + 2].toLowerCase(),
+        name:   decodeURIComponent(parts[idx + 3]),
+        role:   getRecruitmentRole(card),
+    };
+}
+
+// Best-effort role detection from the result card. WCL's recruitment search
+// markup for spec/role isn't confirmed here, so this degrades gracefully to
+// 'dps' (the safe default used across the extension) rather than failing.
+function getRecruitmentRole(card) {
+    const roleText = (card.querySelector('[class*="spec"], [class*="role"]')?.textContent || '').toLowerCase();
+    const healerSpecs = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation', 'healer'];
+    const tankSpecs   = ['protection', 'guardian', 'blood', 'brewmaster', 'vengeance', 'tank'];
+    if (healerSpecs.some(s => roleText.includes(s))) return 'healer';
+    if (tankSpecs.some(s => roleText.includes(s)))   return 'tank';
+    return 'dps';
+}
+
+function applyProactiveScoring(options) {
+    const wclSettings = buildWclSettings(options);
+    const cards = Array.from(document.querySelectorAll('.recruitment-search-result'))
+        .filter(card => card.style.display !== 'none' && !card.dataset.wclScored);
+
+    if (cards.length === 0) return;
+
+    for (const card of cards) {
+        const nameCell = card.querySelector('.character-name-faction-server-region-title__name') || card;
+        setBadgeState(nameCell, 'pending', null, wclSettings);
+    }
+
+    const total = document.querySelectorAll('.recruitment-search-result').length;
+    let hidden  = document.querySelectorAll('.recruitment-search-result[data-wcl-hidden="true"]').length;
+    const summaryAnchor = document.querySelector('.guild-recruitment-search-results-tile__results');
+    upsertFilterSummary(summaryAnchor, hidden, total);
+
+    runWithConcurrency(cards, async (card) => {
+        card.dataset.wclScored = 'pending';
+        const character = getRecruitmentCharacter(card);
+        const nameCell   = card.querySelector('.character-name-faction-server-region-title__name') || card;
+
+        if (!character) {
+            card.dataset.wclScored = 'done';
+            return;
+        }
+
+        const score = await requestWclScore(character);
+        card.dataset.wclScored = 'done';
+
+        let badgeState = 'score';
+        if (score.error && score.rateLimitMs)                                    badgeState = 'rate-limited';
+        else if (score.error)                                                     badgeState = 'error';
+        else if (score.notFound || (score.best === null && score.median === null)) badgeState = 'no-logs';
+
+        setBadgeState(nameCell, badgeState, score, wclSettings, character.role);
+
+        if (failsWclThresholds(score, wclSettings, character.role)) {
+            card.dataset.wclHidden = 'true';
+            card.style.display = 'none';
+            hidden++;
+        }
+        upsertFilterSummary(summaryAnchor, hidden, total);
+    }, wclSettings.concurrency || 4);
 }
 
 function initRecruitmentFiltering() {
-    const storageKeys = ['wclSearchParseThreshold', 'wclSelectedRegions', 'wclSelectedClasses', 'wclMinMythicKills'];
+    const storageKeys = [
+        'wclSearchParseThreshold', 'wclSelectedRegions', 'wclSelectedClasses', 'wclMinMythicKills',
+        'wclSearchProactive', ...SHARED_WCL_KEYS,
+    ];
 
     function applyFilters() {
         chrome.storage.sync.get(storageKeys, filterRecruitmentResults);
@@ -176,9 +263,15 @@ function initRecruitmentFiltering() {
 
     // Live re-apply when any of the filter settings change (including class filter)
     chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'sync' && storageKeys.some(k => k in changes)) {
-            applyFilters();
+        if (area !== 'sync' || !storageKeys.some(k => k in changes)) return;
+
+        // A proactive-scoring-relevant key changed — clear markers so cards
+        // that were already scored/hidden get re-evaluated against the new
+        // settings instead of keeping their stale badge/hidden state.
+        if ('wclSearchProactive' in changes || SHARED_WCL_KEYS.some(k => k in changes)) {
+            clearWclMarkers(document.querySelectorAll('.recruitment-search-result'));
         }
+        applyFilters();
     });
 
     if (document.readyState === 'loading') {

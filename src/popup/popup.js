@@ -1,12 +1,12 @@
 const SETTINGS_KEYS = [
     'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
     'wowprogressEnabled', 'openWarcraftLogsTab', 'minIlvl', 'maxIlvl', 'selectedRegions', 'guildFilter',
-    'wpWclEnabled',
+    'wpWclEnabled', 'wpWclSort',
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedRegions', 'rioSelectedRoles',
-    'rioWclEnabled',
+    'rioWclEnabled', 'rioWclSort',
     'guildsofwowEnabled', 'gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedRoles',
-    'gowWclEnabled',
+    'gowWclEnabled', 'gowWclSort',
 ];
 
 const SITE_PANEL_MAP = {
@@ -24,13 +24,19 @@ function getSiteFromUrl(url) {
     return null;
 }
 
+function renderBadge(count) {
+    const badgeArea = document.getElementById('badgeArea');
+    if (count > 0) {
+        document.getElementById('badgeCount').textContent = String(count);
+        badgeArea.classList.add('visible');
+    } else {
+        badgeArea.classList.remove('visible');
+    }
+}
+
 function loadBadge() {
     chrome.runtime.sendMessage({ action: 'getClosedTabCount' }, function (res) {
-        const count = res?.count ?? 0;
-        if (count > 0) {
-            document.getElementById('badgeCount').textContent = String(count);
-            document.getElementById('badgeArea').classList.add('visible');
-        }
+        renderBadge(res?.count ?? 0);
     });
 }
 function applySettings(data) {
@@ -52,6 +58,7 @@ function applySettings(data) {
     document.getElementById('q-guildFilter').value = data.guildFilter ?? 'any';
     document.getElementById('q-openWarcraftLogsTab').checked = data.openWarcraftLogsTab !== false;
     document.getElementById('q-wpWclEnabled').checked = !!data.wpWclEnabled;
+    document.getElementById('q-wpWclSort').checked = !!data.wpWclSort;
 
     const savedRegions = data.selectedRegions ?? ['EU'];
     document.querySelectorAll('.q-regionFilter').forEach(cb => {
@@ -62,6 +69,7 @@ function applySettings(data) {
     document.getElementById('q-openWarcraftLogsFromRaiderIO').checked = data.openWarcraftLogsFromRaiderIO !== false;
     document.getElementById('q-hideRaiderIoAds').checked = data.hideRaiderIoAds !== false;
     document.getElementById('q-rioWclEnabled').checked = !!data.rioWclEnabled;
+    document.getElementById('q-rioWclSort').checked = !!data.rioWclSort;
     document.getElementById('q-rioMinIlvl').value = data.rioMinIlvl || '';
 
     const savedRioRegions = data.rioSelectedRegions ?? [];
@@ -76,6 +84,7 @@ function applySettings(data) {
 
     document.getElementById('q-guildsofwowEnabled').checked = data.guildsofwowEnabled !== false;
     document.getElementById('q-gowWclEnabled').checked = !!data.gowWclEnabled;
+    document.getElementById('q-gowWclSort').checked = !!data.gowWclSort;
     document.getElementById('q-gowMinIlvl').value = data.gowMinIlvl || '';
     document.getElementById('q-gowMinMythicKills').value = data.gowMinMythicKills || '';
     document.getElementById('q-gowMinMythicPlusScore').value = data.gowMinMythicPlusScore || '';
@@ -112,6 +121,7 @@ function saveAll() {
         wowprogressEnabled: document.getElementById('q-wowprogressEnabled').checked,
         openWarcraftLogsTab: document.getElementById('q-openWarcraftLogsTab').checked,
         wpWclEnabled: document.getElementById('q-wpWclEnabled').checked,
+        wpWclSort: document.getElementById('q-wpWclSort').checked,
         minIlvl: parseFloat(document.getElementById('q-minIlvl').value) || 0,
         maxIlvl: parseFloat(document.getElementById('q-maxIlvl').value) || 0,
         selectedRegions,
@@ -124,6 +134,7 @@ function saveAll() {
         rioSelectedRegions,
         rioSelectedRoles,
         rioWclEnabled: document.getElementById('q-rioWclEnabled').checked,
+        rioWclSort: document.getElementById('q-rioWclSort').checked,
 
         guildsofwowEnabled: document.getElementById('q-guildsofwowEnabled').checked,
         gowMinIlvl: parseFloat(document.getElementById('q-gowMinIlvl').value) || 0,
@@ -131,7 +142,27 @@ function saveAll() {
         gowMinMythicPlusScore: parseInt(document.getElementById('q-gowMinMythicPlusScore').value) || 0,
         gowSelectedRoles,
         gowWclEnabled: document.getElementById('q-gowWclEnabled').checked,
+        gowWclSort: document.getElementById('q-gowWclSort').checked,
     }, showSaved);
+}
+
+let rateLimitTimer = null;
+
+function startRateLimitCountdown(bar, remainingMs) {
+    clearInterval(rateLimitTimer);
+    let secs = Math.ceil(remainingMs / 1000);
+    const render = () => { bar.textContent = `🚦 WCL rate limited — ${secs}s remaining`; };
+    render();
+    bar.style.display = 'block';
+    rateLimitTimer = setInterval(() => {
+        secs--;
+        if (secs <= 0) {
+            clearInterval(rateLimitTimer);
+            bar.style.display = 'none';
+            return;
+        }
+        render();
+    }, 1000);
 }
 
 function showSaved() {
@@ -146,13 +177,11 @@ document.addEventListener('DOMContentLoaded', function () {
     chrome.storage.sync.get(SETTINGS_KEYS, applySettings);
     loadBadge();
 
-    // Rate-limit indicator
+    // Rate-limit indicator — counts down and hides at zero
     chrome.runtime.sendMessage({ action: 'getRateLimitStatus' }, function (status) {
         const bar = document.getElementById('wclStatusBar');
         if (bar && status?.limited) {
-            const secs = Math.ceil(status.remainingMs / 1000);
-            bar.textContent = `🚦 WCL rate limited — ${secs}s remaining`;
-            bar.style.display = 'block';
+            startRateLimitCountdown(bar, status.remainingMs);
         }
     });
 
@@ -182,7 +211,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // Clear badge counter
     document.getElementById('clearBadge').addEventListener('click', function () {
         chrome.runtime.sendMessage({ action: 'clearBadge' });
-        document.getElementById('badgeArea').classList.remove('visible');
+        renderBadge(0);
+    });
+
+    // Live-update the closed-tab count while the popup is open
+    chrome.runtime.onMessage.addListener(function (message) {
+        if (message.action === 'badgeUpdated') {
+            renderBadge(message.count ?? 0);
+        }
     });
 
     // Open full settings page

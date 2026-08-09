@@ -278,7 +278,28 @@ function clearWclMarkers(elements) {
     for (const el of elements) {
         delete el.dataset.wclScored;
         delete el.dataset.wclHidden;
+        delete el.dataset.wclBest;
+        delete el.dataset.wclMedian;
         const badge = el.querySelector('.rs-badge');
         if (badge) badge.remove();
     }
+}
+
+// ─── Sort by WCL parse ─────────────────────────────────────────────────────────
+// Re-orders `items` (rows/cards) within their shared parent by score, highest
+// first. Reads `dataset.wclMedian` (falling back to `dataset.wclBest`), set by
+// each site's scoring pass. Items with no score sort last. No-op below 2 items
+// or if the items aren't attached to a common parent.
+function sortByWclScore(items) {
+    if (!items || items.length < 2) return;
+    const parent = items[0].parentNode;
+    if (!parent) return;
+    const scored = items.map(el => {
+        const median = parseFloat(el.dataset.wclMedian);
+        const best   = parseFloat(el.dataset.wclBest);
+        const value  = !isNaN(median) ? median : (!isNaN(best) ? best : -1);
+        return { el, value };
+    });
+    scored.sort((a, b) => b.value - a.value);
+    for (const { el } of scored) parent.appendChild(el);
 }

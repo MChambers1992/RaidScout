@@ -144,6 +144,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `wclMinMedianTank` | number | `0` | **Shared** min median DPS parse % for tanks — falls back to `parseThreshold` when 0 |
 | `wclHideUnknown` | boolean | `false` | **Shared** also hide characters WCL has no parse data for (proactive scoring) |
 | `wclSearchParseThreshold` | number | `0` | Min parse % for recruitment search results (0 = no minimum) |
+| `wclSearchProactive` | boolean | `false` | Also apply the proactive API scoring flow (role-aware thresholds + inline badges) to recruitment search results, on top of the flat `wclSearchParseThreshold` filter above. Requires API credentials |
 | `wclSelectedRegions` | string[] | `[]` | Filter recruitment search by region — empty shows all |
 | `wclMinMythicKills` | number | `0` | Min mythic kills for recruitment search (0 = no minimum) |
 | `wclSelectedClasses` | string[] | `[]` | Filter recruitment search by class — empty shows all |
@@ -164,6 +165,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `guildFilter` | string | `"any"` | Guild status: `"any"` / `"in"` / `"out"` |
 | `selectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `wpWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the WoWProgress player table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
+| `wpWclSort` | boolean | `false` | Sort visible players by WCL parse (highest first) instead of only hiding those below threshold |
 
 > **Migration note:** The old `region` (string) key is still read as a fallback when `selectedRegions` is absent.
 
@@ -179,6 +181,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `rioSelectedRoles` | string[] | `[]` | Filter search rows by main role (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `rioSelectedClasses` | string[] | `[]` | Filter search rows by class — empty shows all (Full Settings only; not in popup) |
 | `rioWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the Raider.IO search table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
+| `rioWclSort` | boolean | `false` | Sort visible search rows by WCL parse (highest first) instead of only hiding those below threshold |
 
 ### Guilds of WoW
 
@@ -191,6 +194,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `gowSelectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `gowSelectedRoles` | string[] | `[]` | Allowed roles (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `gowWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the recruits list (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
+| `gowWclSort` | boolean | `false` | Sort visible recruit cards by WCL parse (highest first) instead of only hiding those below threshold |
 
 ### WoW class name format
 
@@ -235,6 +239,10 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 17. **Sender validation:** The background validates `sender.tab.url` hostname against `TRUSTED_HOSTS` before acting on any message. `openTab` additionally validates the URL against `ALLOWED_TAB_PREFIXES` (WCL character URLs only) to prevent URL injection.
 
 18. **Unit tests:** `tests/common.test.js` (Vitest) covers 34 cases across `normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, and `normalizeCharacter`. Run with `npm test`.
+
+19. **Sort by WCL parse:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
+
+20. **WCL recruitment search proactive layer is best-effort on role detection:** Unlike WoWProgress/Raider.IO/GoW, the WCL recruitment search page's spec/role markup wasn't available to verify against the live site, so `getRecruitmentRole()` in `warcraftlogs.js` degrades gracefully to `'dps'` when it can't confidently detect healer/tank specs. Enabling `wclSearchProactive` is safe even if this misfires — DPS thresholds are just applied to a healer/tank, same fail-open behaviour as everywhere else in the codebase.
 
 ## File Structure
 

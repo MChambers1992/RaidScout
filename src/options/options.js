@@ -33,12 +33,10 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('wclDebug').checked = !!local.wclDebug;
         });
 
-        // Rate-limit status
+        // Rate-limit status — counts down and clears at zero
         chrome.runtime.sendMessage({ action: 'getRateLimitStatus' }, function (status) {
             if (status?.limited) {
-                const secs = Math.ceil(status.remainingMs / 1000);
-                document.getElementById('wclRateLimitStatus').textContent =
-                    `⚠ Rate limited — retry in ${secs}s`;
+                startRateLimitCountdown(status.remainingMs);
             }
         });
     });
@@ -154,5 +152,23 @@ document.addEventListener('DOMContentLoaded', function () {
         const el = document.getElementById('statusMessage');
         el.textContent = msg;
         setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, ms);
+    }
+
+    let rateLimitTimer = null;
+    function startRateLimitCountdown(remainingMs) {
+        const el = document.getElementById('wclRateLimitStatus');
+        clearInterval(rateLimitTimer);
+        let secs = Math.ceil(remainingMs / 1000);
+        const render = () => { el.textContent = `⚠ Rate limited — retry in ${secs}s`; };
+        render();
+        rateLimitTimer = setInterval(() => {
+            secs--;
+            if (secs <= 0) {
+                clearInterval(rateLimitTimer);
+                el.textContent = '';
+                return;
+            }
+            render();
+        }, 1000);
     }
 });

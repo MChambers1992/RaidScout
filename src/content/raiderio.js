@@ -135,7 +135,7 @@ function filterSearchRows() {
 let wclHiddenCount = 0;
 let wclTotalCount  = 0;
 
-function applyWclScoring() {
+async function applyWclScoring() {
     const groups = Array.from(document.querySelectorAll('.rt-tr-group'))
         .filter(g => g.style.display !== 'none' && !g.dataset.wclScored);
 
@@ -152,7 +152,7 @@ function applyWclScoring() {
     const summaryAnchor = assertSelector('.rt-tbody', document, 'Raider.IO results body');
     upsertFilterSummary(summaryAnchor, wclHiddenCount, wclTotalCount);
 
-    runWithConcurrency(groups, async (group) => {
+    await runWithConcurrency(groups, async (group) => {
         group.dataset.wclScored = 'pending';
         const character = getRowCharacter(group);
         const nameCell  = group.querySelector('.rt-td:first-child');
@@ -164,6 +164,8 @@ function applyWclScoring() {
 
         const score = await requestWclScore(character);
         group.dataset.wclScored = 'done';
+        if (score.best   !== null && score.best   !== undefined) group.dataset.wclBest   = String(score.best);
+        if (score.median !== null && score.median !== undefined) group.dataset.wclMedian = String(score.median);
 
         let badgeState = 'score';
         if (score.error && score.rateLimitMs)                                   badgeState = 'rate-limited';
@@ -179,11 +181,16 @@ function applyWclScoring() {
         }
         upsertFilterSummary(summaryAnchor, wclHiddenCount, wclTotalCount);
     }, wclSettings.concurrency || 4);
+
+    if (wclSettings.sort) {
+        const visibleGroups = Array.from(document.querySelectorAll('.rt-tr-group')).filter(g => g.style.display !== 'none');
+        sortByWclScore(visibleGroups);
+    }
 }
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const RIO_WCL_KEYS = ['rioWclEnabled', ...SHARED_WCL_KEYS];
+const RIO_WCL_KEYS = ['rioWclEnabled', 'rioWclSort', ...SHARED_WCL_KEYS];
 
 watchSettings(RIO_WCL_KEYS, () => {
     const allGroups = Array.from(document.querySelectorAll('.rt-tr-group'));
@@ -192,7 +199,7 @@ watchSettings(RIO_WCL_KEYS, () => {
 
     // Re-read all WCL settings from storage so no key is missed
     chrome.storage.sync.get(RIO_WCL_KEYS, (options) => {
-        wclSettings = { enabled: !!options.rioWclEnabled, ...buildWclSettings(options) };
+        wclSettings = { enabled: !!options.rioWclEnabled, sort: !!options.rioWclSort, ...buildWclSettings(options) };
         filterSearchRows();
     });
 });
@@ -215,7 +222,7 @@ function observePageChanges(wclEnabled) {
 chrome.storage.sync.get([
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedClasses', 'rioSelectedRoles', 'rioSelectedRegions',
-    'rioWclEnabled', ...SHARED_WCL_KEYS,
+    'rioWclEnabled', 'rioWclSort', ...SHARED_WCL_KEYS,
 ], function(options) {
     if (options.raiderioEnabled === false) return;
 
@@ -226,7 +233,7 @@ chrome.storage.sync.get([
         selectedRoles:   options.rioSelectedRoles    || [],
         selectedRegions: options.rioSelectedRegions  || [],
     };
-    wclSettings = { enabled: !!options.rioWclEnabled, ...buildWclSettings(options) };
+    wclSettings = { enabled: !!options.rioWclEnabled, sort: !!options.rioWclSort, ...buildWclSettings(options) };
 
     enforceSortingAndPublishedColumn();
     observePageChanges(wclEnabled);

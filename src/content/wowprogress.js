@@ -77,7 +77,7 @@ function getWowProgressCharacter(playerRow) {
 let wclThresholds = { minBest: 0, minMedian: 0, hideUnknown: false };
 let wclSummaryAnchor = null;
 
-function applyWclScoring(wclSettings) {
+async function applyWclScoring(wclSettings) {
     wclThresholds = wclSettings;
     const rows = Array.from(document.querySelectorAll('.rating tr'))
         .slice(1)
@@ -100,7 +100,7 @@ function applyWclScoring(wclSettings) {
     }
     upsertFilterSummary(wclSummaryAnchor, hiddenByWcl, totalScored);
 
-    runWithConcurrency(rows, async (row) => {
+    await runWithConcurrency(rows, async (row) => {
         row.dataset.wclScored = 'pending';
         const character = getWowProgressCharacter(row);
         const nameCell  = row.querySelector('.character');
@@ -114,6 +114,8 @@ function applyWclScoring(wclSettings) {
         const score = await requestWclScore(character);
         row.dataset.wclScored = 'done';
         if (!row.isConnected) return;
+        if (score.best   !== null && score.best   !== undefined) row.dataset.wclBest   = String(score.best);
+        if (score.median !== null && score.median !== undefined) row.dataset.wclMedian = String(score.median);
 
         let badgeState = 'score';
         if (score.error && score.rateLimitMs) badgeState = 'rate-limited';
@@ -129,11 +131,18 @@ function applyWclScoring(wclSettings) {
         }
         upsertFilterSummary(wclSummaryAnchor, hiddenByWcl, totalScored);
     }, wclSettings.concurrency || 4);
+
+    if (wclSettings.sort) {
+        const visibleRows = Array.from(document.querySelectorAll('.rating tr'))
+            .slice(1)
+            .filter(row => row.isConnected && row.style.display !== 'none');
+        sortByWclScore(visibleRows);
+    }
 }
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const WP_WCL_KEYS = ['wpWclEnabled', ...SHARED_WCL_KEYS];
+const WP_WCL_KEYS = ['wpWclEnabled', 'wpWclSort', ...SHARED_WCL_KEYS];
 
 watchSettings(WP_WCL_KEYS, () => {
     // Clear all WCL markers so the next filter pass re-scores everything
@@ -147,7 +156,7 @@ watchSettings(WP_WCL_KEYS, () => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get([
         'selectedRegions', 'region', 'minIlvl', 'maxIlvl', 'selectedClasses', 'guildFilter',
-        'wpWclEnabled', ...SHARED_WCL_KEYS,
+        'wpWclEnabled', 'wpWclSort', ...SHARED_WCL_KEYS,
     ], function(options) {
         const selectedRegions = options.selectedRegions ?? (options.region ? [options.region] : ['EU']);
         const minIlvl         = parseFloat(options.minIlvl) || 0;
@@ -157,7 +166,7 @@ function loadSettingsAndFilter() {
         filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter);
 
         if (options.wpWclEnabled) {
-            applyWclScoring(buildWclSettings(options));
+            applyWclScoring({ ...buildWclSettings(options), sort: !!options.wpWclSort });
         }
     });
 }

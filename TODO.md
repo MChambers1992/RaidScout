@@ -8,7 +8,6 @@ Items deferred from the v1.3 improvement pass.
 
 - ✅ Build step — assessed: not needed. The globals-via-injection-order pattern is reliable in MV3 and the maintainability problem it was meant to solve is now addressed by `settings-schema.js`.
 - ✅ Per-role WCL thresholds — implemented in v1.3.
-- ✅ Sort by WCL parse — deferred, see below.
 - ✅ WarcraftLogs reactive flow → API — implemented in v1.3.
 - ✅ Configurable concurrency — implemented in v1.3.
 - ✅ Export/import includes local settings — implemented in v1.3 (v2 format).
@@ -16,26 +15,26 @@ Items deferred from the v1.3 improvement pass.
 - ✅ WCL recruitment search storage.onChanged for class filter — fixed in v1.3.
 - ✅ Rate-limit UI in popup — added in v1.3.
 - ✅ Explicit getClosedTabCount message — added in v1.3.
-- ✅ Localization — deferred, see below.
-- ✅ Automated selector smoke test — deferred, see below.
 - ✅ WCL search/proactive overlap documentation — addressed in options UI hint text.
+- ✅ Sort by WCL parse — implemented. `sortByWclScore()` in `common.js` re-orders visible
+  rows/cards by median (falling back to best) parse after each scoring pass, gated behind
+  a per-site "Sort by WCL parse" checkbox (`wpWclSort`/`rioWclSort`/`gowWclSort`, default
+  off) in both the popup and Full Settings.
+- ✅ WCL recruitment search — proactive scoring overlap — the recruitment search page can
+  now opt into the same `requestWclScore`/`failsWclThresholds`/badge flow as the other
+  three sites via the "Use role-aware API scoring" toggle (`wclSearchProactive`, default
+  off), layered on top of the original flat `wclSearchParseThreshold` DOM-scrape filter
+  which still works without API credentials. Role detection on this page is best-effort
+  (see the note under "Automated selector smoke test" below) since the search-result
+  markup for spec/role wasn't confirmed against the live site.
+- ✅ Rate-limit UI auto-refresh — the rate-limit banner in the popup and Full Settings now
+  counts down live via `setInterval` and hides/clears at zero.
+- ✅ Tab count badge in popup auto-update — background now broadcasts `badgeUpdated` on
+  every count change; the popup listens and refreshes live while open.
 
 ---
 
 ## Active backlog
-
-### Sort by WCL parse (medium effort, high value)
-
-The filter is binary (show/hide). A sort layer would let users rank by parse without
-hiding anyone. Approach per site:
-
-- **Raider.IO**: the React table exposes a column sort. After all scores arrive, store
-  `dataset.wclBest` / `dataset.wclMedian` on each `.rt-tr-group`, then re-sort the DOM.
-  Watch for observer re-fires re-scrambling the order.
-- **WoWProgress / GoW**: simpler — collect all visible rows/cards after scoring,
-  sort the array by score, then re-insert in sorted order using `appendChild`.
-- Add a "Sort by WCL parse" checkbox in each site's WCL filter block. Default off so
-  current behaviour is unchanged.
 
 ### Automated selector smoke test (medium effort, medium value)
 
@@ -48,6 +47,12 @@ login, but WCL recruitment search requires a WoW account. A CI-safe approach wou
 be to test only the pages that don't need auth, and rely on `assertSelector` warnings
 for the rest.
 
+This would also validate the role-detection selectors added for the WCL recruitment
+search's proactive scoring layer (`getRecruitmentRole` in `warcraftlogs.js`), which
+were written defensively (`[class*="spec"], [class*="role"]`, defaulting to `'dps'`)
+without a live page to confirm against — a smoke test with an authenticated session
+is the most reliable way to verify or correct them.
+
 ### Localization / i18n (low priority)
 
 All user-visible strings are hardcoded in English. Chrome extensions support
@@ -57,24 +62,3 @@ a Chrome Web Store "Featured" badge.
 
 Surfaces to translate: popup labels, options page labels and hints, inline badge
 text (the `⏳ WCL` / `📋 No logs` labels), filter summary bar text.
-
-### WarcraftLogs recruitment search — proactive scoring overlap
-
-`warcraftlogs.js` filters the WCL-hosted recruitment search page (`/recruitment/`)
-using the `wclSearchParseThreshold` key. The proactive scoring system operates on
-WoWProgress, Raider.IO, and GoW. They are on different pages and don't conflict,
-but a user might expect similar behaviour on both. The WCL recruitment search page
-could also use the API-based proactive flow (it has character links) — this would
-unify the two approaches.
-
-### Rate-limit UI auto-refresh
-
-The rate-limit banner in both popup and Full Settings is shown once on open and does
-not count down. Add a `setInterval` that updates the remaining-seconds display every
-second and hides the banner when it reaches zero.
-
-### Tab count badge in popup — auto-update
-
-The closed-tab count shown in the popup is fetched once on open. If tabs are closed
-while the popup is open it won't update. Add a `chrome.runtime.onMessage` listener
-in the popup to receive a `badgeUpdated` notification and refresh the count.
