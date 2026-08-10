@@ -116,7 +116,7 @@ let gowWclThresholds  = { minBest: 0, minMedian: 0, hideUnknown: false };
 let gowHiddenCount    = 0;
 let gowSummaryAnchor  = null;
 
-function applyWclScoring(wclSettings) {
+async function applyWclScoring(wclSettings) {
     gowWclThresholds = wclSettings;
     const cards = Array.from(document.querySelectorAll('#recruits-list .card'))
         .filter(card => card.style.display !== 'none' && !card.dataset.wclScored);
@@ -138,7 +138,7 @@ function applyWclScoring(wclSettings) {
     }
     upsertFilterSummary(gowSummaryAnchor, gowHiddenCount, total);
 
-    runWithConcurrency(cards, async (card) => {
+    await runWithConcurrency(cards, async (card) => {
         card.dataset.wclScored = 'pending';
         const character = getCardCharacter(card);
         const nameEl    = card.querySelector('.character-name, h3, .card-title') || card;
@@ -151,6 +151,8 @@ function applyWclScoring(wclSettings) {
 
         const score = await requestWclScore(character);
         card.dataset.wclScored = 'done';
+        if (score.best   !== null && score.best   !== undefined) card.dataset.wclBest   = String(score.best);
+        if (score.median !== null && score.median !== undefined) card.dataset.wclMedian = String(score.median);
 
         let badgeState = 'score';
         if (score.error && score.rateLimitMs)                                    badgeState = 'rate-limited';
@@ -166,11 +168,16 @@ function applyWclScoring(wclSettings) {
         }
         upsertFilterSummary(gowSummaryAnchor, gowHiddenCount, total);
     }, wclSettings.concurrency || 4);
+
+    if (wclSettings.sort) {
+        const visibleCards = Array.from(document.querySelectorAll('#recruits-list .card')).filter(c => c.style.display !== 'none');
+        sortByWclScore(visibleCards);
+    }
 }
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const GOW_WCL_KEYS = ['gowWclEnabled', ...SHARED_WCL_KEYS];
+const GOW_WCL_KEYS = ['gowWclEnabled', 'gowWclSort', ...SHARED_WCL_KEYS];
 
 watchSettings(GOW_WCL_KEYS, (changes) => {
     const allCards = Array.from(document.querySelectorAll('#recruits-list .card'));
@@ -184,7 +191,7 @@ watchSettings(GOW_WCL_KEYS, (changes) => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get(
         ['gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedClasses', 'gowSelectedRoles',
-         'gowWclEnabled', ...SHARED_WCL_KEYS],
+         'gowWclEnabled', 'gowWclSort', ...SHARED_WCL_KEYS],
         function(options) {
             filterCards(
                 parseFloat(options.gowMinIlvl)          || 0,
@@ -194,7 +201,7 @@ function loadSettingsAndFilter() {
                 options.gowSelectedRoles   || []
             );
             if (options.gowWclEnabled) {
-                applyWclScoring(buildWclSettings(options));
+                applyWclScoring({ ...buildWclSettings(options), sort: !!options.gowWclSort });
             }
         }
     );

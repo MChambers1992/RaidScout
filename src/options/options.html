@@ -111,6 +111,14 @@
                 <input type="number" id="wclSearchParseThreshold" min="0" max="100" step="1" placeholder="e.g. 50">
                 <p class="hint">Hides recruits on the recruitment search below this parse %</p>
             </div>
+            <div class="option toggle-inline">
+                <label for="wclSearchProactive">Use role-aware API scoring</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="wclSearchProactive">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Adds the same WarcraftLogs API scoring used on WoWProgress/Raider.IO/GoW to this page: role-aware thresholds (DPS, Healer HPS, Tank — configured above) and inline parse badges, on top of the flat Min. Parse % filter. Requires API credentials.</p>
+            </div>
             <div class="option-group">
                 <div class="option-group-header">
                     <span>Region</span>
@@ -224,6 +232,14 @@
                 </label>
                 <p class="hint">Looks up each listed character's parse via the WarcraftLogs API and hides those below your thresholds. Parse thresholds (DPS, Healer HPS, Tank) are configured once in the <strong>WarcraftLogs</strong> section and require API credentials there.</p>
             </div>
+            <div class="option toggle-inline">
+                <label for="wpWclSort">Sort by WCL parse</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="wpWclSort">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Ranks visible players by parse (highest first) instead of only hiding low parses.</p>
+            </div>
         </div>
 
         <!-- Raider.IO Settings -->
@@ -303,6 +319,14 @@
                 </label>
                 <p class="hint">Looks up each search row's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the search row — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
             </div>
+            <div class="option toggle-inline">
+                <label for="rioWclSort">Sort by WCL parse</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="rioWclSort">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Ranks visible search results by parse (highest first) instead of only hiding low parses.</p>
+            </div>
         </div>
 
         <!-- Guilds of WoW Settings -->
@@ -368,6 +392,14 @@
                     <span class="toggle-slider"></span>
                 </label>
                 <p class="hint">Looks up each recruit's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the recruit card — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
+            </div>
+            <div class="option toggle-inline">
+                <label for="gowWclSort">Sort by WCL parse</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="gowWclSort">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Ranks visible recruit cards by parse (highest first) instead of only hiding low parses.</p>
             </div>
         </div>
 
