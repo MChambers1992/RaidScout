@@ -21,6 +21,11 @@ async function updateBadge() {
     await chrome.storage.session.set({ wclClosedTabCount: closedTabCount }).catch(() => {});
     chrome.action.setBadgeText({ text: String(closedTabCount) });
     chrome.action.setBadgeBackgroundColor({ color: '#c0392b' });
+    broadcastBadgeUpdate();
+}
+
+function broadcastBadgeUpdate() {
+    chrome.runtime.sendMessage({ action: 'badgeUpdated', count: closedTabCount }).catch(() => {});
 }
 
 // ─── URL helpers ───────────────────────────────────────────────────────────────
@@ -123,6 +128,7 @@ chrome.runtime.onMessage.addListener(function(message, sender) {
         closedTabCount = 0;
         chrome.storage.session.set({ wclClosedTabCount: 0 }).catch(() => {});
         chrome.action.setBadgeText({ text: '' });
+        broadcastBadgeUpdate();
     }
 });
 
