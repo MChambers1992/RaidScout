@@ -47,6 +47,22 @@ export function makeCandidateKey({ region, realm, name }) {
     return `${String(region || '').toLowerCase()}/${slugRealm(realm)}/${String(name || '').trim().toLowerCase()}`;
 }
 
+// ─── Display names ─────────────────────────────────────────────────────────────
+
+// Storage uses lowercase underscore keys ('demon_hunter', 'deathknight').
+// Naively replacing underscores gets 'demon hunter' right but leaves
+// 'deathknight' as one word, so the two irregular names are spelled out.
+const CLASS_LABELS = {
+    deathknight:  'Death Knight',
+    demon_hunter: 'Demon Hunter',
+};
+
+export function classLabel(playerClass) {
+    if (!playerClass) return null;
+    if (CLASS_LABELS[playerClass]) return CLASS_LABELS[playerClass];
+    return playerClass.charAt(0).toUpperCase() + playerClass.slice(1);
+}
+
 // ─── Normalisation ─────────────────────────────────────────────────────────────
 
 function num(value) {

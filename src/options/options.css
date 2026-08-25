@@ -10,10 +10,16 @@ body {
     min-height: 100vh;
 }
 
+/* The options page opens as a full browser tab, but this was pinned to 400px,
+   so 51 settings stacked into one endless column and the tab labels truncated.
+   It grows to a comfortable reading width now and falls back to full width in
+   the narrow embedded-options panel. */
 .container {
-    width: 400px;
-    padding: 20px 20px 0;
-    background-color: #2a2a2a;
+    width: 100%;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 20px 24px 0;
+    background-color: var(--bg-panel);
     border-radius: 10px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
@@ -41,14 +47,12 @@ h1 {
     border: none;
     border-bottom: 2px solid transparent;
     color: #777;
-    font-size: 11px;
+    font-size: 12px;
     font-family: Arial, sans-serif;
     cursor: pointer;
     margin-bottom: -2px;
     transition: color 0.15s, border-color 0.15s, background 0.15s;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .tab-btn:hover {
@@ -58,11 +62,11 @@ h1 {
 }
 
 /* Per-site active tab accent colours */
-.tab-btn[data-tab="warcraftlogs"].active { color: #fff; border-bottom-color: #e8670d; }
-.tab-btn[data-tab="wowprogress"].active  { color: #fff; border-bottom-color: #4a90d9; }
-.tab-btn[data-tab="raiderio"].active     { color: #fff; border-bottom-color: #00b35a; }
-.tab-btn[data-tab="guildsofwow"].active  { color: #fff; border-bottom-color: #9B59B6; }
-.tab-btn[data-tab="scout"].active        { color: #fff; border-bottom-color: #f0b060; }
+.tab-btn[data-tab="warcraftlogs"].active { color: #fff; border-bottom-color: var(--site-warcraftlogs); }
+.tab-btn[data-tab="wowprogress"].active  { color: #fff; border-bottom-color: var(--site-wowprogress); }
+.tab-btn[data-tab="raiderio"].active     { color: #fff; border-bottom-color: var(--site-raiderio); }
+.tab-btn[data-tab="guildsofwow"].active  { color: #fff; border-bottom-color: var(--site-guildsofwow); }
+.tab-btn[data-tab="scout"].active        { color: #fff; border-bottom-color: var(--site-scout); }
 
 /* ── Section header with enable toggle ── */
 .section-header {
@@ -254,7 +258,9 @@ select:focus {
 /* ── Region checkboxes ── */
 .region-checks {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;      /* long labels overflowed the column without this */
+    gap: 8px 20px;
+    align-items: center;
 }
 
 .inline-check {
@@ -303,19 +309,19 @@ select:focus {
     cursor: pointer;
 }
 
-.class-label.warrior      { --class-color: #C69B3A; }
-.class-label.paladin      { --class-color: #F48CBA; }
-.class-label.hunter       { --class-color: #AAD372; }
-.class-label.rogue        { --class-color: #FFF468; }
-.class-label.priest       { --class-color: #FFFFFF; }
-.class-label.shaman       { --class-color: #0070DD; }
-.class-label.mage         { --class-color: #3FC7EB; }
-.class-label.warlock      { --class-color: #8788EE; }
-.class-label.monk         { --class-color: #00FF98; }
-.class-label.druid        { --class-color: #FF7C0A; }
-.class-label.deathknight  { --class-color: #C41E3A; }
-.class-label.demon_hunter { --class-color: #A330C9; }
-.class-label.evoker       { --class-color: #33937F; }
+.class-label.warrior      { --class-color: var(--wow-warrior); }
+.class-label.paladin      { --class-color: var(--wow-paladin); }
+.class-label.hunter       { --class-color: var(--wow-hunter); }
+.class-label.rogue        { --class-color: var(--wow-rogue); }
+.class-label.priest       { --class-color: var(--wow-priest); }
+.class-label.shaman       { --class-color: var(--wow-shaman); }
+.class-label.mage         { --class-color: var(--wow-mage); }
+.class-label.warlock      { --class-color: var(--wow-warlock); }
+.class-label.monk         { --class-color: var(--wow-monk); }
+.class-label.druid        { --class-color: var(--wow-druid); }
+.class-label.deathknight  { --class-color: var(--wow-deathknight); }
+.class-label.demon_hunter { --class-color: var(--wow-demonhunter); }
+.class-label.evoker       { --class-color: var(--wow-evoker); }
 
 /* ── Role filter colours (Guilds of WoW tab) ── */
 .inline-check.role-tank,
@@ -326,9 +332,9 @@ select:focus {
     border-radius: 2px;
 }
 
-.role-tank   { --role-color: #4e98dc; }
-.role-healer { --role-color: #56cc56; }
-.role-dps    { --role-color: #e74c3c; }
+.role-tank   { --role-color: var(--role-tank); }
+.role-healer { --role-color: var(--role-healer); }
+.role-dps    { --role-color: var(--role-dps); }
 
 /* ── Subsection label (e.g. "Recruitment Search" within WarcraftLogs) ── */
 .subsection-label {
@@ -434,3 +440,96 @@ button#saveButton:hover {
     transition: color 0.15s;
 }
 .support-row .support-link:hover { color: #f0b060; text-decoration: underline; }
+
+
+/* ── Wide-viewport layout ───────────────────────────────────────────────────
+   Two columns of settings once there's room, so a long tab stops being an
+   endless scroll. Anything that must stay full width (grids, notes, disclosure
+   panels) opts out with .option--wide. */
+
+.category-content { display: none; }
+.category-content.is-active { display: block; }
+
+@media (min-width: 720px) {
+    .category-content.is-active {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 24px;
+        align-items: start;
+    }
+    /* Anything whose meaning depends on full width opts out of the columns. */
+    .category-content > .section-header,
+    .category-content > .subsection-label,
+    .category-content > details,
+    .category-content > .threshold-grid,
+    .category-content > .option--wide {
+        grid-column: 1 / -1;
+    }
+    /* A block that is nothing but explanatory text belongs across both columns:
+       stranded in one, it reads as a caption for whatever field landed beside
+       it rather than for the section it introduces. */
+    .category-content > .option:has(> .hint:only-child) {
+        grid-column: 1 / -1;
+        max-width: 72ch;
+    }
+}
+
+/* ── Role threshold grid ────────────────────────────────────────────────────
+   Six stacked inputs, each with its own hint paragraph, became a 3x2 table:
+   the role/metric relationship is the point, and a grid shows it at a glance. */
+
+.threshold-grid {
+    display: grid;
+    grid-template-columns: minmax(70px, 110px) 1fr 1fr;
+    gap: 8px 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.threshold-grid .tg-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.threshold-grid .tg-role {
+    font-size: 13px;
+    color: var(--text-secondary);
+    border-left: 3px solid var(--role-color, #555);
+    padding-left: 8px;
+}
+.threshold-grid .tg-role.role-tank   { --role-color: var(--role-tank); }
+.threshold-grid .tg-role.role-healer { --role-color: var(--role-healer); }
+.threshold-grid .tg-role.role-dps    { --role-color: var(--role-dps); }
+
+.threshold-grid input[type="number"] { margin: 0; }
+
+/* ── Disclosure panels ──────────────────────────────────────────────────────
+   Settings most people never touch (cache TTL, debug, concurrency, per-source
+   listing URLs) stay available but stop competing with the ones they do. */
+
+details.advanced {
+    margin: 4px 0 18px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #262626;
+}
+
+details.advanced > summary {
+    cursor: pointer;
+    padding: 9px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    user-select: none;
+    list-style: none;
+}
+details.advanced > summary::-webkit-details-marker { display: none; }
+details.advanced > summary::before {
+    content: '▸ ';
+    color: var(--text-muted);
+}
+details.advanced[open] > summary::before { content: '▾ '; }
+details.advanced > summary:hover { color: var(--text-strong); }
+details.advanced .details-body { padding: 4px 12px 8px; }

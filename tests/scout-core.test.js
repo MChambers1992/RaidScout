@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
     slugRealm, makeCandidateKey, normalizeCandidate, mergeCandidate, mergeCandidates,
     passesWowProgressFilters, sortCandidates, matchesQuery, profileLinks,
-    toCsv, toWhisperList, runWithConcurrency, hasNoLogs, isScored,
+    toCsv, toWhisperList, runWithConcurrency, hasNoLogs, isScored, classLabel,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -414,5 +414,23 @@ describe('Scout hide rule (no logs counts as below threshold)', () => {
     it('hides no-logs candidates even with no thresholds set', () => {
         expect(isBelowThreshold({ best: null, median: null, notFound: true },
             { minBest: 0, minMedian: 0 })).toBe(true);
+    });
+});
+
+describe('classLabel', () => {
+    it('spells out the two irregular class names', () => {
+        // A naive underscore replace leaves "deathknight" as one word.
+        expect(classLabel('deathknight')).toBe('Death Knight');
+        expect(classLabel('demon_hunter')).toBe('Demon Hunter');
+    });
+
+    it('capitalises the regular ones', () => {
+        expect(classLabel('warrior')).toBe('Warrior');
+        expect(classLabel('evoker')).toBe('Evoker');
+    });
+
+    it('returns null for an unknown class', () => {
+        expect(classLabel(null)).toBeNull();
+        expect(classLabel('')).toBeNull();
     });
 });

@@ -11,7 +11,7 @@
 // one seen inline on the site itself.
 
 import {
-    SOURCE_META, SOURCE_IDS, normalizeCandidate, mergeCandidates, hasNoLogs,
+    SOURCE_META, SOURCE_IDS, normalizeCandidate, mergeCandidates, hasNoLogs, classLabel,
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS } from './sources.js';
@@ -364,7 +364,7 @@ function buildRow(candidate) {
         <td><span class="char-name class-${escapeHtml(candidate.playerClass || '')}">${escapeHtml(candidate.name)}</span>${multi}</td>
         <td>${escapeHtml(candidate.realm)}</td>
         <td>${escapeHtml(candidate.region.toUpperCase())}</td>
-        <td>${candidate.playerClass ? escapeHtml(candidate.playerClass.replace('_', ' ')) : '<span class="muted">—</span>'}</td>
+        <td>${candidate.playerClass ? escapeHtml(classLabel(candidate.playerClass)) : '<span class="muted">—</span>'}</td>
         <td>${candidate.role ? `<span class="role-pill role-${escapeHtml(candidate.role)}">${escapeHtml(candidate.role)}</span>` : '<span class="muted">—</span>'}</td>
         <td class="num">${candidate.ilvl ?? '<span class="muted">—</span>'}</td>
         <td class="num">${candidate.mplusScore ?? '<span class="muted">—</span>'}</td>

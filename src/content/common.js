@@ -130,8 +130,22 @@ const SHARED_WCL_KEYS = [
     'bestParseThreshold', 'parseThreshold',
     'wclMinBestHealer', 'wclMinMedianHealer',
     'wclMinBestTank', 'wclMinMedianTank',
-    'wclConcurrency',
+    'wclConcurrency', 'wclSortByParse',
+    // Read only for migration — see wclSortEnabled() below.
+    'wpWclSort', 'rioWclSort', 'gowWclSort',
 ];
+
+// Sorting by parse is one preference, not three. It used to be stored per site
+// (wpWclSort / rioWclSort / gowWclSort), which meant setting the same thing in
+// three places for an option nobody wants applied inconsistently.
+//
+// Existing installs keep working: if the shared key was never written, any of
+// the three old keys being on turns sorting on. The options page writes the
+// shared key on the next save, and the old ones stop mattering.
+function wclSortEnabled(options) {
+    if (typeof options.wclSortByParse === 'boolean') return options.wclSortByParse;
+    return !!(options.wpWclSort || options.rioWclSort || options.gowWclSort);
+}
 
 // Build the role-aware settings object consumed by thresholdsForRole /
 // failsWclThresholds from a storage snapshot. The per-site enable flag is

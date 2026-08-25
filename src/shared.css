@@ -1,0 +1,67 @@
+/* shared.css — design tokens for every RaidScout surface.
+ *
+ * Loaded before each page's own stylesheet by the popup, the options page and
+ * the Scout page. Previously the palette was ~90 loose hex literals spread over
+ * three files, with the 13 WoW class colours written out twice verbatim; a
+ * retheme meant editing all three, and they had already drifted.
+ *
+ * Class and role colours are exposed as tokens rather than finished rules
+ * because each surface addresses them differently (.class-label.warrior on the
+ * options page, .class-warrior in the Scout table). The values live here once;
+ * the selectors stay local. */
+
+:root {
+    /* Surfaces, darkest to lightest */
+    --bg-page:        #1e1e1e;
+    --bg-panel:       #2a2a2a;
+    --bg-raised:      #333;
+    --bg-input:       #2a2a2a;
+    --bg-hover:       #3a3a3a;
+    --bg-active:      #4a4a4a;
+
+    /* Text, most to least prominent */
+    --text-strong:    #fff;
+    --text-primary:   #e8e8e8;
+    --text-secondary: #ccc;
+    --text-muted:     #888;
+    --text-faint:     #6a6a6a;
+
+    /* Lines */
+    --border-subtle:  #2c2c2c;
+    --border:         #333;
+    --border-strong:  #444;
+
+    /* Intent */
+    --accent:         #007bff;
+    --accent-hover:   #0056b3;
+    --success:        #4caf50;
+    --warning:        #f0b060;
+    --danger:         #f04040;
+
+    /* Per-site identity — matches each site's own branding */
+    --site-warcraftlogs: #e8670d;
+    --site-wowprogress:  #4a90d9;
+    --site-raiderio:     #00b35a;
+    --site-guildsofwow:  #9B59B6;
+    --site-scout:        #f0b060;
+
+    /* WoW class colours (Blizzard's official values) */
+    --wow-warrior:      #C69B3A;
+    --wow-paladin:      #F48CBA;
+    --wow-hunter:       #AAD372;
+    --wow-rogue:        #FFF468;
+    --wow-priest:       #FFFFFF;
+    --wow-shaman:       #0070DD;
+    --wow-mage:         #3FC7EB;
+    --wow-warlock:      #8788EE;
+    --wow-monk:         #00FF98;
+    --wow-druid:        #FF7C0A;
+    --wow-deathknight:  #C41E3A;
+    --wow-demonhunter:  #A330C9;
+    --wow-evoker:       #33937F;
+
+    /* Roles */
+    --role-tank:   #4e98dc;
+    --role-healer: #56cc56;
+    --role-dps:    #e74c3c;
+}

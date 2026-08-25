@@ -148,7 +148,7 @@ async function applyWclScoring(wclSettings) {
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const WP_WCL_KEYS = ['wpWclEnabled', 'wpWclSort', ...SHARED_WCL_KEYS];
+const WP_WCL_KEYS = ['wpWclEnabled', ...SHARED_WCL_KEYS];
 
 watchSettings(WP_WCL_KEYS, () => {
     // Clear all WCL markers so the next filter pass re-scores everything
@@ -162,7 +162,7 @@ watchSettings(WP_WCL_KEYS, () => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get([
         'selectedRegions', 'region', 'minIlvl', 'maxIlvl', 'selectedClasses', 'guildFilter',
-        'wpWclEnabled', 'wpWclSort', ...SHARED_WCL_KEYS,
+        'wpWclEnabled', ...SHARED_WCL_KEYS,
     ], function(options) {
         const selectedRegions = options.selectedRegions ?? (options.region ? [options.region] : ['EU']);
         const minIlvl         = parseFloat(options.minIlvl) || 0;
@@ -172,7 +172,7 @@ function loadSettingsAndFilter() {
         filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter);
 
         if (options.wpWclEnabled) {
-            applyWclScoring({ ...buildWclSettings(options), sort: !!options.wpWclSort });
+            applyWclScoring({ ...buildWclSettings(options), sort: wclSortEnabled(options) });
         }
     });
 }

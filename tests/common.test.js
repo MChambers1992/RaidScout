@@ -364,3 +364,40 @@ describe('no-logs rule is role-independent', () => {
         });
     }
 });
+
+// ─── Shared sort preference + migration ──────────────────────────────────────
+// Mirrors wclSortEnabled() in common.js. Sorting by parse used to be three
+// per-site keys; it is now one. Installs that set the old keys must keep the
+// behaviour they chose without touching settings again.
+
+function wclSortEnabled(options) {
+    if (typeof options.wclSortByParse === 'boolean') return options.wclSortByParse;
+    return !!(options.wpWclSort || options.rioWclSort || options.gowWclSort);
+}
+
+describe('wclSortEnabled', () => {
+    it('uses the shared key when it has been written', () => {
+        expect(wclSortEnabled({ wclSortByParse: true })).toBe(true);
+        expect(wclSortEnabled({ wclSortByParse: false })).toBe(false);
+    });
+
+    it('lets an explicit false win over stale per-site keys', () => {
+        // Someone who turns the new toggle off must not have it resurrected by
+        // an old key still sitting in sync storage.
+        expect(wclSortEnabled({ wclSortByParse: false, wpWclSort: true, rioWclSort: true })).toBe(false);
+    });
+
+    it('migrates from any single old per-site key', () => {
+        expect(wclSortEnabled({ wpWclSort: true })).toBe(true);
+        expect(wclSortEnabled({ rioWclSort: true })).toBe(true);
+        expect(wclSortEnabled({ gowWclSort: true })).toBe(true);
+    });
+
+    it('stays off when every old key was off', () => {
+        expect(wclSortEnabled({ wpWclSort: false, rioWclSort: false, gowWclSort: false })).toBe(false);
+    });
+
+    it('defaults to off for a fresh install with nothing saved', () => {
+        expect(wclSortEnabled({})).toBe(false);
+    });
+});

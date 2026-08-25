@@ -139,25 +139,29 @@ thead th.sorted-desc::after { content: ' ▼'; color: #007bff; }
 
 tbody td { padding: 7px 10px; border-bottom: 1px solid #2c2c2c; vertical-align: middle; }
 tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
-tbody tr:hover { background: #262626; }
+/* Eleven columns over a hundred-odd rows: a faint stripe is what keeps the eye
+   on one candidate all the way across. Kept below the hover tint so hover still
+   reads as the stronger signal. */
+tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.018); }
+tbody tr:hover { background: #2c2c2c; }
 tbody tr.below-threshold { opacity: 0.45; }
 
 .char-name { font-weight: 600; color: var(--class-color, #e8e8e8); }
 .multi-source { color: #f0b060; font-size: 11px; margin-left: 5px; }
 
-.class-warrior      { --class-color: #C69B3A; }
-.class-paladin      { --class-color: #F48CBA; }
-.class-hunter       { --class-color: #AAD372; }
-.class-rogue        { --class-color: #FFF468; }
-.class-priest       { --class-color: #FFFFFF; }
-.class-shaman       { --class-color: #0070DD; }
-.class-mage         { --class-color: #3FC7EB; }
-.class-warlock      { --class-color: #8788EE; }
-.class-monk         { --class-color: #00FF98; }
-.class-druid        { --class-color: #FF7C0A; }
-.class-deathknight  { --class-color: #C41E3A; }
-.class-demon_hunter { --class-color: #A330C9; }
-.class-evoker       { --class-color: #33937F; }
+.class-warrior      { --class-color: var(--wow-warrior); }
+.class-paladin      { --class-color: var(--wow-paladin); }
+.class-hunter       { --class-color: var(--wow-hunter); }
+.class-rogue        { --class-color: var(--wow-rogue); }
+.class-priest       { --class-color: var(--wow-priest); }
+.class-shaman       { --class-color: var(--wow-shaman); }
+.class-mage         { --class-color: var(--wow-mage); }
+.class-warlock      { --class-color: var(--wow-warlock); }
+.class-monk         { --class-color: var(--wow-monk); }
+.class-druid        { --class-color: var(--wow-druid); }
+.class-deathknight  { --class-color: var(--wow-deathknight); }
+.class-demon_hunter { --class-color: var(--wow-demonhunter); }
+.class-evoker       { --class-color: var(--wow-evoker); }
 
 .role-pill {
     display: inline-block;
@@ -167,9 +171,9 @@ tbody tr.below-threshold { opacity: 0.45; }
     background: #2f2f2f;
     border-left: 3px solid var(--role-color, #555);
 }
-.role-tank   { --role-color: #4e98dc; }
-.role-healer { --role-color: #56cc56; }
-.role-dps    { --role-color: #e74c3c; }
+.role-tank   { --role-color: var(--role-tank); }
+.role-healer { --role-color: var(--role-healer); }
+.role-dps    { --role-color: var(--role-dps); }
 
 .source-dots { display: inline-flex; gap: 4px; }
 .source-dot {

@@ -219,7 +219,7 @@ async function applyWclScoring() {
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const RIO_WCL_KEYS = ['rioWclEnabled', 'rioWclSort', ...SHARED_WCL_KEYS];
+const RIO_WCL_KEYS = ['rioWclEnabled', ...SHARED_WCL_KEYS];
 
 watchSettings(RIO_WCL_KEYS, () => {
     const allGroups = Array.from(document.querySelectorAll('.rt-tr-group'));
@@ -228,7 +228,7 @@ watchSettings(RIO_WCL_KEYS, () => {
 
     // Re-read all WCL settings from storage so no key is missed
     chrome.storage.sync.get(RIO_WCL_KEYS, (options) => {
-        wclSettings = { enabled: !!options.rioWclEnabled, sort: !!options.rioWclSort, ...buildWclSettings(options) };
+        wclSettings = { enabled: !!options.rioWclEnabled, sort: wclSortEnabled(options), ...buildWclSettings(options) };
         filterSearchRows();
     });
 });
@@ -251,7 +251,7 @@ function observePageChanges(wclEnabled) {
 chrome.storage.sync.get([
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedClasses', 'rioSelectedRoles', 'rioSelectedRegions',
-    'rioWclEnabled', 'rioWclSort', ...SHARED_WCL_KEYS,
+    'rioWclEnabled', ...SHARED_WCL_KEYS,
 ], function(options) {
     if (options.raiderioEnabled === false) return;
 
@@ -262,7 +262,7 @@ chrome.storage.sync.get([
         selectedRoles:   options.rioSelectedRoles    || [],
         selectedRegions: options.rioSelectedRegions  || [],
     };
-    wclSettings = { enabled: !!options.rioWclEnabled, sort: !!options.rioWclSort, ...buildWclSettings(options) };
+    wclSettings = { enabled: !!options.rioWclEnabled, sort: wclSortEnabled(options), ...buildWclSettings(options) };
 
     enforceSortingAndPublishedColumn();
     observePageChanges(wclEnabled);

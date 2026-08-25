@@ -7,9 +7,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabBtns    = document.querySelectorAll('.tab-btn');
     const categories = document.querySelectorAll('.category-content');
 
+    // Toggles a class rather than an inline display: the wide-viewport layout
+    // switches the active category to a two-column grid via a media query, and
+    // an inline `display: block` would override it.
     function showCategory(cat) {
-        categories.forEach(c => c.style.display = 'none');
-        document.getElementById(cat).style.display = 'block';
+        categories.forEach(c => c.classList.toggle('is-active', c.id === cat));
         tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === cat));
     }
 

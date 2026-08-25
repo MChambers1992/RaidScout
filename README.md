@@ -214,6 +214,7 @@ Role is detected automatically from each candidate row. On Raider.IO it reads th
 | Min. Median HPS % (Healer) | — | **Shared** — minimum median HPS parse for healers (proactive scoring) |
 | Min. Best % (Tank override) | — | **Shared** — overrides the DPS best threshold for tanks only |
 | Min. Median % (Tank override) | — | **Shared** — overrides the DPS median threshold for tanks only |
+| Sort lists by parse | Off | **Shared** — ranks candidates by parse (highest first) on every site with proactive filtering on. Was three per-site toggles before 1.4.0; your existing choice carries over |
 | Recruitment search parse filter | — | Minimum parse % on the WarcraftLogs recruitment search page |
 | Min mythic kills (WCL search) | — | Minimum current-tier mythic kill count on the WCL recruitment search page |
 | Client ID | — | WarcraftLogs v2 API client ID (synced across devices) |

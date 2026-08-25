@@ -33,6 +33,7 @@ const SCHEMA = [
     { key: 'wclCacheTtlHours',           type: 'float',  default: 6,     domId: 'wclCacheTtlHours' },
     { key: 'wclDebug',                   type: 'bool',   default: false, domId: 'wclDebug' },
     { key: 'wclConcurrency',             type: 'int',    default: 4,     domId: 'wclConcurrency' },
+    { key: 'wclSortByParse',             type: 'bool',   default: false, domId: 'wclSortByParse' },
     { key: 'wclSelectedRegions',         type: 'checkboxGroup', default: [], selector: '.wclRegionFilter' },
     { key: 'wclSelectedClasses',         type: 'checkboxGroup', default: [], selector: '.wclClassFilter' },
 
@@ -43,7 +44,6 @@ const SCHEMA = [
     { key: 'maxIlvl',                    type: 'float',  default: 0,     domId: 'maxIlvl' },
     { key: 'guildFilter',                type: 'string', default: 'any', domId: 'guildFilter' },
     { key: 'wpWclEnabled',               type: 'bool',   default: false, domId: 'wpWclEnabled' },
-    { key: 'wpWclSort',                  type: 'bool',   default: false, domId: 'wpWclSort' },
     { key: 'selectedRegions',            type: 'checkboxGroup', default: ['EU'], selector: '.regionFilter' },
     { key: 'selectedClasses',            type: 'checkboxGroup', default: [],     selector: '.classFilter' },
 
@@ -53,7 +53,6 @@ const SCHEMA = [
     { key: 'hideRaiderIoAds',            type: 'bool',   default: true,  domId: 'hideRaiderIoAds' },
     { key: 'rioMinIlvl',                 type: 'float',  default: 0,     domId: 'rioMinIlvl' },
     { key: 'rioWclEnabled',              type: 'bool',   default: false, domId: 'rioWclEnabled' },
-    { key: 'rioWclSort',                 type: 'bool',   default: false, domId: 'rioWclSort' },
     { key: 'rioSelectedRegions',         type: 'checkboxGroup', default: [], selector: '.rioRegionFilter' },
     { key: 'rioSelectedRoles',           type: 'checkboxGroup', default: [], selector: '.rioRoleFilter' },
     { key: 'rioSelectedClasses',         type: 'checkboxGroup', default: [], selector: '.rioClassFilter' },
@@ -64,7 +63,6 @@ const SCHEMA = [
     { key: 'gowMinMythicKills',          type: 'int',    default: 0,     domId: 'gowMinMythicKills' },
     { key: 'gowMinMythicPlusScore',      type: 'int',    default: 0,     domId: 'gowMinMythicPlusScore' },
     { key: 'gowWclEnabled',              type: 'bool',   default: false, domId: 'gowWclEnabled' },
-    { key: 'gowWclSort',                 type: 'bool',   default: false, domId: 'gowWclSort' },
     { key: 'gowSelectedClasses',         type: 'checkboxGroup', default: [], selector: '.gowClassFilter' },
     { key: 'gowSelectedRoles',           type: 'checkboxGroup', default: [], selector: '.roleFilter' },
 

@@ -156,6 +156,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `wclSelectedClasses` | string[] | `[]` | Filter recruitment search by class — empty shows all |
 | `wclClientId` | string | `""` | WarcraftLogs v2 API client ID (for proactive scoring) — stored in sync |
 | `wclCacheTtlHours` | number | `6` | Score cache TTL in hours — stored in sync |
+| `wclSortByParse` | boolean | `false` | **Shared** — rank candidates by parse (highest first) on every site with proactive filtering on. Replaced the per-site `wpWclSort`/`rioWclSort`/`gowWclSort` in 1.4.0; `wclSortEnabled()` in `common.js` still reads those three when the shared key is absent, so existing installs keep their choice |
 | `wclClientSecret` | string | `""` | WarcraftLogs v2 API client secret — stored in **`chrome.storage.local`** only, never synced |
 | `wclDebug` | boolean | `false` | Log WCL queries/scores to service-worker console — stored in `local` |
 
@@ -171,7 +172,6 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `guildFilter` | string | `"any"` | Guild status: `"any"` / `"in"` / `"out"` |
 | `selectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `wpWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the WoWProgress player table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
-| `wpWclSort` | boolean | `false` | Sort visible players by WCL parse (highest first) instead of only hiding those below threshold |
 
 > **Migration note:** The old `region` (string) key is still read as a fallback when `selectedRegions` is absent.
 
@@ -187,7 +187,6 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `rioSelectedRoles` | string[] | `[]` | Filter search rows by main role (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `rioSelectedClasses` | string[] | `[]` | Filter search rows by class — empty shows all (Full Settings only; not in popup) |
 | `rioWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the Raider.IO search table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
-| `rioWclSort` | boolean | `false` | Sort visible search rows by WCL parse (highest first) instead of only hiding those below threshold |
 
 ### Guilds of WoW
 
@@ -200,7 +199,6 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `gowSelectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `gowSelectedRoles` | string[] | `[]` | Allowed roles (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `gowWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the recruits list (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
-| `gowWclSort` | boolean | `false` | Sort visible recruit cards by WCL parse (highest first) instead of only hiding those below threshold |
 
 ### Scout
 
@@ -260,7 +258,7 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 18. **Unit tests:** `tests/common.test.js` (Vitest) covers 34 cases across `normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, and `normalizeCharacter` — it re-declares those functions inline because content scripts have no export surface. `tests/scout-core.test.js` covers 73 cases and imports `src/scout/scout-core.js` directly, since it is a real ES module. `tests/sources.test.js` covers the WoWProgress HTML parser against jsdom fixtures. Run with `npm test`.
 
-19. **Sort by WCL parse:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
+19. **Sort by WCL parse** (one shared `wclSortByParse`, see the settings table)**:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
 
 20. **WCL recruitment search proactive layer is best-effort on role detection:** Unlike WoWProgress/Raider.IO/GoW, the WCL recruitment search page's spec/role markup wasn't available to verify against the live site, so `getRecruitmentRole()` in `warcraftlogs.js` degrades gracefully to `'dps'` when it can't confidently detect healer/tank specs. Enabling `wclSearchProactive` is safe even if this misfires — DPS thresholds are just applied to a healer/tank, same fail-open behaviour as everywhere else in the codebase.
 
@@ -278,6 +276,10 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 27. **"No logs" fails every threshold, everywhere.** `failsWclThresholds()` in `common.js` returns `true` for a definitive no-logs result — `notFound`, or a successful lookup where both metrics are null — regardless of any setting. A character with no parses cannot be judged against a parse minimum, so they are below all of them. This is unconditional by design: it replaced the `wclHideUnknown` toggle (removed in 1.4.0), because most existing installs had an explicit `false` saved and a default flip would never have reached them. The line the rule draws is between information about the *player* (`notFound` → actionable) and information about the *request* (`error`, or no score at all → says nothing about them): anything errored or unscored is always kept, so a missing API key, a disabled scoring toggle or a mid-run rate limit can never empty a page. Scout adds only a `!candidate.wcl` guard, because it renders rows before scoring runs, and uses `hasNoLogs()` from `scout-core.js` purely to report the two hide reasons separately above the table.
 
+28. **Design tokens live in `src/shared.css`.** The palette was ~90 loose hex literals across three stylesheets, with the 13 WoW class colours written out verbatim in both `options.css` and `scout.css`. Colours are now CSS custom properties on `:root`; each surface still writes its own selectors (`.class-label.warrior` on the options page, `.class-warrior` in the Scout table) but reads one value. Loaded via a `<link>` before each page's own stylesheet.
+
+29. **The options page toggles a class, not an inline `display`.** `showCategory()` sets `.is-active` rather than `style.display = 'block'`, because the wide-viewport layout promotes the active category to a two-column grid through a media query and an inline `display` would override it. The container was also pinned at `width: 400px`, which is why a 51-setting page scrolled forever and the tab labels ellipsised.
+
 ## File Structure
 
 ```
@@ -292,6 +294,8 @@ RaidScout/
 └── src/
     ├── background.js          # Service worker (ES module) — tab management, badge, message routing, WCL score requests
     ├── wcl-api.js             # WarcraftLogs v2 API client — OAuth, GraphQL scoring, token + score caching
+    ├── shared.css             # Design tokens (palette, WoW class + role colours) — loaded by popup, options and Scout
+    ├── links.js               # Support/YouTube URLs, single source of truth
     ├── scout/
     │   ├── scout.html         # Scout aggregator page (opened from the popup)
     │   ├── scout.css

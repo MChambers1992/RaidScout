@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RaidScout</title>
+    <link rel="stylesheet" href="../shared.css">
     <link rel="stylesheet" href="options.css">
 </head>
 <body>
@@ -44,61 +45,73 @@
                 <button type="button" id="testWclCredentials">Test connection</button>
                 <span id="wclTestStatus" style="font-size:12px;"></span>
             </div>
-            <div class="option">
-                <label for="wclCacheTtlHours">Score cache TTL (hours)</label>
-                <input type="number" id="wclCacheTtlHours" min="0.5" max="48" step="0.5" placeholder="6">
-                <p class="hint">How long to cache each character's parse score. Default 6 h. Lower = fresher data but more API calls.</p>
-            </div>
-            <div class="option">
-                <button type="button" id="clearWclScoreCache">Clear cached scores</button>
-                <span id="wclRateLimitStatus" style="font-size:12px;margin-left:8px;color:#f09020;"></span>
-                <p class="hint">Scores are cached to limit API calls. Clear if you want fresh data immediately.</p>
-            </div>
-            <div class="option toggle-inline">
-                <label for="wclDebug">Debug logging</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wclDebug">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Logs WCL API queries and scores to the browser console (service worker). Useful for troubleshooting.</p>
-            </div>
-            <div class="option">
-                <label for="wclConcurrency">Max concurrent score lookups</label>
-                <input type="number" id="wclConcurrency" min="1" max="8" step="1" placeholder="4">
-                <p class="hint">How many WarcraftLogs API requests to run in parallel when scoring a list page. Lower = less API pressure, higher = faster results. Default 4.</p>
-            </div>
+            <details class="advanced">
+                <summary>Advanced &mdash; caching, diagnostics and request rate</summary>
+                <div class="details-body">
+                <div class="option">
+                    <label for="wclCacheTtlHours">Score cache TTL (hours)</label>
+                    <input type="number" id="wclCacheTtlHours" min="0.5" max="48" step="0.5" placeholder="6">
+                    <p class="hint">How long to cache each character's parse score. Default 6 h. Lower = fresher data but more API calls.</p>
+                </div>
+                <div class="option">
+                    <button type="button" id="clearWclScoreCache">Clear cached scores</button>
+                    <span id="wclRateLimitStatus" style="font-size:12px;margin-left:8px;color:#f09020;"></span>
+                    <p class="hint">Scores are cached to limit API calls. Clear if you want fresh data immediately.</p>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="wclDebug">Debug logging</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="wclDebug">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Logs WCL API queries and scores to the browser console (service worker). Useful for troubleshooting.</p>
+                </div>
+                <div class="option">
+                    <label for="wclConcurrency">Max concurrent score lookups</label>
+                    <input type="number" id="wclConcurrency" min="1" max="8" step="1" placeholder="4">
+                    <p class="hint">How many WarcraftLogs API requests to run in parallel when scoring a list page. Lower = less API pressure, higher = faster results. Default 4.</p>
+                </div>
+                </div>
+            </details>
             <p class="subsection-label">Proactive Score Filter (all sites)</p>
             <p class="hint">Set your parse thresholds once here. They drive proactive WCL filtering on WoWProgress, Raider.IO and Guilds of WoW — switch it on per-site in each section. The DPS values also auto-close a WarcraftLogs character tab opened from those sites when the parse is below threshold.</p>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">DPS &amp; Tank thresholds</p>
-            <div class="option">
-                <label for="bestParseThreshold">Min. Best Parse %</label>
-                <input type="number" id="bestParseThreshold" min="0" max="100" step="1" placeholder="e.g. 60">
-                <p class="hint">Highest single DPS parse on any fight</p>
+            <div class="threshold-grid">
+                <span class="tg-head"></span>
+                <span class="tg-head">Min. Best %</span>
+                <span class="tg-head">Min. Median %</span>
+
+                <span class="tg-role role-dps">DPS</span>
+                <input type="number" id="bestParseThreshold" min="0" max="100" step="1" placeholder="e.g. 60"
+                       aria-label="Minimum best DPS parse percent">
+                <input type="number" id="parseThreshold" min="0" max="100" step="1" placeholder="e.g. 50"
+                       aria-label="Minimum median DPS parse percent">
+
+                <span class="tg-role role-tank">Tank</span>
+                <input type="number" id="wclMinBestTank" min="0" max="100" step="1" placeholder="↑ uses DPS"
+                       aria-label="Minimum best tank parse percent">
+                <input type="number" id="wclMinMedianTank" min="0" max="100" step="1" placeholder="↑ uses DPS"
+                       aria-label="Minimum median tank parse percent">
+
+                <span class="tg-role role-healer">Healer</span>
+                <input type="number" id="wclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60"
+                       aria-label="Minimum best healer parse percent">
+                <input type="number" id="wclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50"
+                       aria-label="Minimum median healer parse percent">
             </div>
-            <div class="option">
-                <label for="parseThreshold">Min. Median Parse %</label>
-                <input type="number" id="parseThreshold" min="0" max="100" step="1" placeholder="e.g. 50">
-                <p class="hint">Median DPS parse % across all fights</p>
+            <div class="option toggle-inline option--wide">
+                <label for="wclSortByParse">Sort lists by parse</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="wclSortByParse">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Ranks candidates by parse (highest first) on every site with proactive filtering on,
+                instead of only hiding those below your thresholds. Previously this was three separate per-site
+                toggles; your existing choice carries over.</p>
             </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Healer thresholds (HPS metric)</p>
-            <div class="option">
-                <label for="wclMinBestHealer">Min. Best HPS Parse %</label>
-                <input type="number" id="wclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60">
-            </div>
-            <div class="option">
-                <label for="wclMinMedianHealer">Min. Median HPS Parse %</label>
-                <input type="number" id="wclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50">
-            </div>
-            <p class="subsection-label" style="font-size:10px;margin-top:12px;">Tank-specific thresholds (optional override)</p>
-            <div class="option">
-                <label for="wclMinBestTank">Min. Best DPS Parse % (Tank)</label>
-                <input type="number" id="wclMinBestTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option">
-                <label for="wclMinMedianTank">Min. Median DPS Parse % (Tank)</label>
-                <input type="number" id="wclMinMedianTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
-            </div>
-            <div class="option">
+            <div class="option option--wide">
+                <p class="hint"><strong>Best</strong> is the highest single parse on any fight; <strong>Median</strong> is
+                the middle parse across all of them. DPS and Tank are measured on damage, Healers on healing (HPS) —
+                RaidScout picks the right metric per character automatically. Leave Tank blank to reuse the DPS row.</p>
                 <p class="hint">Characters WarcraftLogs has no parse data for are treated as below every threshold and
                 hidden — an unparsed raider can't be judged against a parse minimum. Characters whose lookup
                 <em>failed</em> (no credentials, rate limit, timeout) are always left visible, so a misconfiguration can
@@ -231,14 +244,6 @@
                 </label>
                 <p class="hint">Looks up each listed character's parse via the WarcraftLogs API and hides those below your thresholds. Parse thresholds (DPS, Healer HPS, Tank) are configured once in the <strong>WarcraftLogs</strong> section and require API credentials there.</p>
             </div>
-            <div class="option toggle-inline">
-                <label for="wpWclSort">Sort by WCL parse</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wpWclSort">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Ranks visible players by parse (highest first) instead of only hiding low parses.</p>
-            </div>
         </div>
 
         <!-- Raider.IO Settings -->
@@ -318,14 +323,6 @@
                 </label>
                 <p class="hint">Looks up each search row's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the search row — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
             </div>
-            <div class="option toggle-inline">
-                <label for="rioWclSort">Sort by WCL parse</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="rioWclSort">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Ranks visible search results by parse (highest first) instead of only hiding low parses.</p>
-            </div>
         </div>
 
         <!-- Guilds of WoW Settings -->
@@ -392,14 +389,6 @@
                 </label>
                 <p class="hint">Looks up each recruit's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the recruit card — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
             </div>
-            <div class="option toggle-inline">
-                <label for="gowWclSort">Sort by WCL parse</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gowWclSort">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Ranks visible recruit cards by parse (highest first) instead of only hiding low parses.</p>
-            </div>
         </div>
 
         <!-- Scout Settings -->
@@ -415,7 +404,7 @@
             </div>
 
             <p class="subsection-label">Sources</p>
-            <div class="option">
+            <div class="option option--wide">
                 <div class="region-checks">
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="wowprogress"> WoWProgress</label>
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="raiderio"> Raider.IO</label>
@@ -465,28 +454,32 @@
                 You can also toggle this directly on the Scout page.</p>
             </div>
 
-            <p class="subsection-label">Listing URLs (advanced)</p>
-            <div class="option">
-                <p class="hint">Leave blank to use the defaults. Set these to the exact listing you normally browse — a
-                specific realm, region or role filter — and Scout will harvest that instead. These also let you repoint Scout
-                yourself if a site moves its recruitment page.</p>
-            </div>
-            <div class="option">
-                <label for="scoutUrlWowprogress">WoWProgress</label>
-                <input type="text" id="scoutUrlWowprogress" placeholder="https://www.wowprogress.com/gearscore/?lfg=1&amp;sortby=ts&amp;raids_week=2&amp;lang=en" autocomplete="off">
-            </div>
-            <div class="option">
-                <label for="scoutUrlRaiderio">Raider.IO</label>
-                <input type="text" id="scoutUrlRaiderio" placeholder="https://raider.io/search?…recruitment.guild_raids…" autocomplete="off">
-            </div>
-            <div class="option">
-                <label for="scoutUrlWarcraftlogs">WarcraftLogs recruitment</label>
-                <input type="text" id="scoutUrlWarcraftlogs" placeholder="https://www.warcraftlogs.com/recruitment/" autocomplete="off">
-            </div>
-            <div class="option">
-                <label for="scoutUrlGuildsofwow">Guilds of WoW</label>
-                <input type="text" id="scoutUrlGuildsofwow" placeholder="https://guildsofwow.com/recruits" autocomplete="off">
-            </div>
+            <details class="advanced">
+                <summary>Listing URLs &mdash; point a source at a different search</summary>
+                <div class="details-body">
+    <div class="option">
+                    <p class="hint">Leave blank to use the defaults. Set these to the exact listing you normally browse — a
+                    specific realm, region or role filter — and Scout will harvest that instead. These also let you repoint Scout
+                    yourself if a site moves its recruitment page.</p>
+                </div>
+                <div class="option">
+                    <label for="scoutUrlWowprogress">WoWProgress</label>
+                    <input type="text" id="scoutUrlWowprogress" placeholder="https://www.wowprogress.com/gearscore/?lfg=1&amp;sortby=ts&amp;raids_week=2&amp;lang=en" autocomplete="off">
+                </div>
+                <div class="option">
+                    <label for="scoutUrlRaiderio">Raider.IO</label>
+                    <input type="text" id="scoutUrlRaiderio" placeholder="https://raider.io/search?…recruitment.guild_raids…" autocomplete="off">
+                </div>
+                <div class="option">
+                    <label for="scoutUrlWarcraftlogs">WarcraftLogs recruitment</label>
+                    <input type="text" id="scoutUrlWarcraftlogs" placeholder="https://www.warcraftlogs.com/recruitment/" autocomplete="off">
+                </div>
+                <div class="option">
+                    <label for="scoutUrlGuildsofwow">Guilds of WoW</label>
+                    <input type="text" id="scoutUrlGuildsofwow" placeholder="https://guildsofwow.com/recruits" autocomplete="off">
+                </div>
+                </div>
+            </details>
         </div>
 
         <div class="save-area">

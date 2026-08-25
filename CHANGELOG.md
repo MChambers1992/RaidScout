@@ -17,6 +17,11 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **78 new tests** — `tests/scout-core.test.js` imports `scout-core.js` directly (it is a real ES module, unlike the content scripts); `tests/sources.test.js` covers the WoWProgress HTML parser against jsdom fixtures.
 
 ### Changed
+- **Options page is no longer a 400px column** — The container was pinned to a fixed 400px even though the page opens as a full browser tab, so 51 settings stacked into an endless scroll and the tab labels ellipsised ("WoWProgr…", "Guilds of W…"). It now grows to a readable width and lays settings out in two columns on wide viewports. `showCategory()` toggles an `.is-active` class instead of an inline `display`, since an inline style would override the grid.
+- **Parse thresholds are a role grid** — Six stacked inputs, each with its own hint paragraph, became a 3x2 grid (DPS / Tank / Healer against Best / Median) with role colour bars. The tank-falls-back-to-DPS relationship is visible rather than described.
+- **Advanced settings are collapsed** — Cache TTL, clear-cache, debug logging and request concurrency on the WarcraftLogs tab, and the four per-source listing URLs on the Scout tab, now sit behind disclosure panels.
+- **Design tokens** (`src/shared.css`) — The palette was ~90 loose hex literals across three stylesheets, with the 13 WoW class colours duplicated verbatim in two of them. They are now CSS custom properties loaded by all three surfaces; each keeps its own selectors but reads one value.
+- **Scout table** — Zebra striping and a stronger hover tint for scanning eleven columns, and class names render properly ("Death Knight", not "deathknight").
 - **Characters with no WarcraftLogs logs now fail every parse threshold** — `failsWclThresholds()` returns `true` for a definitive no-logs result (`notFound`, or a successful lookup with both metrics null) on every site and in Scout. A character with no parses cannot be judged against a parse minimum. Lookups that *failed* (no credentials, rate limit, timeout) and candidates that were never scored are still always kept, so a misconfiguration can never empty a page.
 - **`isTrustedSender` split** (`background.js`) — Now `isTrustedTabSender` (host allowlist; the only path that can trigger the tab-bound `parseThresholdFailed`/`openTab`/`clearBadge` actions) and `isExtensionPageSender` (extension origin, no tab). The Scout page has no `sender.tab` and was rejected outright before this.
 
@@ -24,6 +29,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **Licensing was ambiguous** — README advertised MIT, `package.json` declared ISC, and no `LICENSE` file existed, so nothing was definite. Now MIT throughout, with a proper `LICENSE` file and a copyright line. Added a `.mailmap` so the three author-name variants on the same address collapse to one in `git log`/`shortlog` without rewriting history. README's licence section also now carries the standard unaffiliated-fan-project disclaimer for Blizzard and the four recruitment sites.
 
 ### Removed
+- **Three per-site sort toggles became one** — `wpWclSort`, `rioWclSort` and `gowWclSort` were the same preference stored three times, needing nine UI controls across the popup and options page for one concept. Replaced by the shared `wclSortByParse`. `wclSortEnabled()` in `common.js` falls back to any of the three old keys when the shared one is absent, so existing installs keep the behaviour they chose without re-configuring.
 - **`wclHideUnknown` setting** — Superseded by the unconditional no-logs rule above. Made unconditional rather than default-flipped because most existing installs have an explicit `false` saved, which a default change would never have reached.
 
 ### Fixed
