@@ -460,8 +460,11 @@
                     <input type="checkbox" id="scoutHideBelowThresholds">
                     <span class="toggle-slider"></span>
                 </label>
-                <p class="hint">Applies the parse thresholds from the WarcraftLogs tab. Candidates with no logs, or whose
-                lookup failed, are never hidden by this. You can also toggle it directly on the Scout page.</p>
+                <p class="hint">Applies the parse thresholds from the WarcraftLogs tab. <strong>Candidates WarcraftLogs has
+                no logs for are hidden too</strong> — a Scout run is meant to be a finished shortlist, and an unparsed raider
+                can't be judged against a parse threshold. Candidates that <em>couldn't be scored</em> (no credentials,
+                scoring off, rate limit, lookup error) are always shown, so a misconfiguration can never empty the list.
+                You can also toggle this directly on the Scout page.</p>
             </div>
 
             <p class="subsection-label">Listing URLs (advanced)</p>

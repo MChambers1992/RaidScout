@@ -66,6 +66,12 @@ Click **🔎 Scout all sites** in the popup. Scout then:
 4. **Scores** each unique player once through the WarcraftLogs API, with the same role-aware thresholds, 6-hour cache and rate-limit backoff as proactive filtering.
 5. **Ranks** everyone in a sortable table you can search, filter, copy as an in-game whisper list, or export to CSV.
 
+### No logs counts as below threshold
+
+If WarcraftLogs has no parses for a candidate, Scout hides them along with the low parses. A run is meant to be a finished shortlist, and someone with no logs at all can't be judged against a parse threshold. This differs on purpose from the inline site filters, where no-logs candidates are governed by the separate "Hide characters with no logs" setting — on a site you're still reading the page yourself.
+
+Candidates who *couldn't be scored* are never hidden: no API credentials, scoring switched off, a rate limit part-way through a run, or a failed lookup all leave the candidate visible with an explanatory badge. Those say nothing about the player, and hiding on them would empty the whole list on a misconfiguration. The counter above the table breaks the two apart — `12 below thresholds · 5 with no logs` — and unticking **Hide below thresholds & no logs** brings both back.
+
 ### What Scout tells you when something goes wrong
 
 Every other filter in RaidScout fails *open* — on an error it shows the candidate rather than hiding them. Scout deliberately fails *visible* instead: if a site returns nothing, its chip turns red and a banner says exactly which site, why, and against which URL. A shortened list you trust is worse than a visible error.
@@ -266,7 +272,7 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 | Max candidates per run | `150` | Cap on unique candidates scored — each one is a WarcraftLogs API call |
 | WoWProgress pages per run | `1` | How many pages of the WoWProgress listing to pull |
 | Fetch WarcraftLogs parses | on | Score candidates via the API. Off = list only, no parses |
-| Hide candidates below thresholds | on | Apply your parse thresholds to the results (also toggleable on the Scout page) |
+| Hide candidates below thresholds | on | Apply your parse thresholds to the results, and hide candidates with no logs. Candidates that couldn't be scored stay visible (also toggleable on the Scout page) |
 | Listing URLs | blank | Override the default listing URL per source. Blank = use the default |
 
 ---
@@ -301,6 +307,10 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 - The banner names the site, the reason and the URL it used. Open that URL yourself: if the listing looks fine in your browser but Scout saw nothing, the site changed its markup
 - "No results rendered within 15s" on Raider.IO, WarcraftLogs or Guilds of WoW usually means the page wanted a sign-in, or the listing URL is wrong — override it in Settings → Scout → Listing URLs
 - WoWProgress is fetched directly rather than through a tab, so it fails differently: an HTTP status or "No results table (.rating)" means the URL is wrong or the markup changed
+
+**Scout is hiding people who look fine on the site**
+- Candidates with no WarcraftLogs parses are hidden by **Hide below thresholds & no logs**. The counter above the table shows how many; untick it to see them
+- This is Scout-only. The inline site filters still use the separate "Hide characters with no logs" setting
 
 **Scout found fewer candidates than the sites show**
 - Each source is filtered by its own tab's settings before Scout ever sees it — a strict item-level or class filter on one site applies to that site's Scout results too

@@ -136,6 +136,26 @@ export function mergeCandidates(candidates) {
     return Array.from(byKey.values());
 }
 
+// ─── Score classification ──────────────────────────────────────────────────────
+
+// True when WarcraftLogs gave a definitive answer that this character has no
+// logs — as opposed to a lookup that failed or never ran.
+//
+// The distinction carries the whole no-logs filtering rule: `notFound` (or a
+// successful lookup with both metrics null) is real information about the
+// candidate, so Scout can act on it. An `error` is information about the
+// *request*, not the player, so it must never remove anyone.
+export function hasNoLogs(score) {
+    if (!score || score.error) return false;
+    return !!score.notFound || (score.best === null && score.median === null);
+}
+
+// Whether a score was actually obtained (used to tell "we know they're empty"
+// apart from "we never asked").
+export function isScored(score) {
+    return !!score && !score.error;
+}
+
 // ─── Filtering ─────────────────────────────────────────────────────────────────
 
 // Applies the WoWProgress-tab filters to a candidate. Used by the fetch adapter,

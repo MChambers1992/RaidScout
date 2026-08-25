@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
     slugRealm, makeCandidateKey, normalizeCandidate, mergeCandidate, mergeCandidates,
     passesWowProgressFilters, sortCandidates, matchesQuery, profileLinks,
-    toCsv, toWhisperList, runWithConcurrency,
+    toCsv, toWhisperList, runWithConcurrency, hasNoLogs, isScored,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -325,5 +325,94 @@ describe('slugRealm percent-encoding (regression)', () => {
 
     it('collapses underscores too', () => {
         expect(slugRealm('Tarren_Mill')).toBe('tarren-mill');
+    });
+});
+
+describe('hasNoLogs', () => {
+    it('is true when WarcraftLogs explicitly reports no logs', () => {
+        expect(hasNoLogs({ best: null, median: null, notFound: true })).toBe(true);
+    });
+
+    it('is true when the lookup succeeded but both metrics are null', () => {
+        expect(hasNoLogs({ best: null, median: null })).toBe(true);
+    });
+
+    it('is false for a real score, including a zero parse', () => {
+        expect(hasNoLogs({ best: 40, median: 12 })).toBe(false);
+        expect(hasNoLogs({ best: 0, median: 0 })).toBe(false);
+    });
+
+    it('is false when only one metric came back', () => {
+        expect(hasNoLogs({ best: 55, median: null })).toBe(false);
+        expect(hasNoLogs({ best: null, median: 55 })).toBe(false);
+    });
+
+    it('is false for any errored lookup, however it failed', () => {
+        // An error describes the request, not the player — treating it as "no
+        // logs" would empty the list on a missing key or a rate limit.
+        for (const error of ['NO_CREDENTIALS', 'FETCH_TIMEOUT', 'RATE_LIMITED:60', 'NO_RESPONSE']) {
+            expect(hasNoLogs({ best: null, median: null, error })).toBe(false);
+        }
+    });
+
+    it('is false for a candidate that was never scored', () => {
+        expect(hasNoLogs(null)).toBe(false);
+        expect(hasNoLogs(undefined)).toBe(false);
+    });
+});
+
+describe('isScored', () => {
+    it('separates a real answer from a failed or absent one', () => {
+        expect(isScored({ best: 70, median: 60 })).toBe(true);
+        expect(isScored({ best: null, median: null, notFound: true })).toBe(true);
+        expect(isScored({ error: 'FETCH_TIMEOUT' })).toBe(false);
+        expect(isScored(null)).toBe(false);
+    });
+});
+
+// Mirrors isBelowThreshold() in scout.js, which composes hasNoLogs with
+// common.js's failsWclThresholds. Re-declared here because common.js is a
+// classic content script with no export surface.
+describe('Scout hide rule (no logs counts as below threshold)', () => {
+    function failsWclThresholds(score, { minBest = 0, minMedian = 0, hideUnknown = false }) {
+        if (!score) return !!hideUnknown;
+        if (score.error) return false;
+        const haveData = score.best !== null || score.median !== null;
+        if (!haveData) return !!hideUnknown;
+        if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
+        if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
+        return false;
+    }
+
+    const isBelowThreshold = (wcl, settings = { minBest: 60, minMedian: 50 }) => {
+        if (!wcl) return false;
+        if (hasNoLogs(wcl)) return true;
+        return failsWclThresholds(wcl, settings);
+    };
+
+    it('hides a no-logs candidate even when hideUnknown is off', () => {
+        // The reported bug: these were showing up alongside qualified raiders.
+        expect(isBelowThreshold({ best: null, median: null, notFound: true },
+            { minBest: 60, minMedian: 50, hideUnknown: false })).toBe(true);
+    });
+
+    it('still hides a genuinely low parse', () => {
+        expect(isBelowThreshold({ best: 30, median: 20 })).toBe(true);
+    });
+
+    it('keeps a candidate above the thresholds', () => {
+        expect(isBelowThreshold({ best: 90, median: 75 })).toBe(false);
+    });
+
+    it('keeps candidates that could not be scored', () => {
+        expect(isBelowThreshold(null)).toBe(false);                                  // never scored
+        expect(isBelowThreshold({ error: 'NO_CREDENTIALS' })).toBe(false);           // no API key
+        expect(isBelowThreshold({ error: 'RATE_LIMITED:60', rateLimitMs: 60000 })).toBe(false);
+        expect(isBelowThreshold({ error: 'FETCH_TIMEOUT' })).toBe(false);
+    });
+
+    it('hides no-logs candidates even with no thresholds set', () => {
+        expect(isBelowThreshold({ best: null, median: null, notFound: true },
+            { minBest: 0, minMedian: 0 })).toBe(true);
     });
 });

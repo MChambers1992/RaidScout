@@ -211,7 +211,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `scoutMaxCandidates` | number | `150` | Cap on unique candidates scored per run (each is one WCL API call) |
 | `scoutPagesPerSource` | number | `1` | WoWProgress listing pages to pull (`fetch` adapter only) |
 | `scoutWclEnabled` | boolean | `true` | Fetch WarcraftLogs parses for harvested candidates |
-| `scoutHideBelowThresholds` | boolean | `true` | Apply the shared parse thresholds to Scout results |
+| `scoutHideBelowThresholds` | boolean | `true` | Apply the shared parse thresholds to Scout results, and hide no-logs candidates (see quirk 27) |
 | `scoutUrlWowprogress` | string | `""` | Listing URL override — blank uses `DEFAULT_SOURCE_URLS` |
 | `scoutUrlRaiderio` | string | `""` | Listing URL override |
 | `scoutUrlGuildsofwow` | string | `""` | Listing URL override |
@@ -259,7 +259,7 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 17. **Sender validation:** The background validates `sender.tab.url` hostname against `TRUSTED_HOSTS` before acting on any message. `openTab` additionally validates the URL against `ALLOWED_TAB_PREFIXES` (WCL character URLs only) to prevent URL injection.
 
-18. **Unit tests:** `tests/common.test.js` (Vitest) covers 34 cases across `normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, and `normalizeCharacter` — it re-declares those functions inline because content scripts have no export surface. `tests/scout-core.test.js` covers 61 cases and imports `src/scout/scout-core.js` directly, since it is a real ES module. Run with `npm test`.
+18. **Unit tests:** `tests/common.test.js` (Vitest) covers 34 cases across `normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, and `normalizeCharacter` — it re-declares those functions inline because content scripts have no export surface. `tests/scout-core.test.js` covers 73 cases and imports `src/scout/scout-core.js` directly, since it is a real ES module. `tests/sources.test.js` covers the WoWProgress HTML parser against jsdom fixtures. Run with `npm test`.
 
 19. **Sort by WCL parse:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
 
@@ -276,6 +276,8 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 25. **Scout listing URLs are user-overridable by design.** Raider.IO and Guilds of WoW render their listings client-side; their JSON endpoints were never confirmed, so the defaults in `DEFAULT_SOURCE_URLS` are best-effort. Any of the four can be repointed in Settings → Scout without an extension update.
 
 26. **Background tabs opened by Scout are always cleaned up** — `harvestViaTab` removes the tab in a `finally` block, so a timeout or a thrown adapter error can't strand a tab in the officer's window.
+
+27. **Scout treats "no logs" as failing, unlike every other filter.** `isBelowThreshold()` in `scout.js` composes `hasNoLogs()` (from `scout-core.js`) with the shared `failsWclThresholds()`: a definitive `notFound` — or a successful lookup where both metrics are null — hides the candidate regardless of `wclHideUnknown`. The inline site filters still defer to that setting. The rationale is that a Scout run is the officer's finished shortlist, whereas on a site they are still reading the page. The line `hasNoLogs()` draws is between information about the *player* (`notFound` → actionable) and information about the *request* (`error` → says nothing about them). Anything unscored or errored stays visible, so a missing API key, a disabled scoring toggle or a mid-run rate limit can never empty the list. The counter above the table reports the two causes separately.
 
 ## File Structure
 

@@ -11,7 +11,7 @@
 // one seen inline on the site itself.
 
 import {
-    SOURCE_META, SOURCE_IDS, normalizeCandidate, mergeCandidates,
+    SOURCE_META, SOURCE_IDS, normalizeCandidate, mergeCandidates, hasNoLogs,
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS } from './sources.js';
@@ -331,11 +331,21 @@ function visibleCandidates() {
         .filter(c => !(hideBelow && isBelowThreshold(c)));
 }
 
-// Unscored candidates are never treated as failing — same fail-open rule the
-// content scripts use, so a missing API key or a timeout can't silently delete
-// people from the officer's list.
+// Scout treats "no logs" as failing the thresholds: an officer asking for
+// candidates above a parse cannot evaluate someone with no parse at all, so
+// listing them alongside qualified raiders is noise. This deliberately differs
+// from the inline site filters, which leave that to the `wclHideUnknown`
+// setting — on a site you are still looking at the page, but a Scout run is
+// meant to be the finished shortlist.
+//
+// What is NOT treated as failing: a candidate who was never scored (no API
+// credentials, scoring switched off, rate limit hit mid-run) or whose lookup
+// errored. Those say nothing about the player, and hiding on them would empty
+// the entire list on a misconfiguration — the exact failure the fail-open rule
+// exists to prevent.
 function isBelowThreshold(candidate) {
-    if (!candidate.wcl) return false;
+    if (!candidate.wcl) return false;                    // never scored
+    if (hasNoLogs(candidate.wcl)) return true;           // definitively no logs
     return failsWclThresholds(candidate.wcl, state.wclSettings, candidate.role || 'dps');
 }
 
@@ -392,14 +402,21 @@ function render() {
         el.tbody.appendChild(tr);
     }
 
-    const hiddenByThreshold = el.hideBelow.checked ? state.candidates.filter(isBelowThreshold).length : 0;
+    // Report no-logs separately from low parses: they are hidden for different
+    // reasons and an officer short on candidates may want to reconsider one but
+    // not the other.
+    const hidden    = el.hideBelow.checked ? state.candidates.filter(isBelowThreshold) : [];
+    const noLogs    = hidden.filter(c => hasNoLogs(c.wcl)).length;
+    const lowParse  = hidden.length - noLogs;
     el.count.textContent = `${rows.length} shown` +
-        (hiddenByThreshold ? ` · ${hiddenByThreshold} below thresholds` : '') +
-        (state.candidates.length !== rows.length + hiddenByThreshold ? ` · ${state.candidates.length} total` : '');
+        (lowParse ? ` · ${lowParse} below thresholds` : '') +
+        (noLogs   ? ` · ${noLogs} with no logs` : '') +
+        (state.candidates.length !== rows.length + hidden.length ? ` · ${state.candidates.length} total` : '');
 
     el.empty.hidden = rows.length > 0;
     if (rows.length === 0 && state.candidates.length > 0) {
-        el.empty.textContent = 'Every candidate is filtered out by the search box or your parse thresholds.';
+        el.empty.textContent = 'Every candidate is filtered out by the search box, your parse thresholds, ' +
+            'or having no WarcraftLogs data. Untick “Hide below parse thresholds” to see them.';
     }
 
     document.querySelectorAll('thead th[data-sort]').forEach(th => {
