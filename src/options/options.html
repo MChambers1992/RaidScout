@@ -98,13 +98,11 @@
                 <label for="wclMinMedianTank">Min. Median DPS Parse % (Tank)</label>
                 <input type="number" id="wclMinMedianTank" min="0" max="100" step="1" placeholder="Falls back to DPS threshold">
             </div>
-            <div class="option toggle-inline">
-                <label for="wclHideUnknown">Hide characters with no logs</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wclHideUnknown">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">When on, characters WarcraftLogs has no parse data for are hidden on list pages too.</p>
+            <div class="option">
+                <p class="hint">Characters WarcraftLogs has no parse data for are treated as below every threshold and
+                hidden — an unparsed raider can't be judged against a parse minimum. Characters whose lookup
+                <em>failed</em> (no credentials, rate limit, timeout) are always left visible, so a misconfiguration can
+                never empty a page.</p>
             </div>
             <p class="subsection-label">Recruitment Search</p>
             <div class="option">

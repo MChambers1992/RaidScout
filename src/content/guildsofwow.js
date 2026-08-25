@@ -112,7 +112,7 @@ function filterCards(minIlvl, minMythicKills, minMythicPlusScore, selectedClasse
 
 // ─── WCL scoring ──────────────────────────────────────────────────────────────
 
-let gowWclThresholds  = { minBest: 0, minMedian: 0, hideUnknown: false };
+let gowWclThresholds  = { minBest: 0, minMedian: 0 };
 let gowHiddenCount    = 0;
 let gowSummaryAnchor  = null;
 

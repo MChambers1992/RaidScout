@@ -52,7 +52,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
      - `normalizeClassName(name)`, `WOW_CLASS_NAMES`, `sendMessageToBackground(action, data)`
      - `assertSelector(selector, context, label)` — logs a console warning if a critical selector finds nothing, so site-markup breakage is surfaced rather than silently failing
      - `requestWclScore(character)` — asks the background for a `{best, median, notFound?, error?, rateLimitMs?}` score. `character` must include `role` so the API uses the right metric
-     - `failsWclThresholds(score, {minBest, minMedian, hideUnknown})` — pure decision function; never hides on transient errors
+     - `failsWclThresholds(score, settings, role)` — pure decision function. Hides low parses and no-logs characters; never hides on transient errors or unscored candidates (see quirk 27)
      - `runWithConcurrency(items, worker, limit)` — concurrency-limited async pool
      - `makeBadge(state, score, thresholds)` / `setBadgeState(container, state, score, thresholds)` — renders inline parse badges with states: `pending`, `no-logs`, `error`, `rate-limited`, `score` (with warn/fail colour coding)
      - `upsertFilterSummary(anchorEl, hidden, total)` — inserts/updates a "X of Y hidden" bar above the list
@@ -149,7 +149,6 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `wclMinMedianHealer` | number | `0` | **Shared** min median HPS parse % for healers (proactive scoring; 0 = no minimum) |
 | `wclMinBestTank` | number | `0` | **Shared** min best DPS parse % for tanks — falls back to `bestParseThreshold` when 0 |
 | `wclMinMedianTank` | number | `0` | **Shared** min median DPS parse % for tanks — falls back to `parseThreshold` when 0 |
-| `wclHideUnknown` | boolean | `false` | **Shared** also hide characters WCL has no parse data for (proactive scoring) |
 | `wclSearchParseThreshold` | number | `0` | Min parse % for recruitment search results (0 = no minimum) |
 | `wclSearchProactive` | boolean | `false` | Also apply the proactive API scoring flow (role-aware thresholds + inline badges) to recruitment search results, on top of the flat `wclSearchParseThreshold` filter above. Requires API credentials |
 | `wclSelectedRegions` | string[] | `[]` | Filter recruitment search by region — empty shows all |
@@ -277,7 +276,7 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 26. **Background tabs opened by Scout are always cleaned up** — `harvestViaTab` removes the tab in a `finally` block, so a timeout or a thrown adapter error can't strand a tab in the officer's window.
 
-27. **Scout treats "no logs" as failing, unlike every other filter.** `isBelowThreshold()` in `scout.js` composes `hasNoLogs()` (from `scout-core.js`) with the shared `failsWclThresholds()`: a definitive `notFound` — or a successful lookup where both metrics are null — hides the candidate regardless of `wclHideUnknown`. The inline site filters still defer to that setting. The rationale is that a Scout run is the officer's finished shortlist, whereas on a site they are still reading the page. The line `hasNoLogs()` draws is between information about the *player* (`notFound` → actionable) and information about the *request* (`error` → says nothing about them). Anything unscored or errored stays visible, so a missing API key, a disabled scoring toggle or a mid-run rate limit can never empty the list. The counter above the table reports the two causes separately.
+27. **"No logs" fails every threshold, everywhere.** `failsWclThresholds()` in `common.js` returns `true` for a definitive no-logs result — `notFound`, or a successful lookup where both metrics are null — regardless of any setting. A character with no parses cannot be judged against a parse minimum, so they are below all of them. This is unconditional by design: it replaced the `wclHideUnknown` toggle (removed in 1.4.0), because most existing installs had an explicit `false` saved and a default flip would never have reached them. The line the rule draws is between information about the *player* (`notFound` → actionable) and information about the *request* (`error`, or no score at all → says nothing about them): anything errored or unscored is always kept, so a missing API key, a disabled scoring toggle or a mid-run rate limit can never empty a page. Scout adds only a `!candidate.wcl` guard, because it renders rows before scoring runs, and uses `hasNoLogs()` from `scout-core.js` purely to report the two hide reasons separately above the table.
 
 ## File Structure
 

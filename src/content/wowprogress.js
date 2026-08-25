@@ -80,7 +80,7 @@ function getWowProgressCharacter(playerRow) {
 // WCL settings change later in the session. The original standard-filter pass
 // removes rows that fail non-WCL criteria; WCL-scored rows that fail are hidden.
 
-let wclThresholds = { minBest: 0, minMedian: 0, hideUnknown: false };
+let wclThresholds = { minBest: 0, minMedian: 0 };
 let wclSummaryAnchor = null;
 
 async function applyWclScoring(wclSettings) {

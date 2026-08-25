@@ -55,35 +55,48 @@ function requestWclScore(character) {
 function thresholdsForRole(role, settings) {
     if (role === 'healer') {
         return {
-            minBest:     settings.minBestHealer  || 0,
-            minMedian:   settings.minMedianHealer || 0,
-            hideUnknown: settings.hideUnknown,
+            minBest:   settings.minBestHealer   || 0,
+            minMedian: settings.minMedianHealer || 0,
         };
     }
     if (role === 'tank') {
         return {
-            minBest:     settings.minBestTank   || settings.minBest   || 0,
-            minMedian:   settings.minMedianTank || settings.minMedian || 0,
-            hideUnknown: settings.hideUnknown,
+            minBest:   settings.minBestTank   || settings.minBest   || 0,
+            minMedian: settings.minMedianTank || settings.minMedian || 0,
         };
     }
     // dps / unknown
     return {
-        minBest:     settings.minBest   || 0,
-        minMedian:   settings.minMedian || 0,
-        hideUnknown: settings.hideUnknown,
+        minBest:   settings.minBest   || 0,
+        minMedian: settings.minMedian || 0,
     };
 }
 
+// True when WarcraftLogs gave a definitive answer that this character has no
+// logs, as opposed to a lookup that failed or never ran. See the note in
+// failsWclThresholds for why that difference decides everything here.
+function hasNoWclLogs(score) {
+    if (!score || score.error) return false;
+    return !!score.notFound || (score.best === null && score.median === null);
+}
+
 // Returns true if the element/row should be hidden.
-// Never hides on transient errors (fail-open).
+//
+// A character with no logs at all fails: they cannot be judged against a parse
+// threshold, so showing them beside raiders who cleared it is noise. This is
+// unconditional rather than a setting — it is what "above X parse" means.
+//
+// What never hides is a lookup that did not produce an answer: a transient
+// error, a rate limit, a missing API key. Those describe the *request*, not the
+// player, and hiding on them would empty an entire page on a misconfiguration.
+// That fail-open rule is the one thing this function must never break.
+//
 // `role` is the character's role; `settings` contains per-role threshold keys.
 function failsWclThresholds(score, settings, role) {
-    const { minBest, minMedian, hideUnknown } = thresholdsForRole(role || 'dps', settings);
-    if (!score) return !!hideUnknown;
+    const { minBest, minMedian } = thresholdsForRole(role || 'dps', settings);
+    if (!score) return false;                               // never scored → keep
     if (score.error) return false;                          // transient failure → keep
-    const haveData = score.best !== null || score.median !== null;
-    if (!haveData) return !!hideUnknown;                    // never logged → user's choice
+    if (hasNoWclLogs(score)) return true;                   // no logs → below any threshold
     if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
     if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
     return false;
@@ -117,7 +130,7 @@ const SHARED_WCL_KEYS = [
     'bestParseThreshold', 'parseThreshold',
     'wclMinBestHealer', 'wclMinMedianHealer',
     'wclMinBestTank', 'wclMinMedianTank',
-    'wclHideUnknown', 'wclConcurrency',
+    'wclConcurrency',
 ];
 
 // Build the role-aware settings object consumed by thresholdsForRole /
@@ -131,7 +144,6 @@ function buildWclSettings(options) {
         minMedianHealer: parseInt(options.wclMinMedianHealer) || 0,
         minBestTank:     parseInt(options.wclMinBestTank)     || 0,
         minMedianTank:   parseInt(options.wclMinMedianTank)   || 0,
-        hideUnknown:     !!options.wclHideUnknown,
         concurrency:     getConcurrency(options),
     };
 }

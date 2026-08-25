@@ -7,7 +7,7 @@ let wclSettings = {
     minBest: 0, minMedian: 0,
     minBestHealer: 0, minMedianHealer: 0,
     minBestTank: 0, minMedianTank: 0,
-    hideUnknown: false, concurrency: 4,
+    concurrency: 4,
 };
 
 function isRaiderIoCharacterPage() {

@@ -68,7 +68,7 @@ Click **🔎 Scout all sites** in the popup. Scout then:
 
 ### No logs counts as below threshold
 
-If WarcraftLogs has no parses for a candidate, Scout hides them along with the low parses. A run is meant to be a finished shortlist, and someone with no logs at all can't be judged against a parse threshold. This differs on purpose from the inline site filters, where no-logs candidates are governed by the separate "Hide characters with no logs" setting — on a site you're still reading the page yourself.
+If WarcraftLogs has no parses for a candidate, Scout hides them along with the low parses — someone with no parse at all can't be judged against a parse threshold. This is the same rule the inline site filters use, so a candidate hidden on WoWProgress is hidden in Scout for the same reason.
 
 Candidates who *couldn't be scored* are never hidden: no API credentials, scoring switched off, a rate limit part-way through a run, or a failed lookup all leave the candidate visible with an explanatory badge. Those say nothing about the player, and hiding on them would empty the whole list on a misconfiguration. The counter above the table breaks the two apart — `12 below thresholds · 5 with no logs` — and unticking **Hide below thresholds & no logs** brings both back.
 
@@ -165,7 +165,7 @@ Parse thresholds are configured a single time in the **WarcraftLogs** tab and ap
 
 1. On the **WarcraftLogs** tab, under **Proactive Score Filter**, set **Min. Best Parse %** and/or **Min. Median Parse %** for DPS characters
 2. Optionally set separate thresholds for healers and tanks (see [Per-role parse thresholds](#per-role-parse-thresholds))
-3. Decide whether to **Hide characters with no logs** (off by default — unlogged characters stay visible)
+3. Characters WarcraftLogs has no parses for are hidden automatically — see [No logs counts as below threshold](#no-logs-counts-as-below-threshold)
 4. On each site's tab (WoWProgress, Raider.IO, Guilds of WoW), toggle on **Enable proactive WCL filtering**
 5. Click **Save**
 
@@ -213,7 +213,6 @@ Role is detected automatically from each candidate row. On Raider.IO it reads th
 | Min. Median HPS % (Healer) | — | **Shared** — minimum median HPS parse for healers (proactive scoring) |
 | Min. Best % (Tank override) | — | **Shared** — overrides the DPS best threshold for tanks only |
 | Min. Median % (Tank override) | — | **Shared** — overrides the DPS median threshold for tanks only |
-| Hide characters with no logs | Off | **Shared** — also hide characters WarcraftLogs has no parse data for |
 | Recruitment search parse filter | — | Minimum parse % on the WarcraftLogs recruitment search page |
 | Min mythic kills (WCL search) | — | Minimum current-tier mythic kill count on the WCL recruitment search page |
 | Client ID | — | WarcraftLogs v2 API client ID (synced across devices) |
@@ -290,8 +289,8 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 - If it persists across page refreshes, check the service worker console: in `chrome://extensions/` find RaidScout and click **Service worker** → **inspect**. Look for `[RaidScout WCL]` log lines (enable debug logging in Full Settings to see more detail)
 
 **The filter cleared everyone / the list is empty**
-- Check "Hide characters with no logs" — if this is on and most candidates have no WarcraftLogs data, they'll all be hidden
-- Lower your parse thresholds or turn off "Hide characters with no logs"
+- Characters WarcraftLogs has no parses for are always hidden when proactive filtering is on. On a low-population realm, or early in a tier, that can be most of the list
+- Lower your parse thresholds, or turn proactive filtering off for that site to see everyone
 - Refresh the page — some site SPAs can end up with stale filter state
 
 **Auto-open WarcraftLogs isn't working on WoWProgress**
@@ -310,7 +309,7 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 
 **Scout is hiding people who look fine on the site**
 - Candidates with no WarcraftLogs parses are hidden by **Hide below thresholds & no logs**. The counter above the table shows how many; untick it to see them
-- This is Scout-only. The inline site filters still use the separate "Hide characters with no logs" setting
+- The inline site filters apply the same rule, so this is consistent with what you'd see browsing the site directly
 
 **Scout found fewer candidates than the sites show**
 - Each source is filtered by its own tab's settings before Scout ever sees it — a strict item-level or class filter on one site applies to that site's Scout results too

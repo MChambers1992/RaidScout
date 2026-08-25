@@ -331,21 +331,13 @@ function visibleCandidates() {
         .filter(c => !(hideBelow && isBelowThreshold(c)));
 }
 
-// Scout treats "no logs" as failing the thresholds: an officer asking for
-// candidates above a parse cannot evaluate someone with no parse at all, so
-// listing them alongside qualified raiders is noise. This deliberately differs
-// from the inline site filters, which leave that to the `wclHideUnknown`
-// setting — on a site you are still looking at the page, but a Scout run is
-// meant to be the finished shortlist.
-//
-// What is NOT treated as failing: a candidate who was never scored (no API
-// credentials, scoring switched off, rate limit hit mid-run) or whose lookup
-// errored. Those say nothing about the player, and hiding on them would empty
-// the entire list on a misconfiguration — the exact failure the fail-open rule
-// exists to prevent.
+// Delegates entirely to the shared rule in common.js, which every site filter
+// also uses: a low parse fails, no logs at all fails, and anything that could
+// not be scored (no credentials, rate limit, timeout, scoring switched off) is
+// always kept. Scout only needs the extra `!candidate.wcl` guard because it
+// renders rows before scoring has run.
 function isBelowThreshold(candidate) {
-    if (!candidate.wcl) return false;                    // never scored
-    if (hasNoLogs(candidate.wcl)) return true;           // definitively no logs
+    if (!candidate.wcl) return false;                    // not scored yet
     return failsWclThresholds(candidate.wcl, state.wclSettings, candidate.role || 'dps');
 }
 

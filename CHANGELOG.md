@@ -6,6 +6,27 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] — Unreleased
+
+### Added
+- **Scout — cross-site recruitment aggregator** (`src/scout/`) — New full-page view opened from the popup's "🔎 Scout all sites" button. Harvests every configured recruitment site in one pass, merges the results into a single de-duplicated candidate list, scores each unique player once through the existing WarcraftLogs pipeline, and renders them in a sortable table with search, CSV export and an in-game whisper list. Two harvest modes behind one adapter registry (`sources.js`): `fetch` parses the listing directly (WoWProgress, the only server-rendered one), `tab` opens the listing in a background tab, lets the site's own content script filter it, harvests the visible rows via the new `registerHarvester()` hook, and closes the tab (Raider.IO, Guilds of WoW, WarcraftLogs recruitment).
+- **Cross-source de-duplication** — A player advertising on several sites becomes one row marked `×N` and is scored once rather than once per site. Realm slugging (`slugRealm()`) collapses the three spellings the sites use (`Tarren Mill` / `tarren-mill` / `Tarren-Mill`) and apostrophe variants. Numeric stats merge by taking the higher value; class and role by source authority.
+- **Scout settings tab** — Source selection, candidate cap (default 150, sized to the WCL API's hourly budget), WoWProgress page count, scoring toggle, threshold toggle, and per-source listing URL overrides.
+- **`hasNoLogs()` / `isScored()`** (`scout-core.js`) — Classify a score result as a definitive answer about the player versus a failed request.
+- **78 new tests** — `tests/scout-core.test.js` imports `scout-core.js` directly (it is a real ES module, unlike the content scripts); `tests/sources.test.js` covers the WoWProgress HTML parser against jsdom fixtures.
+
+### Changed
+- **Characters with no WarcraftLogs logs now fail every parse threshold** — `failsWclThresholds()` returns `true` for a definitive no-logs result (`notFound`, or a successful lookup with both metrics null) on every site and in Scout. A character with no parses cannot be judged against a parse minimum. Lookups that *failed* (no credentials, rate limit, timeout) and candidates that were never scored are still always kept, so a misconfiguration can never empty a page.
+- **`isTrustedSender` split** (`background.js`) — Now `isTrustedTabSender` (host allowlist; the only path that can trigger the tab-bound `parseThresholdFailed`/`openTab`/`clearBadge` actions) and `isExtensionPageSender` (extension origin, no tab). The Scout page has no `sender.tab` and was rejected outright before this.
+
+### Removed
+- **`wclHideUnknown` setting** — Superseded by the unconditional no-logs rule above. Made unconditional rather than default-flipped because most existing installs have an explicit `false` saved, which a default change would never have reached.
+
+### Fixed
+- **WoWProgress realms with spaces were never scored** — `getWowProgressCharacter()` slugged the percent-encoded href segment without decoding it, sending `tarren%20mill` to the WarcraftLogs API and getting `notFound` back for every multi-word realm. Proactive scoring on WoWProgress had been silently failing for those characters.
+
+---
+
 ## [1.3.0] — Unreleased
 
 ### Added

@@ -26,7 +26,6 @@ const SCHEMA = [
     { key: 'wclMinMedianHealer',         type: 'int',    default: 0,     domId: 'wclMinMedianHealer' },
     { key: 'wclMinBestTank',             type: 'int',    default: 0,     domId: 'wclMinBestTank' },
     { key: 'wclMinMedianTank',           type: 'int',    default: 0,     domId: 'wclMinMedianTank' },
-    { key: 'wclHideUnknown',             type: 'bool',   default: false, domId: 'wclHideUnknown' },
     { key: 'wclSearchParseThreshold',    type: 'int',    default: 0,     domId: 'wclSearchParseThreshold' },
     { key: 'wclSearchProactive',         type: 'bool',   default: false, domId: 'wclSearchProactive' },
     { key: 'wclMinMythicKills',          type: 'int',    default: 0,     domId: 'wclMinMythicKills' },

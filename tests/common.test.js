@@ -17,11 +17,15 @@ function normalizeClassName(name) {
     return lower.replace(/ /g, '_');
 }
 
-function failsWclThresholds(score, { minBest, minMedian, hideUnknown }) {
-    if (!score) return !!hideUnknown;
+function hasNoWclLogs(score) {
+    if (!score || score.error) return false;
+    return !!score.notFound || (score.best === null && score.median === null);
+}
+
+function failsWclThresholds(score, { minBest, minMedian }) {
+    if (!score) return false;
     if (score.error) return false;
-    const haveData = score.best !== null || score.median !== null;
-    if (!haveData) return !!hideUnknown;
+    if (hasNoWclLogs(score)) return true;
     if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
     if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
     return false;
@@ -72,7 +76,7 @@ describe('normalizeClassName', () => {
 // ─── failsWclThresholds ───────────────────────────────────────────────────────
 
 describe('failsWclThresholds', () => {
-    const cfg = { minBest: 60, minMedian: 50, hideUnknown: false };
+    const cfg = { minBest: 60, minMedian: 50 };
 
     it('hides when best and median both below threshold', () => {
         expect(failsWclThresholds({ best: 40, median: 30 }, cfg)).toBe(true);
@@ -94,17 +98,25 @@ describe('failsWclThresholds', () => {
         expect(failsWclThresholds({ best: null, median: null, error: 'FETCH_TIMEOUT' }, cfg)).toBe(false);
         expect(failsWclThresholds({ best: null, median: null, error: 'NO_RESPONSE' }, cfg)).toBe(false);
     });
-    it('respects hideUnknown=false for characters with no logs', () => {
-        expect(failsWclThresholds({ best: null, median: null, notFound: true }, cfg)).toBe(false);
+    it('hides a character WarcraftLogs has no logs for', () => {
+        expect(failsWclThresholds({ best: null, median: null, notFound: true }, cfg)).toBe(true);
     });
-    it('respects hideUnknown=true for characters with no logs', () => {
-        expect(failsWclThresholds({ best: null, median: null, notFound: true }, { ...cfg, hideUnknown: true })).toBe(true);
+    it('hides a successful lookup that came back with both metrics null', () => {
+        expect(failsWclThresholds({ best: null, median: null }, cfg)).toBe(true);
     });
-    it('respects hideUnknown=true for null score object', () => {
-        expect(failsWclThresholds(null, { ...cfg, hideUnknown: true })).toBe(true);
+    it('hides a no-logs character even with no thresholds set', () => {
+        expect(failsWclThresholds({ best: null, median: null, notFound: true },
+            { minBest: 0, minMedian: 0 })).toBe(true);
     });
-    it('keeps on null score when hideUnknown=false', () => {
+    it('keeps a character that was never scored', () => {
+        // Distinct from "no logs": nothing was asked, so nothing is known.
         expect(failsWclThresholds(null, cfg)).toBe(false);
+    });
+    it('keeps a no-data result that carries an error, however it failed', () => {
+        // An error describes the request, not the player. Hiding on these would
+        // empty a whole page when credentials are missing or a rate limit hits.
+        expect(failsWclThresholds({ best: null, median: null, error: 'NO_CREDENTIALS' }, cfg)).toBe(false);
+        expect(failsWclThresholds({ best: null, median: null, notFound: true, error: 'FETCH_TIMEOUT' }, cfg)).toBe(false);
     });
     it('handles one metric present: best ok, median null → keep', () => {
         expect(failsWclThresholds({ best: 80, median: null }, cfg)).toBe(false);
@@ -113,7 +125,7 @@ describe('failsWclThresholds', () => {
         expect(failsWclThresholds({ best: null, median: 30 }, cfg)).toBe(true);
     });
     it('disabled thresholds (0) never hide', () => {
-        expect(failsWclThresholds({ best: 5, median: 5 }, { minBest: 0, minMedian: 0, hideUnknown: false })).toBe(false);
+        expect(failsWclThresholds({ best: 5, median: 5 }, { minBest: 0, minMedian: 0 })).toBe(false);
     });
     it('healer with hps score is evaluated the same way (metric agnostic)', () => {
         // The threshold function doesn't know about metric; it just compares numbers
@@ -191,11 +203,11 @@ describe('normalizeCharacter', () => {
 describe('edge cases', () => {
     it('failsWclThresholds: score with best=0 is treated as data (not null)', () => {
         // A parse of 0 is real data (someone logged a 0 parse), not "no data"
-        const cfg = { minBest: 1, minMedian: 0, hideUnknown: false };
+        const cfg = { minBest: 1, minMedian: 0 };
         expect(failsWclThresholds({ best: 0, median: 50 }, cfg)).toBe(true);
     });
     it('failsWclThresholds: score with best=100 is perfect and kept', () => {
-        const cfg = { minBest: 99, minMedian: 99, hideUnknown: false };
+        const cfg = { minBest: 99, minMedian: 99 };
         expect(failsWclThresholds({ best: 100, median: 100 }, cfg)).toBe(false);
     });
     it('characterKey is case-insensitive across region/realm/name', () => {
@@ -209,20 +221,19 @@ describe('edge cases', () => {
 
 function thresholdsForRole(role, settings) {
     if (role === 'healer') {
-        return { minBest: settings.minBestHealer || 0, minMedian: settings.minMedianHealer || 0, hideUnknown: settings.hideUnknown };
+        return { minBest: settings.minBestHealer || 0, minMedian: settings.minMedianHealer || 0 };
     }
     if (role === 'tank') {
-        return { minBest: settings.minBestTank || settings.minBest || 0, minMedian: settings.minMedianTank || settings.minMedian || 0, hideUnknown: settings.hideUnknown };
+        return { minBest: settings.minBestTank || settings.minBest || 0, minMedian: settings.minMedianTank || settings.minMedian || 0 };
     }
-    return { minBest: settings.minBest || 0, minMedian: settings.minMedian || 0, hideUnknown: settings.hideUnknown };
+    return { minBest: settings.minBest || 0, minMedian: settings.minMedian || 0 };
 }
 
 function failsWclThresholdsRoleAware(score, settings, role) {
-    const { minBest, minMedian, hideUnknown } = thresholdsForRole(role || 'dps', settings);
-    if (!score) return !!hideUnknown;
+    const { minBest, minMedian } = thresholdsForRole(role || 'dps', settings);
+    if (!score) return false;
     if (score.error) return false;
-    const haveData = score.best !== null || score.median !== null;
-    if (!haveData) return !!hideUnknown;
+    if (hasNoWclLogs(score)) return true;
     if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
     if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
     return false;
@@ -233,7 +244,6 @@ describe('thresholdsForRole', () => {
         minBest: 60, minMedian: 50,
         minBestHealer: 70, minMedianHealer: 65,
         minBestTank: 40, minMedianTank: 35,
-        hideUnknown: false,
     };
 
     it('returns DPS thresholds for dps role', () => {
@@ -268,7 +278,6 @@ describe('failsWclThresholds role-aware', () => {
         minBest: 60, minMedian: 50,
         minBestHealer: 70, minMedianHealer: 65,
         minBestTank: 0, minMedianTank: 0,
-        hideUnknown: false,
     };
 
     it('healer with 75/70 HPS passes healer thresholds', () => {
@@ -329,4 +338,29 @@ describe('extractCharacterFromUrl', () => {
     it('returns null for malformed URLs', () => {
         expect(extractCharacterFromUrl('not a url')).toBeNull();
     });
+});
+
+// ─── No-logs rule applied per role ───────────────────────────────────────────
+// The rule must not depend on which threshold pair a role resolves to: someone
+// with no parses is below every threshold, including a role whose minimums are
+// all zero.
+
+describe('no-logs rule is role-independent', () => {
+    const settings = {
+        minBest: 60, minMedian: 50,
+        minBestHealer: 70, minMedianHealer: 65,
+        minBestTank: 0, minMedianTank: 0,
+    };
+
+    for (const role of ['dps', 'healer', 'tank', null]) {
+        it(`hides a no-logs ${role ?? 'unknown-role'} character`, () => {
+            expect(failsWclThresholdsRoleAware(
+                { best: null, median: null, notFound: true }, settings, role)).toBe(true);
+        });
+
+        it(`keeps an errored lookup for a ${role ?? 'unknown-role'} character`, () => {
+            expect(failsWclThresholdsRoleAware(
+                { best: null, median: null, error: 'RATE_LIMITED:60' }, settings, role)).toBe(false);
+        });
+    }
 });
