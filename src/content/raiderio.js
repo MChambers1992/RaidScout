@@ -271,3 +271,28 @@ chrome.storage.sync.get([
 
     if (options.hideRaiderIoAds) hideAds();
 });
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// Raider.IO renders its recruitment table client-side, so Scout cannot fetch and
+// parse it — it opens this page in a background tab and collects the rows that
+// survive filterSearchRows() here instead.
+
+registerHarvester('raiderio', '.rt-tr-group', function () {
+    return Array.from(document.querySelectorAll('.rt-tr-group'))
+        .filter(group => group.style.display !== 'none' && group.dataset.wclHidden !== 'true')
+        .map(group => {
+            const character = getRowCharacter(group);
+            if (!character) return null;
+            const row  = group.querySelector('.rt-tr');
+            const data = row ? getRowData(row) : null;
+            const href = group.querySelector('a[href*="/characters/"]')?.getAttribute('href');
+            return {
+                ...character,
+                role:        data?.role ?? null,
+                playerClass: data?.playerClass ?? null,
+                ilvl:        data?.ilvl ?? null,
+                link:        href ? new URL(href, 'https://raider.io').toString() : null,
+            };
+        })
+        .filter(Boolean);
+});

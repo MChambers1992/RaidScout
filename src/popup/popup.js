@@ -221,6 +221,21 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Open the Scout aggregator page. Reuses an already-open Scout tab rather
+    // than stacking duplicates, since it auto-runs a harvest on load.
+    document.getElementById('openScout').addEventListener('click', function () {
+        const scoutUrl = chrome.runtime.getURL('src/scout/scout.html');
+        chrome.tabs.query({ url: scoutUrl }, function (tabs) {
+            if (tabs && tabs.length > 0) {
+                chrome.tabs.update(tabs[0].id, { active: true });
+                chrome.tabs.reload(tabs[0].id);
+            } else {
+                chrome.tabs.create({ url: scoutUrl });
+            }
+            window.close();
+        });
+    });
+
     // Open full settings page
     document.getElementById('openSettings').addEventListener('click', function () {
         chrome.runtime.openOptionsPage();

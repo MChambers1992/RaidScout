@@ -2,12 +2,15 @@
 
 A Chrome extension that streamlines World of Warcraft guild recruitment. Filters candidate lists on WoWProgress, Raider.IO, and Guilds of WoW by item level, class, role, and WarcraftLogs parse score — and auto-closes low-parse WarcraftLogs tabs as you review.
 
+Or skip the browsing entirely: **Scout** pulls every configured site in one pass and hands you a single ranked list of candidates.
+
 ---
 
 ## Contents
 
 - [Installation](#installation)
 - [Quick start](#quick-start)
+- [Scout — all sites in one list](#scout--all-sites-in-one-list)
 - [How filtering works](#how-filtering-works)
 - [Site features](#site-features)
 - [Proactive WarcraftLogs filtering setup](#proactive-warcraftlogs-filtering-setup)
@@ -48,6 +51,32 @@ To install from a packaged release instead, download the `.zip` from the [Releas
 1. Follow the [WarcraftLogs API setup](#proactive-warcraftlogs-filtering-setup) below
 2. Enable "Proactive WCL filtering" on each site in Full Settings
 3. Set your parse thresholds — candidates below them are hidden before you ever click
+
+---
+
+## Scout — all sites in one list
+
+Scout answers one question: *who is looking for a guild right now that meets my criteria?* — without opening four sites and reading four different layouts.
+
+Click **🔎 Scout all sites** in the popup. Scout then:
+
+1. **Harvests** every source you've enabled. WoWProgress is read directly over the network. Raider.IO, WarcraftLogs recruitment and Guilds of WoW render their listings in the browser, so Scout opens each in a background tab for a few seconds, lets RaidScout's own content script filter it exactly as it would for you, reads the surviving rows and closes the tab.
+2. **Filters** each site by that site's own settings — the item level, class, role and region filters you already configured in its tab.
+3. **De-duplicates** across sites. The same player advertising on WoWProgress *and* Raider.IO *and* GoW becomes one row marked `×3` — and being on three sites at once is itself a signal they're actively looking.
+4. **Scores** each unique player once through the WarcraftLogs API, with the same role-aware thresholds, 6-hour cache and rate-limit backoff as proactive filtering.
+5. **Ranks** everyone in a sortable table you can search, filter, copy as an in-game whisper list, or export to CSV.
+
+### What Scout tells you when something goes wrong
+
+Every other filter in RaidScout fails *open* — on an error it shows the candidate rather than hiding them. Scout deliberately fails *visible* instead: if a site returns nothing, its chip turns red and a banner says exactly which site, why, and against which URL. A shortened list you trust is worse than a visible error.
+
+### Listing URLs
+
+Each source has a default listing URL, overridable in **Settings → Scout → Listing URLs**. Point one at the exact search you normally browse — a specific realm, region or role — and Scout harvests that instead. This is also how you repoint Scout yourself if a site moves its recruitment page.
+
+### Why there's a candidate cap
+
+Every candidate past de-duplication costs one WarcraftLogs API lookup, and the API allows roughly 3,600 points per hour. The default cap of 150 keeps a run comfortably inside that. Scores cache for 6 hours, so re-running over the same people is nearly free. If Scout hits the rate limit mid-run it stops, keeps everything already scored, and tells you how long to wait.
 
 ---
 
@@ -229,6 +258,19 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 
 ---
 
+### Scout tab
+
+| Setting | Default | What it does |
+|---|---|---|
+| Sources | all four | Which recruitment sites a Scout run harvests |
+| Max candidates per run | `150` | Cap on unique candidates scored — each one is a WarcraftLogs API call |
+| WoWProgress pages per run | `1` | How many pages of the WoWProgress listing to pull |
+| Fetch WarcraftLogs parses | on | Score candidates via the API. Off = list only, no parses |
+| Hide candidates below thresholds | on | Apply your parse thresholds to the results (also toggleable on the Scout page) |
+| Listing URLs | blank | Override the default listing URL per source. Blank = use the default |
+
+---
+
 ## Troubleshooting
 
 **Proactive filtering isn't hiding anyone**
@@ -254,6 +296,21 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 **Settings changed but the page didn't update**
 - WCL filter settings propagate live without a page refresh
 - Standard filters (item level, class, region) require a page reload on WoWProgress; Raider.IO and Guilds of WoW react live
+
+**A Scout source returned nothing**
+- The banner names the site, the reason and the URL it used. Open that URL yourself: if the listing looks fine in your browser but Scout saw nothing, the site changed its markup
+- "No results rendered within 15s" on Raider.IO, WarcraftLogs or Guilds of WoW usually means the page wanted a sign-in, or the listing URL is wrong — override it in Settings → Scout → Listing URLs
+- WoWProgress is fetched directly rather than through a tab, so it fails differently: an HTTP status or "No results table (.rating)" means the URL is wrong or the markup changed
+
+**Scout found fewer candidates than the sites show**
+- Each source is filtered by its own tab's settings before Scout ever sees it — a strict item-level or class filter on one site applies to that site's Scout results too
+- The de-duplication step merges cross-posted players, so 60 + 45 + 20 listing rows is usually well under 125 unique people
+- Check the candidate cap in Settings → Scout if the banner mentions it
+
+**Scout is slow**
+- The three browser-rendered sources each need a few seconds of real page load. WoWProgress, fetched directly, returns almost instantly
+- Turn off sources you don't use in Settings → Scout
+- The second run of the day is much faster: parses cache for 6 hours
 
 **I want to reset everything**
 - In Full Settings, use **Export Settings** to back up your current settings, then clear storage via `chrome://extensions/` → RaidScout → **Details** → **Extension options** → clear site data

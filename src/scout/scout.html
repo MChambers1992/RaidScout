@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RaidScout — Scout</title>
+    <link rel="stylesheet" href="scout.css">
+</head>
+<body>
+    <header class="scout-header">
+        <div class="scout-title">
+            <h1>Scout</h1>
+            <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+        </div>
+        <div class="scout-actions">
+            <button id="runScout" class="primary">🔎 Run scout</button>
+            <button id="openSettings" class="ghost">⚙ Settings</button>
+        </div>
+    </header>
+
+    <section class="scout-progress" id="scoutProgress">
+        <div class="source-chips" id="sourceChips"></div>
+        <div class="progress-line" id="progressLine">Ready.</div>
+        <div class="scout-banner" id="scoutBanner" hidden></div>
+    </section>
+
+    <section class="scout-toolbar" id="scoutToolbar" hidden>
+        <input type="search" id="searchBox" placeholder="Filter by name, realm, class…" autocomplete="off">
+        <label class="inline-check">
+            <input type="checkbox" id="hideBelowThresholds">
+            Hide below parse thresholds
+        </label>
+        <span class="result-count" id="resultCount"></span>
+        <span class="spacer"></span>
+        <button id="copyNames"  class="ghost" title="Copy Name-Realm for every visible row">📋 Copy names</button>
+        <button id="exportCsv"  class="ghost">⬇ CSV</button>
+    </section>
+
+    <section class="scout-results">
+        <table id="resultsTable" hidden>
+            <thead>
+                <tr>
+                    <th data-sort="name">Character</th>
+                    <th data-sort="realm">Realm</th>
+                    <th data-sort="region">Region</th>
+                    <th data-sort="playerClass">Class</th>
+                    <th data-sort="role">Role</th>
+                    <th data-sort="ilvl" class="num">ilvl</th>
+                    <th data-sort="mplusScore" class="num">M+</th>
+                    <th data-sort="mythicKills" class="num">Mythic</th>
+                    <th data-sort="wclMedian" class="num">WCL parse</th>
+                    <th data-sort="sources">Seen on</th>
+                    <th>Links</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState" hidden></div>
+    </section>
+
+    <!-- common.js is a classic script: it defines requestWclScore, buildWclSettings,
+         failsWclThresholds and the badge renderer as globals that scout.js reuses,
+         so the Scout page scores candidates through exactly the same path the
+         content scripts do. -->
+    <script src="../content/common.js"></script>
+    <script type="module" src="scout.js"></script>
+</body>
+</html>

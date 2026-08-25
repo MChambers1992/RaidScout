@@ -1,0 +1,193 @@
+/* scout.css — Scout aggregator page. Palette matches options.css. */
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 0 24px 48px;
+    background-color: #1e1e1e;
+    color: #e8e8e8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.scout-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 24px 0 16px;
+    border-bottom: 1px solid #333;
+    position: sticky;
+    top: 0;
+    background: #1e1e1e;
+    z-index: 5;
+}
+
+.scout-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+.scout-sub { margin: 4px 0 0; color: #888; font-size: 13px; }
+.scout-actions { display: flex; gap: 8px; }
+
+button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background-color: #007bff; color: #fff; }
+button.primary:hover:not(:disabled) { background-color: #0056b3; }
+button.ghost { background-color: #3a3a3a; color: #ccc; border-color: #4a4a4a; }
+button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
+
+/* ── Progress ───────────────────────────────────────────────────────────── */
+
+.scout-progress { padding: 16px 0; }
+
+.source-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+
+.source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-left: 3px solid var(--source-colour, #555);
+    font-size: 12px;
+    color: #bbb;
+}
+.source-chip .chip-state { color: #777; }
+.source-chip.is-running { border-color: #4a90d9; }
+.source-chip.is-running .chip-state { color: #4a90d9; }
+.source-chip.is-done    .chip-state { color: #4caf50; }
+.source-chip.is-failed  { border-color: #7a2020; }
+.source-chip.is-failed  .chip-state { color: #f04040; }
+.source-chip.is-skipped { opacity: 0.5; }
+
+.progress-line { font-size: 13px; color: #aaa; min-height: 18px; }
+
+.scout-banner {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    background: #2d1a00;
+    border: 1px solid #7a4a00;
+    color: #f0b060;
+}
+.scout-banner ul { margin: 6px 0 0; padding-left: 18px; }
+.scout-banner li { margin: 3px 0; }
+.scout-banner code { color: #ddd; font-size: 12px; }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+
+.scout-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid #333;
+    flex-wrap: wrap;
+}
+.scout-toolbar .spacer { flex: 1; }
+
+#searchBox {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    padding: 7px 10px;
+    font-size: 13px;
+    min-width: 260px;
+    font-family: inherit;
+}
+#searchBox:focus { outline: none; border-color: #007bff; }
+
+.inline-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; cursor: pointer; }
+.result-count { color: #888; font-size: 12px; }
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+thead th {
+    position: sticky;
+    top: 88px;
+    background: #242424;
+    text-align: left;
+    padding: 9px 10px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #aaa;
+    border-bottom: 1px solid #383838;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+}
+thead th:hover { color: #fff; }
+thead th.num { text-align: right; }
+thead th.sorted-asc::after  { content: ' ▲'; color: #007bff; }
+thead th.sorted-desc::after { content: ' ▼'; color: #007bff; }
+
+tbody td { padding: 7px 10px; border-bottom: 1px solid #2c2c2c; vertical-align: middle; }
+tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: #262626; }
+tbody tr.below-threshold { opacity: 0.45; }
+
+.char-name { font-weight: 600; color: var(--class-color, #e8e8e8); }
+.multi-source { color: #f0b060; font-size: 11px; margin-left: 5px; }
+
+.class-warrior      { --class-color: #C69B3A; }
+.class-paladin      { --class-color: #F48CBA; }
+.class-hunter       { --class-color: #AAD372; }
+.class-rogue        { --class-color: #FFF468; }
+.class-priest       { --class-color: #FFFFFF; }
+.class-shaman       { --class-color: #0070DD; }
+.class-mage         { --class-color: #3FC7EB; }
+.class-warlock      { --class-color: #8788EE; }
+.class-monk         { --class-color: #00FF98; }
+.class-druid        { --class-color: #FF7C0A; }
+.class-deathknight  { --class-color: #C41E3A; }
+.class-demon_hunter { --class-color: #A330C9; }
+.class-evoker       { --class-color: #33937F; }
+
+.role-pill {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 11px;
+    background: #2f2f2f;
+    border-left: 3px solid var(--role-color, #555);
+}
+.role-tank   { --role-color: #4e98dc; }
+.role-healer { --role-color: #56cc56; }
+.role-dps    { --role-color: #e74c3c; }
+
+.source-dots { display: inline-flex; gap: 4px; }
+.source-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--source-colour, #555);
+    display: inline-block;
+}
+
+.row-links a { color: #6aa9e0; text-decoration: none; font-size: 12px; margin-right: 8px; }
+.row-links a:hover { text-decoration: underline; }
+
+.muted { color: #5a5a5a; }
+
+.empty-state {
+    padding: 48px 0;
+    text-align: center;
+    color: #777;
+    font-size: 14px;
+    line-height: 1.6;
+}

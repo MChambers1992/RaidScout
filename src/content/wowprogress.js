@@ -61,9 +61,15 @@ function getWowProgressCharacter(playerRow) {
     const idx = parts.indexOf('character');
     if (idx === -1 || parts.length < idx + 4) return null;
     const role = getPlayerRole(playerRow);
+    // WoWProgress percent-encodes spaces in realm names ("Tarren%20Mill"), so
+    // the realm must be decoded before slugging — otherwise the WCL API is
+    // queried for "tarren%20mill" and returns notFound for every multi-word realm.
+    let realm = parts[idx + 2];
+    try { realm = decodeURIComponent(realm); } catch { /* keep raw */ }
+
     return {
         region: parts[idx + 1].toLowerCase(),
-        realm:  parts[idx + 2].replace(/\s/g, '-').toLowerCase(),
+        realm:  realm.replace(/\s/g, '-').toLowerCase(),
         name:   decodeURIComponent(parts[idx + 3].split('?')[0]),
         role:   role || 'dps',
     };
@@ -227,4 +233,30 @@ chrome.storage.sync.get('wowprogressEnabled', function(options) {
             handlePageNavigation();
         }
     }
+});
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// Returns the rows still standing after filterPlayers()/applyWclScoring() have
+// run. Registered unconditionally so Scout works even when the WoWProgress
+// integration toggle is off (Scout warns the officer that filters didn't run).
+
+registerHarvester('wowprogress', '.rating tr', function () {
+    return Array.from(document.querySelectorAll('.rating tr'))
+        .slice(1)
+        .filter(row => row.isConnected && row.style.display !== 'none' && row.dataset.wclHidden !== 'true')
+        .map(row => {
+            const character = getWowProgressCharacter(row);
+            if (!character) return null;
+            const ilvlText = row.querySelector('td.center')?.textContent?.trim() ?? '';
+            const link = row.querySelector('a[href*="/character/"]')?.getAttribute('href');
+            return {
+                ...character,
+                playerClass: getPlayerClass(row),
+                role:        getPlayerRole(row),
+                ilvl:        parseFloat(ilvlText),
+                inGuild:     row.querySelector('.guild') !== null,
+                link:        link ? `https://www.wowprogress.com${link}` : null,
+            };
+        })
+        .filter(Boolean);
 });

@@ -62,6 +62,7 @@ h1 {
 .tab-btn[data-tab="wowprogress"].active  { color: #fff; border-bottom-color: #4a90d9; }
 .tab-btn[data-tab="raiderio"].active     { color: #fff; border-bottom-color: #00b35a; }
 .tab-btn[data-tab="guildsofwow"].active  { color: #fff; border-bottom-color: #9B59B6; }
+.tab-btn[data-tab="scout"].active        { color: #fff; border-bottom-color: #f0b060; }
 
 /* ── Section header with enable toggle ── */
 .section-header {

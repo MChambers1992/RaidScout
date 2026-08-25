@@ -241,3 +241,28 @@ function watchForContainer() {
 chrome.storage.sync.get('guildsofwowEnabled', function(options) {
     if (options.guildsofwowEnabled !== false) watchForContainer();
 });
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// GoW is an SPA with infinite scroll; Scout harvests whatever the first render
+// produced. Recruit cards carry no character link, so identity comes from the
+// Blizzard render URL via getCardCharacter() — the same reconstruction the
+// proactive scoring path uses.
+
+registerHarvester('guildsofwow', '#recruits-list .card', function () {
+    return Array.from(document.querySelectorAll('#recruits-list .card'))
+        .filter(card => card.style.display !== 'none' && card.dataset.wclHidden !== 'true')
+        .map(card => {
+            const character = getCardCharacter(card);
+            if (!character) return null;
+            return {
+                ...character,
+                role:        getCardRole(card),
+                playerClass: getCardClass(card),
+                ilvl:        getCardIlvl(card),
+                mythicKills: getCardMythicKills(card),
+                mplusScore:  getCardMythicPlusScore(card),
+                note:        card.querySelector('.card-notes, .recruit-notes')?.textContent?.trim() || null,
+            };
+        })
+        .filter(Boolean);
+});

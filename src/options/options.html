@@ -15,6 +15,7 @@
             <button class="tab-btn" data-tab="wowprogress">WoWProgress</button>
             <button class="tab-btn" data-tab="raiderio">Raider.IO</button>
             <button class="tab-btn" data-tab="guildsofwow">Guilds of WoW</button>
+            <button class="tab-btn" data-tab="scout">Scout</button>
         </div>
 
         <!-- WarcraftLogs Settings -->
@@ -400,6 +401,90 @@
                     <span class="toggle-slider"></span>
                 </label>
                 <p class="hint">Ranks visible recruit cards by parse (highest first) instead of only hiding low parses.</p>
+            </div>
+        </div>
+
+        <!-- Scout Settings -->
+        <div class="category-content" id="scout">
+            <div class="section-header">
+                <h2>Scout</h2>
+            </div>
+            <div class="option">
+                <p class="hint">Scout gathers candidates from every site below in one pass and merges them into a single
+                de-duplicated list, so you don't have to open four tabs and read four layouts. Each site is filtered by
+                <strong>its own settings</strong> from the tabs above, then every unique player is scored once against your
+                WarcraftLogs thresholds. Open it from the extension popup.</p>
+            </div>
+
+            <p class="subsection-label">Sources</p>
+            <div class="option">
+                <div class="region-checks">
+                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="wowprogress"> WoWProgress</label>
+                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="raiderio"> Raider.IO</label>
+                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="warcraftlogs"> WarcraftLogs recruitment</label>
+                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="guildsofwow"> Guilds of WoW</label>
+                </div>
+                <p class="hint">WoWProgress is read directly over the network. The other three render their listings in the
+                browser, so Scout opens each one in a background tab for a few seconds, reads the filtered results and closes
+                it again — you never have to look at them.</p>
+            </div>
+
+            <p class="subsection-label">Limits</p>
+            <div class="option">
+                <label for="scoutMaxCandidates">Max candidates per run</label>
+                <input type="number" id="scoutMaxCandidates" min="1" max="1000" step="10">
+                <p class="hint">Every candidate past the de-duplication step costs one WarcraftLogs API lookup. The WCL API
+                allows roughly 3,600 points per hour, so a cap around 150 keeps a run comfortably inside it. Scores are cached
+                for <strong>6 hours</strong>, which makes a repeat run of the same candidates nearly free.</p>
+            </div>
+            <div class="option">
+                <label for="scoutPagesPerSource">WoWProgress pages per run</label>
+                <input type="number" id="scoutPagesPerSource" min="1" max="10" step="1">
+                <p class="hint">How many pages of the WoWProgress listing to pull. Only applies to WoWProgress — the
+                background-tab sources always harvest whatever their first page renders.</p>
+            </div>
+
+            <p class="subsection-label">Scoring</p>
+            <div class="option toggle-inline">
+                <label for="scoutWclEnabled">Fetch WarcraftLogs parses</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scoutWclEnabled">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Uses the same API credentials, role-aware metrics and cache as proactive filtering. With no
+                credentials saved, Scout still lists everyone — it just can't rank them by parse.</p>
+            </div>
+            <div class="option toggle-inline">
+                <label for="scoutHideBelowThresholds">Hide candidates below thresholds</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scoutHideBelowThresholds">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Applies the parse thresholds from the WarcraftLogs tab. Candidates with no logs, or whose
+                lookup failed, are never hidden by this. You can also toggle it directly on the Scout page.</p>
+            </div>
+
+            <p class="subsection-label">Listing URLs (advanced)</p>
+            <div class="option">
+                <p class="hint">Leave blank to use the defaults. Set these to the exact listing you normally browse — a
+                specific realm, region or role filter — and Scout will harvest that instead. These also let you repoint Scout
+                yourself if a site moves its recruitment page.</p>
+            </div>
+            <div class="option">
+                <label for="scoutUrlWowprogress">WoWProgress</label>
+                <input type="text" id="scoutUrlWowprogress" placeholder="https://www.wowprogress.com/gearscore/?lfg=1&amp;sortby=ts&amp;raids_week=2&amp;lang=en" autocomplete="off">
+            </div>
+            <div class="option">
+                <label for="scoutUrlRaiderio">Raider.IO</label>
+                <input type="text" id="scoutUrlRaiderio" placeholder="https://raider.io/search?…recruitment.guild_raids…" autocomplete="off">
+            </div>
+            <div class="option">
+                <label for="scoutUrlWarcraftlogs">WarcraftLogs recruitment</label>
+                <input type="text" id="scoutUrlWarcraftlogs" placeholder="https://www.warcraftlogs.com/recruitment/" autocomplete="off">
+            </div>
+            <div class="option">
+                <label for="scoutUrlGuildsofwow">Guilds of WoW</label>
+                <input type="text" id="scoutUrlGuildsofwow" placeholder="https://guildsofwow.com/recruits" autocomplete="off">
             </div>
         </div>
 

@@ -303,3 +303,63 @@ function sortByWclScore(items) {
     scored.sort((a, b) => b.value - a.value);
     for (const { el } of scored) parent.appendChild(el);
 }
+
+// ─── Scout harvest hook ────────────────────────────────────────────────────────
+// The Scout page (src/scout/) aggregates candidates from every configured site
+// without the user browsing to each one. For sites whose listings are rendered
+// client-side (Raider.IO, Guilds of WoW, WCL recruitment), the Scout page opens
+// the listing in a background tab, lets THIS content script render and filter it
+// exactly as it would for a human, then asks for the visible rows back.
+//
+// Each site calls registerHarvester() once with:
+//   sourceId      — must match the adapter id in src/scout/sources.js
+//   readySelector — selector that only matches once the listing has rendered
+//   collect       — () => array of raw candidate objects (visible rows only)
+//
+// Reporting an empty harvest as ok:false is deliberate. Every other filtering
+// path in this extension fails OPEN (never hide on error); an aggregator must
+// fail VISIBLE instead, or a site whose markup changed silently shortens the
+// officer's list and they trust a result that is wrong.
+
+function registerHarvester(sourceId, readySelector, collect) {
+    chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+        if (message?.action !== 'harvestCandidates' || message.source !== sourceId) return;
+
+        const deadline = Date.now() + (message.timeoutMs || 15000);
+        const settleMs = message.settleMs ?? 700;
+
+        (function attempt() {
+            if (document.querySelector(readySelector)) {
+                // Let the site's own filter pass finish before reading rows,
+                // otherwise we harvest candidates this extension is about to hide.
+                setTimeout(function () {
+                    try {
+                        sendResponse({
+                            ok: true,
+                            source: sourceId,
+                            url: location.href,
+                            candidates: collect() || [],
+                        });
+                    } catch (err) {
+                        sendResponse({
+                            ok: false, source: sourceId, url: location.href,
+                            error: `Extraction failed: ${err?.message || err}`, candidates: [],
+                        });
+                    }
+                }, settleMs);
+                return;
+            }
+            if (Date.now() > deadline) {
+                sendResponse({
+                    ok: false, source: sourceId, url: location.href, candidates: [],
+                    error: `No results rendered within ${Math.round((message.timeoutMs || 15000) / 1000)}s ` +
+                           `(selector "${readySelector}"). The page may require sign-in, or its markup changed.`,
+                });
+                return;
+            }
+            setTimeout(attempt, 300);
+        })();
+
+        return true; // async response
+    });
+}

@@ -298,6 +298,25 @@ select:focus {
     border-top: 1px solid #2a2a2a;
 }
 
+#openScout {
+    width: 100%;
+    padding: 9px;
+    margin-bottom: 6px;
+    background: #007bff;
+    color: #fff;
+    border: 1px solid #0069d9;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#openScout:hover {
+    background: #0056b3;
+}
+
 #openSettings {
     width: 100%;
     padding: 8px;

@@ -86,7 +86,9 @@ const TRUSTED_HOSTS = [
     'www.guildsofwow.com',
 ];
 
-function isTrustedSender(sender) {
+// Content scripts: trusted only when running on one of the recruitment sites.
+// Tab-bound actions (closing tabs, opening tabs) accept nothing else.
+function isTrustedTabSender(sender) {
     if (!sender?.tab?.url) return false;
     try {
         const host = new URL(sender.tab.url).hostname;
@@ -94,6 +96,20 @@ function isTrustedSender(sender) {
     } catch {
         return false;
     }
+}
+
+// The Scout page (chrome-extension://<id>/src/scout/scout.html) has no
+// sender.tab, so the host check above rejects it outright. It is our own page
+// and needs the same scoring path the content scripts use, so it is trusted via
+// its extension origin instead — the id check keeps this closed to other
+// extensions, and it grants no tab-bound action.
+function isExtensionPageSender(sender) {
+    if (!sender || sender.id !== chrome.runtime.id || sender.tab) return false;
+    return typeof sender.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
+}
+
+function isTrustedSender(sender) {
+    return isTrustedTabSender(sender) || isExtensionPageSender(sender);
 }
 
 // ─── Navigation listener ───────────────────────────────────────────────────────
@@ -110,7 +126,7 @@ chrome.webNavigation.onCompleted.addListener(function(details) {
 // ─── Sync message listener (fire-and-forget) ───────────────────────────────────
 
 chrome.runtime.onMessage.addListener(function(message, sender) {
-    if (!isTrustedSender(sender)) return;
+    if (!isTrustedTabSender(sender)) return;
 
     if (message.action === 'parseThresholdFailed') {
         chrome.tabs.remove(sender.tab.id);

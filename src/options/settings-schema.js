@@ -68,6 +68,18 @@ const SCHEMA = [
     { key: 'gowWclSort',                 type: 'bool',   default: false, domId: 'gowWclSort' },
     { key: 'gowSelectedClasses',         type: 'checkboxGroup', default: [], selector: '.gowClassFilter' },
     { key: 'gowSelectedRoles',           type: 'checkboxGroup', default: [], selector: '.roleFilter' },
+
+    // ── Scout (cross-site aggregator) ────────────────────────────────────────
+    { key: 'scoutMaxCandidates',         type: 'int',    default: 150,   domId: 'scoutMaxCandidates' },
+    { key: 'scoutPagesPerSource',        type: 'int',    default: 1,     domId: 'scoutPagesPerSource' },
+    { key: 'scoutWclEnabled',            type: 'bool',   default: true,  domId: 'scoutWclEnabled' },
+    { key: 'scoutHideBelowThresholds',   type: 'bool',   default: true,  domId: 'scoutHideBelowThresholds' },
+    { key: 'scoutUrlWowprogress',        type: 'string', default: '',    domId: 'scoutUrlWowprogress' },
+    { key: 'scoutUrlRaiderio',           type: 'string', default: '',    domId: 'scoutUrlRaiderio' },
+    { key: 'scoutUrlGuildsofwow',        type: 'string', default: '',    domId: 'scoutUrlGuildsofwow' },
+    { key: 'scoutUrlWarcraftlogs',       type: 'string', default: '',    domId: 'scoutUrlWarcraftlogs' },
+    { key: 'scoutSources',               type: 'checkboxGroup',
+      default: ['wowprogress', 'raiderio', 'warcraftlogs', 'guildsofwow'], selector: '.scoutSourceFilter' },
 ];
 
 // All sync keys (used for chrome.storage.sync.get)

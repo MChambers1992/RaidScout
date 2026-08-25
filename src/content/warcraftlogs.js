@@ -299,3 +299,24 @@ if (isWarcraftLogsPage()) {
         }
     });
 }
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// Only meaningful on /recruitment/ — on a character page the ready selector
+// never matches and the harvester reports back that nothing rendered.
+
+registerHarvester('warcraftlogs', '.recruitment-search-result', function () {
+    return Array.from(document.querySelectorAll('.recruitment-search-result'))
+        .filter(card => card.style.display !== 'none' && card.dataset.wclHidden !== 'true')
+        .map(card => {
+            const character = getRecruitmentCharacter(card);
+            if (!character) return null;
+            const href = card.querySelector('a[href*="/character/"]')?.getAttribute('href');
+            return {
+                ...character,
+                playerClass: getRecruitmentClass(card),
+                mythicKills: getRecruitmentMythicKills(card),
+                link:        href ? new URL(href, 'https://www.warcraftlogs.com').toString() : null,
+            };
+        })
+        .filter(Boolean);
+});

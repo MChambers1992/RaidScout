@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **RaidScout** is a Chrome extension designed to streamline World of Warcraft guild recruitment. It extends functionality across multiple recruitment-related websites: WarcraftLogs, WoWProgress, Raider.IO, and Guilds of WoW.
 
 **Author:** Michael Chambers  
-**Current Version:** 1.0  
+**Current Version:** 1.4.0  
 **Type:** Chrome Extension (Manifest V3)
 
 ## Tech Stack
@@ -72,7 +72,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - "⚙ Full Settings" button calls `chrome.runtime.openOptionsPage()`
    - Does **not** include class filter (too complex for popup — that's in Full Settings only)
 
-4. **Full Settings Page** (`src/options/`)
+4. **Scout Aggregator** (`src/scout/`) — cross-site recruitment aggregator
+   - Opened from the popup's "🔎 Scout all sites" button (`chrome.tabs.create` on `src/scout/scout.html`); auto-runs a harvest on load
+   - **`scout-core.js`** — pure ES module (no `chrome`/`document`), imported directly by Vitest: realm slugging, candidate normalisation, cross-source merge, sorting, CSV/whisper-list export, concurrency pool
+   - **`sources.js`** — adapter registry. Two harvest modes: `fetch` (request the listing + `DOMParser`; WoWProgress only) and `tab` (open the listing in a background tab, let the site's own content script filter it, harvest the visible rows, close the tab; Raider.IO, GoW, WCL recruitment). Promoting a source from `tab` to `fetch` later touches only its registry entry
+   - **`scout.js`** — orchestration + UI. Loads `common.js` as a classic script first so it reuses `requestWclScore`, `buildWclSettings`, `failsWclThresholds` and `makeBadge` rather than reimplementing scoring
+   - Runs the browser-rendered sources at concurrency 2 (three or four simultaneous SPA loads starve each other and cause spurious render timeouts)
+
+5. **Full Settings Page** (`src/options/`)
    - Opened via right-click → Options or the popup's Full Settings button
    - Tab navigation (WarcraftLogs / WoWProgress / Raider.IO / Guilds of WoW)
    - Per-site enable toggle with disabled state: settings grey out and become non-interactive when a site is OFF
@@ -196,6 +203,20 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `gowWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the recruits list (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
 | `gowWclSort` | boolean | `false` | Sort visible recruit cards by WCL parse (highest first) instead of only hiding those below threshold |
 
+### Scout
+
+| Key | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `scoutSources` | string[] | all four | Which sources a Scout run harvests |
+| `scoutMaxCandidates` | number | `150` | Cap on unique candidates scored per run (each is one WCL API call) |
+| `scoutPagesPerSource` | number | `1` | WoWProgress listing pages to pull (`fetch` adapter only) |
+| `scoutWclEnabled` | boolean | `true` | Fetch WarcraftLogs parses for harvested candidates |
+| `scoutHideBelowThresholds` | boolean | `true` | Apply the shared parse thresholds to Scout results |
+| `scoutUrlWowprogress` | string | `""` | Listing URL override — blank uses `DEFAULT_SOURCE_URLS` |
+| `scoutUrlRaiderio` | string | `""` | Listing URL override |
+| `scoutUrlGuildsofwow` | string | `""` | Listing URL override |
+| `scoutUrlWarcraftlogs` | string | `""` | Listing URL override |
+
 ### WoW class name format
 
 Class names are stored in lowercase with underscores: `warrior`, `paladin`, `hunter`, `rogue`, `priest`, `shaman`, `mage`, `warlock`, `monk`, `druid`, `deathknight`, `demon_hunter`, `evoker`.
@@ -238,11 +259,23 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 17. **Sender validation:** The background validates `sender.tab.url` hostname against `TRUSTED_HOSTS` before acting on any message. `openTab` additionally validates the URL against `ALLOWED_TAB_PREFIXES` (WCL character URLs only) to prevent URL injection.
 
-18. **Unit tests:** `tests/common.test.js` (Vitest) covers 34 cases across `normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, and `normalizeCharacter`. Run with `npm test`.
+18. **Unit tests:** `tests/common.test.js` (Vitest) covers 34 cases across `normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, and `normalizeCharacter` — it re-declares those functions inline because content scripts have no export surface. `tests/scout-core.test.js` covers 61 cases and imports `src/scout/scout-core.js` directly, since it is a real ES module. Run with `npm test`.
 
 19. **Sort by WCL parse:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
 
 20. **WCL recruitment search proactive layer is best-effort on role detection:** Unlike WoWProgress/Raider.IO/GoW, the WCL recruitment search page's spec/role markup wasn't available to verify against the live site, so `getRecruitmentRole()` in `warcraftlogs.js` degrades gracefully to `'dps'` when it can't confidently detect healer/tank specs. Enabling `wclSearchProactive` is safe even if this misfires — DPS thresholds are just applied to a healer/tank, same fail-open behaviour as everywhere else in the codebase.
+
+21. **Scout fails VISIBLE, everything else fails OPEN:** every content-script filter shows a candidate on error (`failsWclThresholds` returns false for transient errors). Scout inverts this for *harvest* failures — a source that returns nothing turns its chip red and raises a banner naming the site, reason and URL. A silently-shortened aggregate list is worse than a visible error because the officer has no page to compare it against. Scoring failures still fail open: an unscored candidate is never hidden.
+
+22. **`isTrustedSender` had to be widened for Scout:** the Scout page has no `sender.tab`, so the original host-based check rejected it. `background.js` now splits the check — `isTrustedTabSender` (host allowlist, used for the tab-bound `parseThresholdFailed`/`openTab`/`clearBadge` actions) and `isExtensionPageSender` (`sender.id === chrome.runtime.id` + extension-origin URL, no tab). Only the async listener accepts the latter, so an extension page can request scores but can never trigger a tab-bound action.
+
+23. **Realm slugging is what makes de-duplication work:** the four sites spell realms three ways (`Tarren Mill`, `tarren-mill`, `Tarren-Mill`) and apostrophes vary (`Kil'jaeden` / `Kil’jaeden`). `slugRealm()` collapses all of them; without it the same player appears once per site and gets scored once per site.
+
+24. **Merge rules:** numeric stats (ilvl, mythic kills, M+ score) take the **higher** value across sources — each site snapshots the character at a different time and these only go up. Class and role take the **more authoritative** source per `SOURCE_META[].priority` (WoWProgress > Raider.IO > WarcraftLogs > GoW, since GoW identity is reconstructed from a Blizzard render URL). Adapters return `role: null` when unknown rather than defaulting to `'dps'`, so a guessed DPS can't beat a real healer during merge and score them against an unreachable threshold.
+
+25. **Scout listing URLs are user-overridable by design.** Raider.IO and Guilds of WoW render their listings client-side; their JSON endpoints were never confirmed, so the defaults in `DEFAULT_SOURCE_URLS` are best-effort. Any of the four can be repointed in Settings → Scout without an extension update.
+
+26. **Background tabs opened by Scout are always cleaned up** — `harvestViaTab` removes the tab in a `finally` block, so a timeout or a thrown adapter error can't strand a tab in the officer's window.
 
 ## File Structure
 
@@ -258,6 +291,12 @@ RaidScout/
 └── src/
     ├── background.js          # Service worker (ES module) — tab management, badge, message routing, WCL score requests
     ├── wcl-api.js             # WarcraftLogs v2 API client — OAuth, GraphQL scoring, token + score caching
+    ├── scout/
+    │   ├── scout.html         # Scout aggregator page (opened from the popup)
+    │   ├── scout.css
+    │   ├── scout-core.js      # Pure ES module: normalise, merge/dedupe, sort, export
+    │   ├── sources.js         # Source adapters (fetch + background-tab harvest)
+    │   └── scout.js           # Orchestration + table UI
     ├── popup/
     │   ├── popup.html         # Quick-access popup (extension button click)
     │   ├── popup.css
