@@ -358,4 +358,8 @@ Both links appear in the popup, the Scout page footer and Full Settings. They're
 
 ## License
 
-MIT
+[MIT](LICENSE) — © 2026 Michael Chambers.
+
+You may use, modify and redistribute RaidScout freely, including commercially, provided the copyright notice and licence text travel with it.
+
+RaidScout is an unofficial fan project. It is not affiliated with or endorsed by Blizzard Entertainment, WarcraftLogs, WoWProgress, Raider.IO or Guilds of WoW. World of Warcraft is a trademark of Blizzard Entertainment, Inc.

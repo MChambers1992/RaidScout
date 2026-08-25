@@ -20,6 +20,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **Characters with no WarcraftLogs logs now fail every parse threshold** — `failsWclThresholds()` returns `true` for a definitive no-logs result (`notFound`, or a successful lookup with both metrics null) on every site and in Scout. A character with no parses cannot be judged against a parse minimum. Lookups that *failed* (no credentials, rate limit, timeout) and candidates that were never scored are still always kept, so a misconfiguration can never empty a page.
 - **`isTrustedSender` split** (`background.js`) — Now `isTrustedTabSender` (host allowlist; the only path that can trigger the tab-bound `parseThresholdFailed`/`openTab`/`clearBadge` actions) and `isExtensionPageSender` (extension origin, no tab). The Scout page has no `sender.tab` and was rejected outright before this.
 
+### Fixed
+- **Licensing was ambiguous** — README advertised MIT, `package.json` declared ISC, and no `LICENSE` file existed, so nothing was definite. Now MIT throughout, with a proper `LICENSE` file and a copyright line. Added a `.mailmap` so the three author-name variants on the same address collapse to one in `git log`/`shortlog` without rewriting history. README's licence section also now carries the standard unaffiliated-fan-project disclaimer for Blizzard and the four recruitment sites.
+
 ### Removed
 - **`wclHideUnknown` setting** — Superseded by the unconditional no-logs rule above. Made unconditional rather than default-flipped because most existing installs have an explicit `false` saved, which a default change would never have reached.
 
