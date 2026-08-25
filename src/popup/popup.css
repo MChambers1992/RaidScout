@@ -349,3 +349,21 @@ select:focus {
 .saved-indicator.visible {
     opacity: 1;
 }
+
+/* ── Support links ── */
+.support-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 0 2px;
+    font-size: 11px;
+}
+
+.support-row .support-link {
+    color: #777;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.support-row .support-link:hover { color: #f0b060; }
+.support-sep { color: #444; }

@@ -13,6 +13,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **Cross-source de-duplication** — A player advertising on several sites becomes one row marked `×N` and is scored once rather than once per site. Realm slugging (`slugRealm()`) collapses the three spellings the sites use (`Tarren Mill` / `tarren-mill` / `Tarren-Mill`) and apostrophe variants. Numeric stats merge by taking the higher value; class and role by source authority.
 - **Scout settings tab** — Source selection, candidate cap (default 150, sized to the WCL API's hourly budget), WoWProgress page count, scoring toggle, threshold toggle, and per-source listing URL overrides.
 - **`hasNoLogs()` / `isScored()`** (`scout-core.js`) — Classify a score result as a definitive answer about the player versus a failed request.
+- **Support links** (`src/links.js`) — Unobtrusive "Support development" and "YouTube" links in the popup footer, the Scout page footer and Full Settings. Plain anchors opened in a new tab with `rel="noopener noreferrer"` — no ad network, no remote script, no tracking, no CSP or host-permission changes, so the extension still makes no network request of its own. URLs live in one constant and every surface reads from it.
 - **78 new tests** — `tests/scout-core.test.js` imports `scout-core.js` directly (it is a real ES module, unlike the content scripts); `tests/sources.test.js` covers the WoWProgress HTML parser against jsdom fixtures.
 
 ### Changed

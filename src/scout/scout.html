@@ -58,10 +58,17 @@
         <div class="empty-state" id="emptyState" hidden></div>
     </section>
 
+    <footer class="scout-footer">
+        <span class="footer-note">RaidScout is free and open source.</span>
+        <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">☕ Support development</a>
+        <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">▶ YouTube</a>
+    </footer>
+
     <!-- common.js is a classic script: it defines requestWclScore, buildWclSettings,
          failsWclThresholds and the badge renderer as globals that scout.js reuses,
          so the Scout page scores candidates through exactly the same path the
-         content scripts do. -->
+         content scripts do. links.js supplies the support URLs. -->
+    <script src="../links.js"></script>
     <script src="../content/common.js"></script>
     <script type="module" src="scout.js"></script>
 </body>

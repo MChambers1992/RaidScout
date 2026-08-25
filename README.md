@@ -18,6 +18,7 @@ Or skip the browsing entirely: **Scout** pulls every configured site in one pass
 - [Settings reference](#settings-reference)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
+- [Support](#support)
 
 ---
 
@@ -339,6 +340,19 @@ npm test
 The test suite (Vitest, `tests/common.test.js`) covers the core filtering and scoring logic with 50 cases.
 
 See [CLAUDE.md](CLAUDE.md) for full architecture notes, the complete settings key reference, debugging workflows, and known quirks. See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+---
+
+## Support
+
+RaidScout is free, open source, and has no ads, no telemetry and no accounts. Nothing you do in it leaves your machine except the character lookups you make with your own WarcraftLogs API key.
+
+If it saves you time recruiting, two things help:
+
+- ☕ [Support development](https://tinyurl.com/donatetochambers)
+- ▶ [Subscribe on YouTube](https://tinyurl.com/subtochambers)
+
+Both links appear in the popup, the Scout page footer and Full Settings. They're plain links — no tracking, no third-party scripts.
 
 ---
 

@@ -191,3 +191,25 @@ tbody tr.below-threshold { opacity: 0.45; }
     font-size: 14px;
     line-height: 1.6;
 }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+.scout-footer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 32px;
+    padding: 14px 0 4px;
+    border-top: 1px solid #2c2c2c;
+    font-size: 12px;
+}
+
+.footer-note { color: #666; }
+
+.support-link {
+    color: #8a8a8a;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.support-link:hover { color: #f0b060; text-decoration: underline; }

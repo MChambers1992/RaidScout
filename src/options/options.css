@@ -412,3 +412,25 @@ button#saveButton:hover {
     background-color: #4a4a4a;
     color: #fff;
 }
+
+/* ── Support links ── */
+.support-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #333;
+    font-size: 12px;
+}
+
+.support-row .footer-note { color: #666; }
+
+.support-row .support-link {
+    color: #8a8a8a;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.support-row .support-link:hover { color: #f0b060; text-decoration: underline; }
