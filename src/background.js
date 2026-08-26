@@ -98,13 +98,21 @@ function isTrustedTabSender(sender) {
     }
 }
 
-// The Scout page (chrome-extension://<id>/src/scout/scout.html) has no
-// sender.tab, so the host check above rejects it outright. It is our own page
-// and needs the same scoring path the content scripts use, so it is trusted via
-// its extension origin instead — the id check keeps this closed to other
-// extensions, and it grants no tab-bound action.
+// The Scout page (chrome-extension://<id>/src/scout/scout.html) is rejected by
+// the host check above, because its hostname is the extension id rather than a
+// recruitment site. It is our own page and needs the same scoring path the
+// content scripts use, so it is trusted via its extension origin instead.
+//
+// Trust rests on `sender.url`: Chrome populates it, a page cannot forge it, and
+// for a content script it is the *web page's* URL — so only a real extension
+// page clears the getURL('') prefix. `sender.id` additionally keeps this closed
+// to other extensions. Neither check grants any tab-bound action.
+//
+// Do NOT reject on `sender.tab` being present: Scout is opened with
+// chrome.tabs.create(), so it always has one. Excluding tab senders here is
+// what made every Scout parse lookup return UNTRUSTED_SENDER.
 function isExtensionPageSender(sender) {
-    if (!sender || sender.id !== chrome.runtime.id || sender.tab) return false;
+    if (!sender || sender.id !== chrome.runtime.id) return false;
     return typeof sender.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
 }
 

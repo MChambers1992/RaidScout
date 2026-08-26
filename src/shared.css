@@ -64,4 +64,24 @@
     --role-tank:   #4e98dc;
     --role-healer: #56cc56;
     --role-dps:    #e74c3c;
+
+    /* Shape and elevation.
+     *
+     * Added for the Scout page's surface work and deliberately NOT applied to
+     * the popup or options page, which were designed against the flat 4px look
+     * above; retrofitting them is a separate pass. New tokens only — no existing
+     * value changed, so nothing else re-themes by accident. */
+    --radius-sm:  4px;
+    --radius:     8px;
+    --radius-lg:  12px;
+    --radius-pill: 999px;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+    --shadow:    0 4px 14px rgb(0 0 0 / 28%);
+    --shadow-lg: 0 18px 46px rgb(0 0 0 / 38%);
+
+    /* One step above --bg-panel, for a card that sits on a panel. */
+    --bg-elevated: #303030;
+    /* Hairline that reads as a highlight rather than a border. */
+    --border-hairline: rgb(255 255 255 / 7%);
 }

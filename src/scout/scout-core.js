@@ -11,11 +11,14 @@
 // (WoWProgress/Raider.IO link to a real character page; GoW is reconstructed
 // from a Blizzard render URL, so it is the least authoritative).
 
+// `abbr` is what the Scout table shows per row. Bare coloured dots needed a
+// tooltip to mean anything; a two- or three-letter brand-coloured pill is
+// readable at a glance without one.
 export const SOURCE_META = {
-    wowprogress:  { label: 'WoWProgress',   colour: '#4a90d9', priority: 1 },
-    raiderio:     { label: 'Raider.IO',     colour: '#00b35a', priority: 2 },
-    warcraftlogs: { label: 'WarcraftLogs',  colour: '#e8670d', priority: 3 },
-    guildsofwow:  { label: 'Guilds of WoW', colour: '#9B59B6', priority: 4 },
+    wowprogress:  { label: 'WoWProgress',   abbr: 'WP',  colour: '#4a90d9', priority: 1 },
+    raiderio:     { label: 'Raider.IO',     abbr: 'RIO', colour: '#00b35a', priority: 2 },
+    warcraftlogs: { label: 'WarcraftLogs',  abbr: 'WCL', colour: '#e8670d', priority: 3 },
+    guildsofwow:  { label: 'Guilds of WoW', abbr: 'GoW', colour: '#9B59B6', priority: 4 },
 };
 
 export const SOURCE_IDS = Object.keys(SOURCE_META);
@@ -94,6 +97,14 @@ export function normalizeCandidate(raw, source) {
         mythicKills: num(raw.mythicKills),
         mplusScore:  num(raw.mplusScore),
         note:        raw.note ? String(raw.note).trim().slice(0, 300) : null,
+        // Present only where a source actually publishes them: Raider.IO's API
+        // returns a spec name, current guild and Blizzard avatar URL, none of
+        // which the scraped listings expose. Kept optional rather than required
+        // so a source that lacks them still produces a valid candidate.
+        spec:        raw.spec ? String(raw.spec).trim() : null,
+        guild:       raw.guild ? String(raw.guild).trim() : null,
+        avatar:      typeof raw.avatar === 'string' && raw.avatar.startsWith('https://')
+                        ? raw.avatar : null,
         sources:     [source],
         links:       raw.link ? { [source]: raw.link } : {},
         wcl:         null,
@@ -133,6 +144,11 @@ export function mergeCandidate(existing, incoming) {
         mythicKills: preferHigher(existing.mythicKills, incoming.mythicKills),
         mplusScore:  preferHigher(existing.mplusScore, incoming.mplusScore),
         note:        existing.note || incoming.note,
+        // First non-null wins for these: they are descriptive, not measurements,
+        // so there is no "higher is fresher" argument to make.
+        spec:        existing.spec   || incoming.spec,
+        guild:       existing.guild  || incoming.guild,
+        avatar:      existing.avatar || incoming.avatar,
         sources:     existing.sources.includes(incomingSource)
                         ? existing.sources
                         : [...existing.sources, incomingSource],
@@ -197,6 +213,84 @@ export function passesWowProgressFilters(candidate, settings = {}) {
 
     if (guildFilter === 'in'  && candidate.inGuild === false) return false;
     if (guildFilter === 'out' && candidate.inGuild === true)  return false;
+
+    return true;
+}
+
+// Raider.IO's equivalent. Scout reads Raider.IO through its JSON API rather
+// than a rendered page, so raiderio.js never runs and its filters have to be
+// applied here instead — see the adapter in sources.js.
+//
+// Same fail-open contract as the WoWProgress version above: a filter only ever
+// excludes a candidate whose value is actually known. An unknown class or ilvl
+// keeps the row, because dropping a lead over missing data is the worse error.
+export function passesRaiderIoFilters(candidate, settings = {}) {
+    if (!candidate) return false;
+    const {
+        selectedRegions = [], selectedRoles = [], selectedClasses = [], minIlvl = 0,
+    } = settings;
+
+    if (selectedRegions.length && candidate.region &&
+        !selectedRegions.some(r => r.toLowerCase() === candidate.region)) return false;
+
+    if (selectedRoles.length && candidate.role &&
+        !selectedRoles.some(r => r.toLowerCase() === candidate.role)) return false;
+
+    if (selectedClasses.length && candidate.playerClass &&
+        !selectedClasses.includes(candidate.playerClass)) return false;
+
+    if (minIlvl > 0 && candidate.ilvl !== null && candidate.ilvl < minIlvl) return false;
+
+    return true;
+}
+
+// Scout's own filters, applied to the merged list rather than to any one site.
+//
+// Every source filters differently — WoWProgress by its table, Raider.IO by its
+// API query, GoW by its cards — so the merged list was only ever as strict as
+// the loosest source. These run over candidates after the merge, which also
+// means toggling one re-filters instantly instead of re-harvesting.
+//
+// DELIBERATELY STRICTER than the per-site filters: here an unknown value is
+// excluded when a minimum is set, because by this point the candidate has been
+// scored and merged from every source that had it, so a missing item level
+// really means "nobody published one" rather than "this source doesn't say".
+// `hideUnknown: false` restores the per-site fail-open behaviour.
+export function passesScoutFilters(candidate, settings = {}) {
+    if (!candidate) return false;
+    const {
+        classes = [], roles = [], regions = [],
+        minIlvl = 0, minMplus = 0, minMythicKills = 0,
+        minBestParse = 0, minMedianParse = 0,
+        guild = 'any', hideUnknown = false,
+    } = settings;
+
+    if (regions.length && !regions.includes(candidate.region)) return false;
+    if (roles.length   && !(candidate.role && roles.includes(candidate.role))) return false;
+    if (classes.length && !(candidate.playerClass && classes.includes(candidate.playerClass))) return false;
+
+    const atLeast = (value, min) => {
+        if (min <= 0) return true;
+        if (value === null || value === undefined) return !hideUnknown;
+        return value >= min;
+    };
+
+    if (!atLeast(candidate.ilvl,        minIlvl))        return false;
+    if (!atLeast(candidate.mplusScore,  minMplus))       return false;
+    if (!atLeast(candidate.mythicKills, minMythicKills)) return false;
+
+    // Parses come from the WCL layer, which may not have run at all; an unscored
+    // candidate is never excluded by a parse minimum unless hideUnknown is set.
+    if (minBestParse > 0 || minMedianParse > 0) {
+        if (!candidate.wcl || candidate.wcl.error) { if (hideUnknown) return false; }
+        else {
+            if (!atLeast(candidate.wcl.best,   minBestParse))   return false;
+            if (!atLeast(candidate.wcl.median, minMedianParse)) return false;
+        }
+    }
+
+    if (guild === 'in'  && candidate.guild === null) return false;
+    if (guild === 'out' && candidate.guild !== null) return false;
 
     return true;
 }

@@ -6,8 +6,9 @@
 import { describe, it, expect } from 'vitest';
 import {
     slugRealm, makeCandidateKey, normalizeCandidate, mergeCandidate, mergeCandidates,
-    passesWowProgressFilters, sortCandidates, matchesQuery, profileLinks,
+    passesWowProgressFilters, passesScoutFilters, sortCandidates, matchesQuery, profileLinks,
     toCsv, toWhisperList, runWithConcurrency, hasNoLogs, isScored, classLabel,
+    SOURCE_META, SOURCE_IDS,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -432,5 +433,132 @@ describe('classLabel', () => {
     it('returns null for an unknown class', () => {
         expect(classLabel(null)).toBeNull();
         expect(classLabel('')).toBeNull();
+    });
+});
+
+describe('SOURCE_META', () => {
+    it('describes every source id', () => {
+        for (const id of SOURCE_IDS) expect(SOURCE_META[id]).toBeDefined();
+        expect(SOURCE_IDS.length).toBe(Object.keys(SOURCE_META).length);
+    });
+
+    it('gives every source a label, a pill abbreviation and a colour', () => {
+        // A missing abbr renders the raw source id in the Scout table's "Seen
+        // on" column, which is how "guildsofwow" would end up in a 3-char pill.
+        for (const id of SOURCE_IDS) {
+            const meta = SOURCE_META[id];
+            expect(meta.label, `${id}.label`).toBeTruthy();
+            expect(meta.abbr, `${id}.abbr`).toBeTruthy();
+            expect(meta.abbr.length, `${id}.abbr is short enough for a pill`).toBeLessThanOrEqual(4);
+            expect(meta.colour, `${id}.colour`).toMatch(/^#[0-9a-fA-F]{6}$/);
+            expect(typeof meta.priority, `${id}.priority`).toBe('number');
+        }
+    });
+
+    it('keeps pill abbreviations unique, so two sites cannot look alike', () => {
+        const abbrs = SOURCE_IDS.map(id => SOURCE_META[id].abbr);
+        expect(new Set(abbrs).size).toBe(abbrs.length);
+    });
+});
+
+// ─── passesScoutFilters ───────────────────────────────────────────────────────
+// Scout's own filters run over the MERGED list, so unlike the per-site filters
+// they are the last word — see the fail-open/fail-closed note below.
+
+const cand = (over = {}) => ({
+    key: 'eu/tarren-mill/thrall', name: 'Thrall', realm: 'tarren-mill', region: 'eu',
+    role: 'dps', playerClass: 'shaman', ilvl: 300, mythicKills: 4, mplusScore: 2500,
+    spec: 'Enhancement', guild: 'Frostwolf', avatar: null, note: null,
+    sources: ['raiderio'], links: {}, wcl: null,
+    ...over,
+});
+
+describe('passesScoutFilters', () => {
+    it('keeps everything when nothing is set', () => {
+        expect(passesScoutFilters(cand(), {})).toBe(true);
+        expect(passesScoutFilters(cand())).toBe(true);
+    });
+
+    it('rejects a null candidate', () => {
+        expect(passesScoutFilters(null, {})).toBe(false);
+    });
+
+    it('filters by region', () => {
+        expect(passesScoutFilters(cand(), { regions: ['eu'] })).toBe(true);
+        expect(passesScoutFilters(cand(), { regions: ['us'] })).toBe(false);
+        expect(passesScoutFilters(cand(), { regions: ['us', 'eu'] })).toBe(true);
+    });
+
+    it('filters by role, and excludes a candidate whose role is unknown', () => {
+        // A role filter is the officer saying "I am recruiting healers". A
+        // candidate with no known role is not a healer, so it does not qualify.
+        expect(passesScoutFilters(cand({ role: 'healer' }), { roles: ['healer'] })).toBe(true);
+        expect(passesScoutFilters(cand({ role: 'dps' }),    { roles: ['healer'] })).toBe(false);
+        expect(passesScoutFilters(cand({ role: null }),     { roles: ['healer'] })).toBe(false);
+        expect(passesScoutFilters(cand({ role: null }),     {})).toBe(true);
+    });
+
+    it('filters by class, and excludes an unknown class', () => {
+        expect(passesScoutFilters(cand(), { classes: ['shaman'] })).toBe(true);
+        expect(passesScoutFilters(cand(), { classes: ['mage'] })).toBe(false);
+        expect(passesScoutFilters(cand({ playerClass: null }), { classes: ['mage'] })).toBe(false);
+    });
+
+    it('applies numeric minimums', () => {
+        expect(passesScoutFilters(cand(), { minIlvl: 300 })).toBe(true);
+        expect(passesScoutFilters(cand(), { minIlvl: 301 })).toBe(false);
+        expect(passesScoutFilters(cand(), { minMplus: 2500 })).toBe(true);
+        expect(passesScoutFilters(cand(), { minMplus: 2501 })).toBe(false);
+        expect(passesScoutFilters(cand(), { minMythicKills: 4 })).toBe(true);
+        expect(passesScoutFilters(cand(), { minMythicKills: 5 })).toBe(false);
+    });
+
+    it('treats 0 as "no minimum", not as a real floor', () => {
+        expect(passesScoutFilters(cand({ ilvl: 0, mplusScore: 0, mythicKills: 0 }),
+            { minIlvl: 0, minMplus: 0, minMythicKills: 0 })).toBe(true);
+    });
+
+    it('keeps a candidate with no value for a minimum unless hideUnknown is set', () => {
+        const blank = cand({ ilvl: null, mplusScore: null, mythicKills: null });
+        expect(passesScoutFilters(blank, { minIlvl: 300 })).toBe(true);
+        expect(passesScoutFilters(blank, { minIlvl: 300, hideUnknown: true })).toBe(false);
+        expect(passesScoutFilters(blank, { minMplus: 2000, hideUnknown: true })).toBe(false);
+    });
+
+    it('applies parse minimums to a scored candidate', () => {
+        const scored = cand({ wcl: { best: 80, median: 60 } });
+        expect(passesScoutFilters(scored, { minMedianParse: 60 })).toBe(true);
+        expect(passesScoutFilters(scored, { minMedianParse: 61 })).toBe(false);
+        expect(passesScoutFilters(scored, { minBestParse: 80 })).toBe(true);
+        expect(passesScoutFilters(scored, { minBestParse: 81 })).toBe(false);
+    });
+
+    it('never drops an unscored candidate on a parse minimum unless hideUnknown', () => {
+        // Scoring may not have run at all (no credentials, rate limited, or the
+        // officer switched it off); punishing a candidate for that is wrong.
+        expect(passesScoutFilters(cand({ wcl: null }), { minMedianParse: 90 })).toBe(true);
+        expect(passesScoutFilters(cand({ wcl: { error: 'NO_CREDENTIALS' } }),
+            { minMedianParse: 90 })).toBe(true);
+        expect(passesScoutFilters(cand({ wcl: null }),
+            { minMedianParse: 90, hideUnknown: true })).toBe(false);
+    });
+
+    it('filters by guild status', () => {
+        expect(passesScoutFilters(cand({ guild: 'Frostwolf' }), { guild: 'in' })).toBe(true);
+        expect(passesScoutFilters(cand({ guild: 'Frostwolf' }), { guild: 'out' })).toBe(false);
+        expect(passesScoutFilters(cand({ guild: null }), { guild: 'out' })).toBe(true);
+        expect(passesScoutFilters(cand({ guild: null }), { guild: 'in' })).toBe(false);
+        expect(passesScoutFilters(cand({ guild: null }), { guild: 'any' })).toBe(true);
+    });
+
+    it('requires every active filter to pass, not any', () => {
+        const c = cand({ role: 'healer', playerClass: 'priest', region: 'eu', ilvl: 310 });
+        expect(passesScoutFilters(c, {
+            roles: ['healer'], classes: ['priest'], regions: ['eu'], minIlvl: 300,
+        })).toBe(true);
+        // One mismatch is enough to exclude.
+        expect(passesScoutFilters(c, {
+            roles: ['healer'], classes: ['priest'], regions: ['us'], minIlvl: 300,
+        })).toBe(false);
     });
 });

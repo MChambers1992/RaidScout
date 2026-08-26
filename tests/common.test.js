@@ -1,6 +1,12 @@
-// tests/common.test.js
-// Unit tests for pure logic extracted from common.js and wcl-api.js.
-// These run in Node (via Vitest) with no browser globals needed.
+/**
+ * tests/common.test.js
+ *
+ * Unit tests for logic extracted from common.js and wcl-api.js. Most of it is
+ * pure, but the getRecruitmentRole suite at the end walks a real card element,
+ * so the whole file runs under jsdom.
+ *
+ * @vitest-environment jsdom
+ */
 
 import { describe, it, expect } from 'vitest';
 
@@ -399,5 +405,295 @@ describe('wclSortEnabled', () => {
 
     it('defaults to off for a fresh install with nothing saved', () => {
         expect(wclSortEnabled({})).toBe(false);
+    });
+});
+
+// ─── Guilds of WoW M+ score parsing (guildsofwow.js) ─────────────────────────
+
+function parseGowMythicPlusScore(text) {
+    const match = (text ?? '').trim().match(/^[\d,]+/);
+    if (!match) return null;
+    const val = parseInt(match[0].replace(/,/g, ''), 10);
+    return isNaN(val) ? null : val;
+}
+
+describe('Guilds of WoW M+ score parsing', () => {
+    it('reads a bare current-season score', () => {
+        expect(parseGowMythicPlusScore('2672')).toBe(2672);
+    });
+
+    it('reads a grouped past-season score without truncating at the comma', () => {
+        // The card renders "2,245 HIGHEST SEASON"; parseInt() alone stops at
+        // the comma and yields 2, which silently fails a min-score filter.
+        expect(parseGowMythicPlusScore('2,245 HIGHEST SEASON')).toBe(2245);
+        expect(parseGowMythicPlusScore('3,260 HIGHEST SEASON')).toBe(3260);
+    });
+
+    it('returns null when there is no score', () => {
+        expect(parseGowMythicPlusScore('N/A')).toBe(null);
+        expect(parseGowMythicPlusScore('')).toBe(null);
+        expect(parseGowMythicPlusScore(null)).toBe(null);
+    });
+
+    it('never yields an implausibly small score for a real card', () => {
+        for (const t of ['2672', '2,245 HIGHEST SEASON', '1018', '156', '3,280 HIGHEST SEASON'])
+            expect(parseGowMythicPlusScore(t)).toBeGreaterThan(100);
+    });
+});
+
+// ─── Spec table completeness ──────────────────────────────────────────────────
+// Mirrors SPEC_ROLE in common.js. The whole point of the table is that it is
+// COMPLETE, so these tests enumerate every spec in the game rather than
+// spot-checking: a missing DPS spec makes roleFromText() blind to it, and a
+// missing tank or healer makes specToRole() call them DPS.
+
+const SPEC_ROLE = {
+    blood: 'tank', vengeance: 'tank', guardian: 'tank', brewmaster: 'tank',
+    protection: 'tank',
+    restoration: 'healer', preservation: 'healer', mistweaver: 'healer',
+    holy: 'healer', discipline: 'healer',
+    frost: 'dps', unholy: 'dps', havoc: 'dps', balance: 'dps', feral: 'dps',
+    devastation: 'dps', augmentation: 'dps', marksmanship: 'dps', survival: 'dps',
+    arcane: 'dps', fire: 'dps', windwalker: 'dps', retribution: 'dps',
+    shadow: 'dps', assassination: 'dps', outlaw: 'dps', subtlety: 'dps',
+    elemental: 'dps', enhancement: 'dps', affliction: 'dps', demonology: 'dps',
+    destruction: 'dps', arms: 'dps', fury: 'dps',
+    'beast mastery': 'dps',
+};
+
+function specToRole(spec) {
+    if (!spec) return null;
+    return SPEC_ROLE[spec.trim().toLowerCase()] ?? 'dps';
+}
+
+function roleFromSpecName(spec) {
+    if (!spec) return null;
+    return SPEC_ROLE[spec.trim().toLowerCase()] ?? null;
+}
+
+function roleFromText(text) {
+    if (!text) return null;
+    const lower = String(text).toLowerCase();
+    if (/\b(healer|healers|healing|heals)\b/.test(lower)) return 'healer';
+    if (/\b(tank|tanks|tanking)\b/.test(lower))           return 'tank';
+    if (/\b(dps|damage|ranged|melee)\b/.test(lower))      return 'dps';
+    if (lower.includes('beast mastery')) return 'dps';
+    for (const word of lower.split(/[^a-z]+/)) {
+        const role = roleFromSpecName(word);
+        if (role) return role;
+    }
+    return null;
+}
+
+// Every spec in the game, by class, with the role it actually plays.
+const ALL_SPECS = [
+    ['Death Knight', 'Blood', 'tank'], ['Death Knight', 'Frost', 'dps'], ['Death Knight', 'Unholy', 'dps'],
+    ['Demon Hunter', 'Havoc', 'dps'], ['Demon Hunter', 'Vengeance', 'tank'],
+    ['Druid', 'Balance', 'dps'], ['Druid', 'Feral', 'dps'], ['Druid', 'Guardian', 'tank'],
+    ['Druid', 'Restoration', 'healer'],
+    ['Evoker', 'Devastation', 'dps'], ['Evoker', 'Preservation', 'healer'], ['Evoker', 'Augmentation', 'dps'],
+    ['Hunter', 'Beast Mastery', 'dps'], ['Hunter', 'Marksmanship', 'dps'], ['Hunter', 'Survival', 'dps'],
+    ['Mage', 'Arcane', 'dps'], ['Mage', 'Fire', 'dps'], ['Mage', 'Frost', 'dps'],
+    ['Monk', 'Brewmaster', 'tank'], ['Monk', 'Mistweaver', 'healer'], ['Monk', 'Windwalker', 'dps'],
+    ['Paladin', 'Holy', 'healer'], ['Paladin', 'Protection', 'tank'], ['Paladin', 'Retribution', 'dps'],
+    ['Priest', 'Discipline', 'healer'], ['Priest', 'Holy', 'healer'], ['Priest', 'Shadow', 'dps'],
+    ['Rogue', 'Assassination', 'dps'], ['Rogue', 'Outlaw', 'dps'], ['Rogue', 'Subtlety', 'dps'],
+    ['Shaman', 'Elemental', 'dps'], ['Shaman', 'Enhancement', 'dps'], ['Shaman', 'Restoration', 'healer'],
+    ['Warlock', 'Affliction', 'dps'], ['Warlock', 'Demonology', 'dps'], ['Warlock', 'Destruction', 'dps'],
+    ['Warrior', 'Arms', 'dps'], ['Warrior', 'Fury', 'dps'], ['Warrior', 'Protection', 'tank'],
+];
+
+describe('SPEC_ROLE completeness', () => {
+    it('maps every spec of every class to its real role', () => {
+        for (const [cls, spec, role] of ALL_SPECS) {
+            expect(specToRole(spec), `${cls} ${spec}`).toBe(role);
+        }
+    });
+
+    it('recognises every spec by name, with no gaps', () => {
+        // roleFromSpecName returning null for a real spec is the bug this guards:
+        // it would make roleFromText() silently blind to that spec.
+        for (const [cls, spec] of ALL_SPECS) {
+            expect(roleFromSpecName(spec), `${cls} ${spec} is a known spec`).toBeTruthy();
+        }
+    });
+
+    it('covers every tank and healer spec, so neither can be mistaken for DPS', () => {
+        const tanks = ALL_SPECS.filter(([, , r]) => r === 'tank').map(([, s]) => s);
+        const heals = ALL_SPECS.filter(([, , r]) => r === 'healer').map(([, s]) => s);
+        for (const s of tanks) expect(specToRole(s), s).toBe('tank');
+        for (const s of heals) expect(specToRole(s), s).toBe('healer');
+        // Five distinct tank spec names and five healer ones across all classes.
+        expect(new Set(tanks).size).toBe(5);
+        expect(new Set(heals).size).toBe(5);
+    });
+
+    it('resolves specs shared between classes to one unambiguous role', () => {
+        expect(specToRole('Restoration')).toBe('healer');  // druid + shaman
+        expect(specToRole('Holy')).toBe('healer');         // paladin + priest
+        expect(specToRole('Protection')).toBe('tank');     // paladin + warrior
+        expect(specToRole('Frost')).toBe('dps');           // death knight + mage
+    });
+});
+
+describe('specToRole vs roleFromSpecName', () => {
+    it('differ only on unknown input, which is the whole point', () => {
+        // specToRole is for callers who already know the string is a spec.
+        expect(specToRole('Elemental')).toBe('dps');
+        expect(roleFromSpecName('Elemental')).toBe('dps');
+        // roleFromSpecName is for callers scanning arbitrary text.
+        expect(specToRole('Recruiting')).toBe('dps');
+        expect(roleFromSpecName('Recruiting')).toBe(null);
+        expect(specToRole('')).toBe(null);
+        expect(roleFromSpecName('')).toBe(null);
+    });
+});
+
+describe('roleFromText', () => {
+    it('returns null when there is no role or spec to find', () => {
+        expect(roleFromText(null)).toBe(null);
+        expect(roleFromText('')).toBe(null);
+        expect(roleFromText('Recruiting for Heroic progression')).toBe(null);
+        expect(roleFromText('Tuesday 20:00 server time')).toBe(null);
+    });
+
+    it('prefers an explicit role word over anything else', () => {
+        expect(roleFromText('Healer')).toBe('healer');
+        expect(roleFromText('Tank')).toBe('tank');
+        expect(roleFromText('DPS')).toBe('dps');
+        expect(roleFromText('Ranged')).toBe('dps');
+        expect(roleFromText('Melee')).toBe('dps');
+    });
+
+    it('falls back to a spec name embedded in the text', () => {
+        expect(roleFromText('Restoration Druid')).toBe('healer');
+        expect(roleFromText('spec-icon protection-warrior')).toBe('tank');
+        expect(roleFromText('Beast Mastery')).toBe('dps');
+        expect(roleFromText('  Mistweaver  ')).toBe('healer');
+    });
+
+    it('is not fooled by a spec name appearing inside a longer word', () => {
+        // Word-splitting, not substring matching: "Holyfield" is not a healer.
+        expect(roleFromText('Holyfield')).toBe(null);
+        expect(roleFromText('Frostmourne')).toBe(null);
+    });
+
+    it('never guesses DPS for text it does not understand', () => {
+        // The old implementation returned 'dps' unconditionally, which scored
+        // every unrecognised healer against a threshold they cannot meet.
+        for (const text of ['', 'Guild', 'EU-Tarren Mill', '3/8 Mythic', 'Alliance']) {
+            expect(roleFromText(text), text).toBe(null);
+        }
+    });
+});
+
+// ─── roleFromSpecText ─────────────────────────────────────────────────────────
+// Spec-only scanning, used to sift CSS class names. Kept separate from
+// roleFromText precisely so a "damage-meter" class cannot invent a role.
+
+function roleFromSpecText(text) {
+    if (!text) return null;
+    const lower = String(text).toLowerCase();
+    if (/beast[^a-z]+mastery/.test(lower)) return 'dps';
+    for (const word of lower.split(/[^a-z]+/)) {
+        const role = roleFromSpecName(word);
+        if (role) return role;
+    }
+    return null;
+}
+
+describe('roleFromSpecText', () => {
+    it('reads a spec out of a hyphenated or underscored CSS class', () => {
+        expect(roleFromSpecText('player-character-spec spec-mistweaver')).toBe('healer');
+        expect(roleFromSpecText('icon_blood_dk')).toBe('tank');
+        expect(roleFromSpecText('spec--vengeance')).toBe('tank');
+    });
+
+    it('finds the only two-word spec despite the separator', () => {
+        expect(roleFromSpecText('beast-mastery-icon')).toBe('dps');
+        expect(roleFromSpecText('Beast Mastery')).toBe('dps');
+        expect(roleFromSpecText('beast_mastery')).toBe('dps');
+    });
+
+    it('ignores explicit role words, unlike roleFromText', () => {
+        // This is the whole reason the two functions are separate: these strings
+        // are plausible CSS class names, not statements about a player's role.
+        expect(roleFromSpecText('damage-meter-col')).toBe(null);
+        expect(roleFromSpecText('ranged-column')).toBe(null);
+        expect(roleFromSpecText('tank-icon')).toBe(null);
+        expect(roleFromText('damage')).toBe('dps');
+    });
+
+    it('is not fooled by a spec name inside a longer word', () => {
+        expect(roleFromSpecText('Frostmourne')).toBe(null);
+        expect(roleFromSpecText('holyfield')).toBe(null);
+    });
+
+    it('returns null for empty input', () => {
+        expect(roleFromSpecText('')).toBe(null);
+        expect(roleFromSpecText(null)).toBe(null);
+    });
+});
+
+// ─── getRecruitmentRole (warcraftlogs.js) ─────────────────────────────────────
+// WCL's recruitment card markup is not confirmed, so the extractor tries several
+// signals. These cover each strategy plus the cases that must NOT produce a role.
+// Requires a DOM, so this suite runs under Vitest's jsdom environment.
+
+function getRecruitmentRole(card) {
+    for (const el of card.querySelectorAll('img[alt], [title], [aria-label]')) {
+        const role = roleFromText(el.getAttribute('alt') || el.getAttribute('title') ||
+                                 el.getAttribute('aria-label'));
+        if (role) return role;
+    }
+    for (const el of card.querySelectorAll('[class*="spec"], [class*="role"]')) {
+        const role = roleFromText(el.textContent);
+        if (role) return role;
+    }
+    for (const el of card.querySelectorAll('[class]')) {
+        if (typeof el.className !== 'string') continue;
+        const role = roleFromSpecText(el.className);
+        if (role) return role;
+    }
+    return null;
+}
+
+describe('getRecruitmentRole', () => {
+    const card = html => {
+        const el = document.createElement('div');
+        el.innerHTML = html;
+        return el;
+    };
+
+    it('reads a spec from an icon alt, title or aria-label', () => {
+        expect(getRecruitmentRole(card('<img alt="Restoration" src="x.jpg">'))).toBe('healer');
+        expect(getRecruitmentRole(card('<span title="Brewmaster"></span>'))).toBe('tank');
+        expect(getRecruitmentRole(card('<div aria-label="Healer"></div>'))).toBe('healer');
+    });
+
+    it('reads a spec or role from a spec/role-named element', () => {
+        expect(getRecruitmentRole(card('<div class="character-spec">Vengeance</div>'))).toBe('tank');
+        expect(getRecruitmentRole(card('<div class="recruitment-role">Tank</div>'))).toBe('tank');
+        expect(getRecruitmentRole(card('<div class="role-label">DPS</div>'))).toBe('dps');
+    });
+
+    it('reads a spec carried as a CSS class', () => {
+        expect(getRecruitmentRole(card('<div class="player-character-spec spec-mistweaver"></div>')))
+            .toBe('healer');
+        expect(getRecruitmentRole(card('<div class="beast-mastery-icon"></div>'))).toBe('dps');
+    });
+
+    it('returns null rather than guessing DPS when the card does not say', () => {
+        // The old implementation defaulted to 'dps', which scored every healer it
+        // failed to recognise against a threshold no healer can meet.
+        expect(getRecruitmentRole(card(
+            '<span>Thrall</span><span>EU-Tarren Mill</span><span>3/8 Mythic</span>'))).toBe(null);
+        expect(getRecruitmentRole(card('<span class="realm">Frostmourne</span>'))).toBe(null);
+        expect(getRecruitmentRole(card('<div class="damage-meter-col"></div>'))).toBe(null);
+    });
+
+    it('prefers a real spec signal over class-name noise', () => {
+        expect(getRecruitmentRole(card('<div class="damage-col"></div><img alt="Discipline">')))
+            .toBe('healer');
     });
 });

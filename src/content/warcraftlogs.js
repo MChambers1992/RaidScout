@@ -32,15 +32,12 @@ function extractCharacterFromUrl(url) {
 
 // Try to read the character's primary role from the spec icon shown on their page.
 // WCL renders a spec icon with an alt like "Restoration Druid" or "Protection Paladin".
+// Role on a character page, from the selected spec icon. Shares the spec table
+// in common.js rather than keeping its own copy — the two lists had already
+// drifted from the recruitment-card version below.
 function detectRoleFromPage() {
     const specIcon = document.querySelector('.player-character-spec img[alt]');
-    if (!specIcon) return null;
-    const alt = specIcon.alt.toLowerCase();
-    const healerSpecs = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation'];
-    const tankSpecs   = ['protection', 'guardian', 'blood', 'brewmaster', 'vengeance'];
-    if (healerSpecs.some(s => alt.startsWith(s))) return 'healer';
-    if (tankSpecs.some(s => alt.startsWith(s)))   return 'tank';
-    return 'dps';
+    return specIcon ? roleFromText(specIcon.alt) : null;
 }
 
 let reactiveCheckTimer = null;
@@ -173,16 +170,42 @@ function getRecruitmentCharacter(card) {
     };
 }
 
-// Best-effort role detection from the result card. WCL's recruitment search
-// markup for spec/role isn't confirmed here, so this degrades gracefully to
-// 'dps' (the safe default used across the extension) rather than failing.
+// Role for one recruitment result card.
+//
+// Returns null when the card does not say. It used to fall back to 'dps', which
+// silently scored every healer it failed to recognise against a DPS threshold no
+// healer can meet — the worst possible failure for this feature. A null costs
+// nothing: roleToMetric() and thresholdsForRole() both already treat unknown as
+// DPS, so behaviour is unchanged, while the merge in scout-core can now take a
+// real role from another source and Scout's role filter can tell it is unknown.
+//
+// WCL's markup for spec is not confirmed, so several signals are tried rather
+// than betting on one selector. The spec→role table lives in common.js so this
+// and Raider.IO cannot drift apart.
 function getRecruitmentRole(card) {
-    const roleText = (card.querySelector('[class*="spec"], [class*="role"]')?.textContent || '').toLowerCase();
-    const healerSpecs = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation', 'healer'];
-    const tankSpecs   = ['protection', 'guardian', 'blood', 'brewmaster', 'vengeance', 'tank'];
-    if (healerSpecs.some(s => roleText.includes(s))) return 'healer';
-    if (tankSpecs.some(s => roleText.includes(s)))   return 'tank';
-    return 'dps';
+    // 1. A spec or role icon, where the answer is in an attribute.
+    for (const el of card.querySelectorAll('img[alt], [title], [aria-label]')) {
+        const role = roleFromText(el.getAttribute('alt') || el.getAttribute('title') ||
+                                 el.getAttribute('aria-label'));
+        if (role) return role;
+    }
+
+    // 2. A spec- or role-named element, read as text.
+    for (const el of card.querySelectorAll('[class*="spec"], [class*="role"]')) {
+        const role = roleFromText(el.textContent);
+        if (role) return role;
+    }
+
+    // 3. A spec name carried as a CSS class, the way the character name element
+    //    carries the class name (see getRecruitmentClass). Spec names only here:
+    //    matching role words too would let a "damage-meter" class invent a role.
+    for (const el of card.querySelectorAll('[class]')) {
+        if (typeof el.className !== 'string') continue;
+        const role = roleFromSpecText(el.className);
+        if (role) return role;
+    }
+
+    return null;
 }
 
 function applyProactiveScoring(options) {

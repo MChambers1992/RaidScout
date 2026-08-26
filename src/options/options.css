@@ -533,3 +533,11 @@ details.advanced > summary::before {
 details.advanced[open] > summary::before { content: '▾ '; }
 details.advanced > summary:hover { color: var(--text-strong); }
 details.advanced .details-body { padding: 4px 12px 8px; }
+
+/* Inline qualifier next to a checkbox label — used to mark the WarcraftLogs
+   recruitment source as unreliable without a whole help paragraph. */
+.hint-inline {
+    color: var(--text-faint, #6a6a6a);
+    font-size: 11px;
+    font-style: italic;
+}

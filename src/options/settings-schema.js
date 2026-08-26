@@ -70,13 +70,15 @@ const SCHEMA = [
     { key: 'scoutMaxCandidates',         type: 'int',    default: 150,   domId: 'scoutMaxCandidates' },
     { key: 'scoutPagesPerSource',        type: 'int',    default: 1,     domId: 'scoutPagesPerSource' },
     { key: 'scoutWclEnabled',            type: 'bool',   default: true,  domId: 'scoutWclEnabled' },
+    { key: 'scoutEnrichRoles',           type: 'bool',   default: true,  domId: 'scoutEnrichRoles' },
     { key: 'scoutHideBelowThresholds',   type: 'bool',   default: true,  domId: 'scoutHideBelowThresholds' },
     { key: 'scoutUrlWowprogress',        type: 'string', default: '',    domId: 'scoutUrlWowprogress' },
     { key: 'scoutUrlRaiderio',           type: 'string', default: '',    domId: 'scoutUrlRaiderio' },
     { key: 'scoutUrlGuildsofwow',        type: 'string', default: '',    domId: 'scoutUrlGuildsofwow' },
     { key: 'scoutUrlWarcraftlogs',       type: 'string', default: '',    domId: 'scoutUrlWarcraftlogs' },
     { key: 'scoutSources',               type: 'checkboxGroup',
-      default: ['wowprogress', 'raiderio', 'warcraftlogs', 'guildsofwow'], selector: '.scoutSourceFilter' },
+      default: ['wowprogress', 'raiderio', 'warcraftlogs', 'guildsofwow'],
+      selector: '.scoutSourceFilter' },
 ];
 
 // All sync keys (used for chrome.storage.sync.get)

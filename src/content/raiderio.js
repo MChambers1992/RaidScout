@@ -39,6 +39,13 @@ function enforceSortingAndPublishedColumn() {
     const href   = window.location.href;
     const params = new URLSearchParams(window.location.search);
     const toAppend = [];
+    // Without an explicit type, Raider.IO ignores the recruitment.* filters and
+    // renders its "Add some filters to find Characters" empty state instead of
+    // the recruitment listing. Only fill in a *missing* type — an explicit
+    // type=guild/team is the officer browsing the other side of recruitment,
+    // and overwriting it would both hijack that page and re-trigger this
+    // redirect forever.
+    if (!params.has('type')) toAppend.push('type=character');
     if (!params.has('recruitment.guild_raids.profile.published_at[0][gte]'))
         toAppend.push('recruitment.guild_raids.profile.published_at%5B0%5D%5Bgte%5D=1');
     if (!params.has('sort[recruitment.guild_raids.profile.published_at]'))
@@ -105,11 +112,11 @@ function getRowData(row) {
     const region      = realmText.match(/^\(([A-Z]+)\)/)?.[1] ?? null;
     const ilvlText    = cells[4]?.querySelector('.slds-text-align--center')?.textContent.trim() ?? '';
     const ilvl        = parseFloat(ilvlText);
-    const roleCell    = cells[5];
-    let role = null;
-    if (roleCell?.querySelector('.tank-lfg-rio'))   role = 'tank';
-    else if (roleCell?.querySelector('.healer-lfg-rio')) role = 'healer';
-    else if (roleCell?.querySelector('.dps-lfg-rio'))    role = 'dps';
+    // The search table has no role column — cells[5] is "Published". The class
+    // cell carries two avatars, class then spec, and the spec is the only role
+    // signal on the page.
+    const specTitle = cells[1]?.querySelectorAll('.slds-avatar[title]')[1]?.title ?? null;
+    const role      = specToRole(specTitle);
     return { playerClass, region, ilvl: isNaN(ilvl) ? null : ilvl, role };
 }
 

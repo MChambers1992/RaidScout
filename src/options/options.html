@@ -408,7 +408,7 @@
                 <div class="region-checks">
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="wowprogress"> WoWProgress</label>
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="raiderio"> Raider.IO</label>
-                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="warcraftlogs"> WarcraftLogs recruitment</label>
+                    <label class="inline-check" title="The WarcraftLogs recruitment listing sits behind a one-click human check; clear it once in a normal tab if a run reports it."><input type="checkbox" class="scoutSourceFilter" value="warcraftlogs"> WarcraftLogs recruitment</label>
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="guildsofwow"> Guilds of WoW</label>
                 </div>
                 <p class="hint">WoWProgress is read directly over the network. The other three render their listings in the
@@ -432,6 +432,17 @@
             </div>
 
             <p class="subsection-label">Scoring</p>
+            <div class="option toggle-inline">
+                <label for="scoutEnrichRoles">Look up missing roles</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scoutEnrichRoles">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">WoWProgress publishes no spec or role on its LFG listing, so those candidates arrive with
+                no role and get scored on the DPS metric — which makes healers look far worse than they are. This asks
+                Raider.IO's public character API for the role of any candidate whose source didn't say. One request per
+                such candidate, no credentials needed, and it runs before parses are fetched so the right metric is used.</p>
+            </div>
             <div class="option toggle-inline">
                 <label for="scoutWclEnabled">Fetch WarcraftLogs parses</label>
                 <label class="toggle-switch">
@@ -472,7 +483,7 @@
                 </div>
                 <div class="option">
                     <label for="scoutUrlWarcraftlogs">WarcraftLogs recruitment</label>
-                    <input type="text" id="scoutUrlWarcraftlogs" placeholder="https://www.warcraftlogs.com/recruitment/" autocomplete="off">
+                    <input type="text" id="scoutUrlWarcraftlogs" placeholder="https://www.warcraftlogs.com/recruitment/guild-looking-for-players" autocomplete="off">
                 </div>
                 <div class="option">
                     <label for="scoutUrlGuildsofwow">Guilds of WoW</label>

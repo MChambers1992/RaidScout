@@ -14,6 +14,89 @@ function normalizeClassName(name) {
     return lower.replace(/ /g, '_');
 }
 
+// Spec name → role. Some sites (Raider.IO) publish only the spec, never the
+// role, so the role a metric depends on has to be derived from it. Spec names
+// are unique enough across classes that no class context is needed: every
+// "Restoration"/"Holy" is a healer, every "Protection" a tank, every "Frost"
+// a DPS.
+//
+// Every current spec is listed, not just the tanks and healers, because two
+// different questions get asked of this table:
+//
+//   specToRole()      — "what role is this spec?" Unknown means a spec name we
+//                       have not seen, and DPS is the right guess.
+//   roleFromSpecName() — "is this string a spec at all?" Used when scanning
+//                       arbitrary page text for a role, where guessing DPS on
+//                       every non-spec word would make the scan useless.
+const SPEC_ROLE = {
+    // Tanks
+    blood: 'tank', vengeance: 'tank', guardian: 'tank', brewmaster: 'tank',
+    protection: 'tank',
+    // Healers
+    restoration: 'healer', preservation: 'healer', mistweaver: 'healer',
+    holy: 'healer', discipline: 'healer',
+    // DPS
+    frost: 'dps', unholy: 'dps', havoc: 'dps', balance: 'dps', feral: 'dps',
+    devastation: 'dps', augmentation: 'dps', marksmanship: 'dps', survival: 'dps',
+    arcane: 'dps', fire: 'dps', windwalker: 'dps', retribution: 'dps',
+    shadow: 'dps', assassination: 'dps', outlaw: 'dps', subtlety: 'dps',
+    elemental: 'dps', enhancement: 'dps', affliction: 'dps', demonology: 'dps',
+    destruction: 'dps', arms: 'dps', fury: 'dps',
+    // Two words on every site that publishes it.
+    'beast mastery': 'dps',
+};
+
+// Unknown spec → 'dps'. Correct where the caller already knows the string IS a
+// spec (Raider.IO's API hands us `spec.name`), so an unrecognised one is far
+// more likely a new DPS spec than a new tank or healer.
+function specToRole(spec) {
+    if (!spec) return null;
+    return SPEC_ROLE[spec.trim().toLowerCase()] ?? 'dps';
+}
+
+// Unknown spec → null. For scanning page text, where "is this a spec?" has to
+// be answerable with "no".
+function roleFromSpecName(spec) {
+    if (!spec) return null;
+    return SPEC_ROLE[spec.trim().toLowerCase()] ?? null;
+}
+
+// Scan a string for a SPEC name and return its role, or null. Splits on
+// non-letters, so it reads a spec out of prose, an icon's alt text, or a CSS
+// class alike ("spec-mistweaver", "beast-mastery-icon").
+//
+// Deliberately excludes the explicit role words that roleFromText matches: this
+// is used to sift CSS class names, where a stray "damage-meter" or "ranged-col"
+// would otherwise be read as a role the page never claimed.
+function roleFromSpecText(text) {
+    if (!text) return null;
+    const lower = String(text).toLowerCase();
+
+    // "Beast Mastery" is the only two-word spec, so it cannot survive the split.
+    if (/beast[^a-z]+mastery/.test(lower)) return 'dps';
+
+    for (const word of lower.split(/[^a-z]+/)) {
+        const role = roleFromSpecName(word);
+        if (role) return role;
+    }
+    return null;
+}
+
+// Pull a role out of arbitrary page text: an explicit role word if the site
+// prints one, otherwise a spec name appearing anywhere in it. Returns null when
+// neither is present, so callers can tell "unknown" from "DPS".
+function roleFromText(text) {
+    if (!text) return null;
+    const lower = String(text).toLowerCase();
+
+    // Explicit role wording wins — it is the site stating the answer.
+    if (/\b(healer|healers|healing|heals)\b/.test(lower)) return 'healer';
+    if (/\b(tank|tanks|tanking)\b/.test(lower))           return 'tank';
+    if (/\b(dps|damage|ranged|melee)\b/.test(lower))      return 'dps';
+
+    return roleFromSpecText(lower);
+}
+
 function sendMessageToBackground(action, data = {}) {
     chrome.runtime.sendMessage({ action, ...data });
 }
@@ -347,6 +430,118 @@ function sortByWclScore(items) {
 // fail VISIBLE instead, or a site whose markup changed silently shortens the
 // officer's list and they trust a result that is wrong.
 
+// Every site Scout harvests is behind bot protection: WoWProgress, GoW and
+// WarcraftLogs sit behind Cloudflare, and WarcraftLogs additionally gates
+// listing pages behind its own one-click /human-challenge form. A tab that lands
+// on one of those never renders the listing, so without this the harvest just
+// times out and blames the selector or the officer's filters.
+//
+// The two kinds are NOT interchangeable, and treating them alike is a bug:
+//
+//   'waiting'     — Cloudflare's JS check ("Just a moment…"). It solves itself
+//                   in a few seconds and then loads the real page, so the only
+//                   correct response is to keep waiting. Failing fast here is
+//                   what made WoWProgress report a Cloudflare check it would
+//                   have cleared on its own.
+//   'interactive' — needs a human to click something (WarcraftLogs' one-click
+//                   form). No amount of waiting helps, so stop immediately and
+//                   say what to do.
+//
+// Returns { kind, label } or null on a real page.
+function detectInterstitial() {
+    const title = (document.title || '').trim();
+
+    // WarcraftLogs' gate: its own page, with a real form to submit.
+    if (/human-challenge/i.test(location.pathname) || /^human verification$/i.test(title))
+        return { kind: 'interactive', label: 'a one-click human-verification page' };
+
+    // Cloudflare's own pages all title themselves "Just a moment...". A managed
+    // challenge and a plain JS check look alike from the DOM, so both are
+    // treated as 'waiting'; a managed one simply never clears and is reported at
+    // the deadline instead.
+    if (/^just a moment/i.test(title) ||
+        document.querySelector('#challenge-running, #cf-challenge-running, #challenge-stage'))
+        return { kind: 'waiting', label: 'a Cloudflare check' };
+
+    return null;
+}
+
+// When a ready selector never matches, "the markup changed" is true but useless
+// on its own. A site's listing rows are by definition a class that repeats many
+// times, so reporting the most-repeated class names turns the next failure
+// report into the answer instead of another round trip.
+function countClassNames(elements, depth = 0) {
+    const counts = new Map();
+    for (const start of elements) {
+        let el = start;
+        for (let up = 0; el && up <= depth; up++, el = el.parentElement) {
+            if (typeof el.className !== 'string') continue;   // SVG animated class
+            for (const name of el.className.trim().split(/\s+/)) {
+                if (name.length > 2) counts.set(name, (counts.get(name) || 0) + 1);
+            }
+        }
+    }
+    return counts;
+}
+
+function topClasses(counts, { min = 5, limit = 8 } = {}) {
+    return [...counts]
+        .filter(([, n]) => n >= min)      // a one-off wrapper is never the row
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([name, n]) => `.${name} (${n})`);
+}
+
+// tag.class.class for one element, so a chain reads like a CSS path.
+function describeElement(el) {
+    const classes = typeof el.className === 'string'
+        ? el.className.trim().split(/\s+/).filter(Boolean)
+        : [];
+    return el.tagName.toLowerCase() + classes.map(c => `.${c}`).join('');
+}
+
+function ancestorChain(start, depth = 10) {
+    const chain = [];
+    let el = start;
+    for (let up = 0; el && up < depth && el !== document.body; up++, el = el.parentElement) {
+        chain.push(describeElement(el));
+    }
+    return chain.join(' < ');
+}
+
+// Names the element that most likely IS the listing row, for when a ready
+// selector never matches.
+//
+// Counting every repeated class on the page was the first attempt and only
+// narrowed it down — it surfaced the page's chrome (footers, nav, icons)
+// alongside the rows. A listing row almost always *links to the thing it lists*,
+// so walking up from each character link and counting the classes on the way
+// points at the container directly. Falls back to the page-wide count, and to
+// reporting the links themselves, when there is nothing to walk up from.
+function describeRowCandidates() {
+    const links = Array.from(document.querySelectorAll(
+        'a[href*="/character/"], a[href*="/characters/"]'));
+
+    if (links.length >= 3) {
+        // The counted list says which classes are involved; the chain says how
+        // they nest, which is what actually identifies the row. Counts alone
+        // cannot: every ancestor of a link is seen once per link, so a row
+        // container and a page-level wrapper score identically.
+        const wrappers = topClasses(countClassNames(links, 10), { min: 2, limit: 10 });
+        return `${links.length} character links found. Ancestors of the first, ` +
+               `innermost first: ${ancestorChain(links[0])}. ` +
+               `Commonest wrapping classes: ${wrappers.join(', ') || 'none'}`;
+    }
+
+    const repeated = topClasses(countClassNames(document.querySelectorAll('[class]')));
+    const hrefs = [...new Set(Array.from(document.querySelectorAll('a[href]'))
+        .map(a => a.getAttribute('href'))
+        .filter(h => h && !h.startsWith('#') && h.length < 60))].slice(0, 6);
+
+    return `no character links on the page. Repeated classes: ` +
+           `${repeated.join(', ') || 'none'}. Sample links: ${hrefs.join(' ') || 'none'}`;
+}
+
 function registerHarvester(sourceId, readySelector, collect) {
     chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         if (message?.action !== 'harvestCandidates' || message.source !== sourceId) return;
@@ -354,8 +549,24 @@ function registerHarvester(sourceId, readySelector, collect) {
         const deadline = Date.now() + (message.timeoutMs || 15000);
         const settleMs = message.settleMs ?? 700;
 
+        function failGate(gate) {
+            sendResponse({
+                ok: false, source: sourceId, url: location.href, candidates: [],
+                interstitial: true,
+                error: `the site is showing ${gate.label} instead of the listing. Open it in a ` +
+                       `normal tab, clear the check, then run Scout again.`,
+            });
+        }
+
         (function attempt() {
-            if (document.querySelector(readySelector)) {
+            // An interactive gate is the answer, so report it immediately rather
+            // than waiting out the full timeout to blame the selector. A
+            // self-solving one is NOT an answer — keep polling and let the
+            // deadline branch below report it only if it never clears.
+            const gate = detectInterstitial();
+            if (gate && gate.kind === 'interactive') { failGate(gate); return; }
+
+            if (!gate && document.querySelector(readySelector)) {
                 // Let the site's own filter pass finish before reading rows,
                 // otherwise we harvest candidates this extension is about to hide.
                 setTimeout(function () {
@@ -376,10 +587,14 @@ function registerHarvester(sourceId, readySelector, collect) {
                 return;
             }
             if (Date.now() > deadline) {
+                // A check still up at the deadline is the real reason nothing
+                // rendered, so report that rather than the selector.
+                if (gate) { failGate(gate); return; }
                 sendResponse({
                     ok: false, source: sourceId, url: location.href, candidates: [],
                     error: `No results rendered within ${Math.round((message.timeoutMs || 15000) / 1000)}s ` +
-                           `(selector "${readySelector}"). The page may require sign-in, or its markup changed.`,
+                           `(selector "${readySelector}"). The page may require sign-in, or its markup ` +
+                           `changed. Repeated class names on the page: ${describeRowCandidates()}`,
                 });
                 return;
             }

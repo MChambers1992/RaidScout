@@ -43,9 +43,17 @@ function getCardMythicKills(card) {
 
 function getCardMythicPlusScore(card) {
     for (const fieldset of card.querySelectorAll('fieldset')) {
-        if (fieldset.querySelector('legend')?.textContent.includes('M+')) {
+        // The legend renders the "M" as a font-awesome glyph, so its
+        // textContent reads "+ Progress" — never "M+".
+        if (fieldset.querySelector('legend')?.textContent.includes('+ Progress')) {
             const text = fieldset.querySelector('.main-stat span')?.textContent.trim() ?? '';
-            const val = parseInt(text);
+            // Current-season scores render bare ("2672"); a best-from-a-past-
+            // season score renders grouped and badged ("2,245 HIGHEST SEASON").
+            // parseInt() stops at the comma and reads that as 2, so pull the
+            // leading number out and strip the separators.
+            const match = text.match(/^[\d,]+/);
+            if (!match) return null;
+            const val = parseInt(match[0].replace(/,/g, ''), 10);
             return isNaN(val) ? null : val;
         }
     }

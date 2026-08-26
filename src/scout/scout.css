@@ -73,6 +73,47 @@ button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 
 .progress-line { font-size: 13px; color: #aaa; min-height: 18px; }
 
+/* ── Summary strip ──────────────────────────────────────────────────────────
+   Describes the whole harvest, not the filtered view: an officer recruiting for
+   a slot wants the role split before any individual row. */
+
+.scout-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    background: var(--bg-panel, #2a2a2a);
+    border: 1px solid var(--border, #333);
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-strong, #fff);
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: var(--text-muted, #888);
+}
+
+/* Role tiles borrow the row iconography so the strip and the table read as one
+   vocabulary rather than two. */
+.stat--role { color: var(--role-color, #888); }
+.stat--role .stat-value { color: var(--role-color, #fff); }
+.stat--role .role-icon { width: 14px; height: 14px; }
+
 .scout-banner {
     margin-top: 12px;
     padding: 10px 12px;
@@ -120,7 +161,7 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 thead th {
     position: sticky;
-    top: 88px;
+    top: var(--header-h, 72px);
     background: #242424;
     text-align: left;
     padding: 9px 10px;
@@ -163,24 +204,173 @@ tbody tr.below-threshold { opacity: 0.45; }
 .class-demon_hunter { --class-color: var(--wow-demonhunter); }
 .class-evoker       { --class-color: var(--wow-evoker); }
 
-.role-pill {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 3px;
+/* ── Character cell ─────────────────────────────────────────────────────────
+   Two lines: the name (the thing an officer reads and whispers) over the spec
+   and guild. Pulling those two facts out of their own columns is what let the
+   table drop from eleven columns to ten while showing strictly more. */
+
+.icon-sprite { display: none; }
+
+.char-cell { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.char-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.char-line { display: flex; align-items: baseline; gap: 5px; }
+
+.char-sub {
     font-size: 11px;
-    background: #2f2f2f;
-    border-left: 3px solid var(--role-color, #555);
+    color: var(--text-faint, #6a6a6a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
+/* Blizzard avatars only exist for candidates Raider.IO's API returned; the
+   monogram keeps the column from going ragged for the scraped sources. */
+.avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    background: #232323;
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--class-color, #555) 65%, transparent);
+}
+
+.avatar--initial {
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--class-color, #999);
+    background: color-mix(in srgb, var(--class-color, #555) 14%, #232323);
+}
+
+/* ── Realm cell ─────────────────────────────────────────────────────────────
+   Region was its own column for one two-letter value. As a tag on the realm it
+   costs no width and reads as what it is: a qualifier on the realm name. */
+
+.realm-cell { display: inline-flex; align-items: center; gap: 7px; }
+.realm-name { color: var(--text-secondary, #ccc); }
+
+.region-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--text-muted, #888);
+    background: #2f2f2f;
+    border: 1px solid #3a3a3a;
+}
+
+/* ── Class cell ─────────────────────────────────────────────────────────────
+   Icon only: the class name is redundant beside the artwork, the class colour
+   and the spec on the character subline. The column stays so class stays
+   sortable. */
+
+.col-class { width: 34px; text-align: center; }
+.class-cell { display: inline-flex; align-items: center; }
+
+.class-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    flex: 0 0 auto;
+    /* A 1px border reads as a hairline at this size, so the class colour is
+       carried by a box-shadow spread instead — visible without eating into the
+       artwork. */
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--class-color, #555) 70%, transparent);
+    background: #1a1a1a;
+}
+
+/* ── Parse bar ──────────────────────────────────────────────────────────────
+   A parse is a percentile, so it has a real 0-100 scale and can be drawn rather
+   than only printed. Fill is the median (the figure that actually predicts
+   performance); the tick is the best single parse. Lets an officer rank a
+   screenful by eye instead of reading every number. */
+
+.parse { display: flex; flex-direction: column; gap: 3px; min-width: 96px; }
+
+.parse-nums {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    font-variant-numeric: tabular-nums;
+}
+.parse-nums b { font-size: 13px; font-weight: 700; color: var(--parse-colour, #ccc); }
+.parse-best { font-size: 10.5px; color: var(--text-faint, #6a6a6a); }
+
+.parse-track {
+    position: relative;
+    height: 4px;
+    border-radius: 2px;
+    background: #303030;
+}
+
+.parse-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 2px;
+    background: var(--parse-colour, #666);
+}
+
+/* The best-parse tick sits above the fill and must stay visible on top of it,
+   hence the light colour and the translate so 100% does not overflow. */
+.parse-tick {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 2px;
+    transform: translateX(-1px);
+    background: rgba(255, 255, 255, 0.75);
+}
+
+.parse.is-high { --parse-colour: var(--success, #4caf50); }
+.parse.is-mid  { --parse-colour: var(--warning, #f0b060); }
+.parse.is-low  { --parse-colour: var(--danger,  #f04040); }
+
+/* ── Role cell ──────────────────────────────────────────────────────────── */
+
+.role-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--role-color, #888);
+}
+
+.role-icon {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    fill: currentColor;
+}
+
+.role-name {
+    font-size: 12px;
+    color: var(--text-secondary, #ccc);
+}
+
 .role-tank   { --role-color: var(--role-tank); }
 .role-healer { --role-color: var(--role-healer); }
 .role-dps    { --role-color: var(--role-dps); }
 
-.source-dots { display: inline-flex; gap: 4px; }
-.source-dot {
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    background: var(--source-colour, #555);
+/* ── Source pills ───────────────────────────────────────────────────────────
+   Was four unlabelled 9px dots, which meant nothing without hovering each one.
+   A brand-coloured letterform is legible at a glance and still colour-coded. */
+
+.source-pills { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+
+.source-pill {
     display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.5;
+    cursor: default;
+    color: var(--source-colour, #999);
+    background: color-mix(in srgb, var(--source-colour, #555) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--source-colour, #555) 40%, transparent);
 }
 
 .row-links a { color: #6aa9e0; text-decoration: none; font-size: 12px; margin-right: 8px; }
@@ -217,3 +407,321 @@ tbody tr.below-threshold { opacity: 0.45; }
     transition: color 0.15s;
 }
 .support-link:hover { color: #f0b060; text-decoration: underline; }
+
+/* ── Polish ─────────────────────────────────────────────────────────────────
+   Refinements layered over the rules above rather than folded into them, so it
+   stays obvious which declarations are structural and which are cosmetic. */
+
+/* Rows carry icons now, so they need vertical room; 7px made the artwork touch
+   the row divider. */
+tbody td { padding: 9px 10px; }
+
+/* The name is the thing an officer actually reads and copies, so give it the
+   most weight in the row and let the class colour do the identifying. */
+.char-name {
+    font-size: 13.5px;
+    letter-spacing: 0.01em;
+}
+
+/* Realm is context, not content — recede it so the eye lands on the name,
+   class icon and parse instead. (Region moved into .region-tag, and column 3 is
+   now the class icon, so neither is addressed positionally any more.) */
+tbody td:nth-child(2) { color: var(--text-muted, #888); }
+
+/* Numeric columns read as a column of figures, so lock their width and keep
+   them tabular — otherwise 3-digit and 4-digit scores jitter the alignment. */
+tbody td.num { color: var(--text-primary, #e8e8e8); }
+
+thead th { letter-spacing: 0.03em; text-transform: uppercase; font-size: 11px; }
+
+/* Sorted column: tint the whole column header rather than only the arrow, so
+   the active sort survives a glance at a wide table. */
+thead th.sorted-asc,
+thead th.sorted-desc { color: var(--text-strong, #fff); background: #2b2b2b; }
+
+/* Keyboard access: every interactive surface here was mouse-only. */
+button:focus-visible,
+#searchBox:focus-visible,
+thead th:focus-visible,
+.row-links a:focus-visible,
+.support-link:focus-visible {
+    outline: 2px solid var(--accent, #007bff);
+    outline-offset: 2px;
+}
+
+/* The parse badge sits in a numeric column, so right-align it with the figures
+   above and below rather than letting it float against the cell's left edge. */
+td.wcl-cell { white-space: nowrap; }
+td.wcl-cell .rs-badge { display: inline-block; }
+
+/* Below-threshold rows: dimming alone made the class colours muddy. Desaturate
+   as well so they read as deliberately set aside, and restore them on hover so
+   they stay reviewable. */
+tbody tr.below-threshold { opacity: 0.4; filter: saturate(0.5); }
+tbody tr.below-threshold:hover { opacity: 0.85; filter: none; }
+
+.empty-state { max-width: 46ch; margin: 0 auto; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Modernisation layer
+   ═══════════════════════════════════════════════════════════════════════════
+   Appended rather than folded into the rules above so it stays obvious which
+   declarations are the original flat theme and which are the current surface
+   treatment. Everything here uses the tokens from shared.css. */
+
+body {
+    /* A single flat fill made the whole page read as one undifferentiated
+       sheet. A very low-contrast vignette gives the content something to sit
+       on without introducing a second colour. */
+    background:
+        radial-gradient(1200px 520px at 50% -10%, #262626 0%, transparent 70%),
+        var(--bg-page);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.scout-header {
+    padding: 20px 0 14px;
+    border-bottom: 1px solid var(--border-hairline);
+    /* The sticky header sat on a fully opaque flat strip; blurring what passes
+       under it reads as a layer rather than a patch of the same colour. */
+    background: color-mix(in srgb, var(--bg-page) 86%, transparent);
+    backdrop-filter: blur(10px);
+}
+
+.scout-title { display: flex; align-items: center; gap: 12px; }
+
+.scout-logo { border-radius: var(--radius-sm); flex: 0 0 auto; }
+
+.scout-header h1 {
+    font-size: 21px;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+}
+
+.scout-sub { font-size: 12.5px; }
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+button {
+    border-radius: var(--radius);
+    font-weight: 500;
+    transition: background-color .15s, border-color .15s, color .15s, transform .06s;
+}
+button:active:not(:disabled) { transform: translateY(1px); }
+
+button.primary { background: var(--accent); box-shadow: var(--shadow-sm); }
+
+button.ghost {
+    background: var(--bg-panel);
+    border-color: var(--border-strong);
+    color: var(--text-secondary);
+}
+button.ghost:hover:not(:disabled) { background: var(--bg-raised); }
+button.ghost.is-active { border-color: var(--accent); color: var(--text-strong); }
+
+/* ── Chips and stats ────────────────────────────────────────────────────── */
+
+.source-chip {
+    border-radius: var(--radius-pill);
+    border-color: var(--border-hairline);
+    padding: 5px 12px 5px 10px;
+}
+
+.stat { border-radius: var(--radius); border-color: var(--border-hairline); }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+
+.scout-toolbar { border-top: 1px solid var(--border-hairline); gap: 10px; }
+
+#searchBox {
+    border-radius: var(--radius);
+    border-color: var(--border-strong);
+    padding: 8px 12px;
+    min-width: 280px;
+}
+#searchBox:focus { border-color: var(--accent); }
+
+.filter-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 17px;
+    height: 17px;
+    margin-left: 2px;
+    padding: 0 4px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+.filter-glyph { opacity: .7; margin-right: 2px; }
+
+/* ── Filter panel ───────────────────────────────────────────────────────── */
+
+.scout-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 4px 0 16px;
+    padding: 16px 18px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hairline);
+    box-shadow: var(--shadow);
+}
+
+.filter-group { display: flex; align-items: flex-start; gap: 14px; }
+
+.filter-label {
+    flex: 0 0 68px;
+    padding-top: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.toggle-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* A toggle is a real button: whole-area hit target, its own pressed state for
+   assistive tech, and room for an icon. */
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    font-size: 12px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-raised);
+    border: 1px solid transparent;
+    color: var(--text-muted);
+}
+.toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.toggle[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--toggle-colour, var(--accent)) 22%, var(--bg-raised));
+    border-color: color-mix(in srgb, var(--toggle-colour, var(--accent)) 65%, transparent);
+    color: var(--text-strong);
+}
+
+.toggle--role { --toggle-colour: var(--role-color); }
+.toggle--role .role-icon { width: 13px; height: 13px; color: var(--role-color); }
+
+.toggle--region { font-weight: 600; letter-spacing: 0.05em; }
+
+/* Class toggles are icon-only, so they get a square target rather than a pill —
+   thirteen pills of differing label width made a ragged block. Unselected icons
+   are desaturated so the selected ones read as lit rather than merely outlined. */
+.toggle-row--classes { gap: 5px; }
+.toggle--class {
+    --toggle-colour: var(--class-color);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+}
+.toggle--class img { display: block; border-radius: 3px; }
+.toggle--class:not([aria-pressed="true"]) img { filter: saturate(.35) brightness(.6); }
+.toggle--class[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--class-color) 32%, var(--bg-raised));
+    border-color: var(--class-color);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--class-color) 45%, transparent);
+}
+.toggle--class[aria-pressed="true"] img { filter: none; }
+
+/* ── Filter numbers ─────────────────────────────────────────────────────── */
+
+.number-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.num-field { display: flex; flex-direction: column; gap: 4px; }
+.num-field > span {
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+.num-field input,
+.num-field select {
+    width: 96px;
+    padding: 6px 9px;
+    font-family: inherit;
+    font-size: 12.5px;
+    color: var(--text-primary);
+    background: var(--bg-input);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+}
+.num-field--select select { width: 130px; }
+.num-field input:focus,
+.num-field select:focus { outline: none; border-color: var(--accent); }
+
+.filter-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-hairline);
+}
+.filter-footer .spacer { flex: 1; }
+
+/* ── Results card ───────────────────────────────────────────────────────── */
+
+.scout-results {
+    border-radius: var(--radius-lg);
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hairline);
+    box-shadow: var(--shadow);
+    overflow: clip;
+}
+
+thead th {
+    background: color-mix(in srgb, var(--bg-elevated) 70%, var(--bg-panel));
+    border-bottom: 1px solid var(--border-hairline);
+    padding: 11px 12px;
+}
+thead th.sorted-asc,
+thead th.sorted-desc { background: var(--bg-elevated); }
+
+tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border-hairline); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:nth-child(even) { background: rgb(255 255 255 / 1.5%); }
+tbody tr:hover { background: rgb(255 255 255 / 4.5%); }
+
+.avatar,
+.class-icon {
+    box-shadow:
+        0 0 0 1.5px color-mix(in srgb, var(--class-color, #555) 60%, transparent),
+        var(--shadow-sm);
+}
+
+.source-pill,
+.region-tag { border-radius: var(--radius-sm); }
+
+.row-links a {
+    display: inline-block;
+    padding: 2px 6px;
+    margin-right: 3px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+}
+.row-links a:hover { background: var(--bg-raised); text-decoration: none; }
+
+/* ── Banner ─────────────────────────────────────────────────────────────── */
+
+.scout-banner {
+    border-radius: var(--radius);
+    border-color: color-mix(in srgb, var(--warning) 34%, transparent);
+    background: color-mix(in srgb, var(--warning) 9%, var(--bg-panel));
+}
+
+/* ── Narrow viewports ───────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+    .filter-group { flex-direction: column; gap: 8px; }
+    .filter-label { flex: none; padding-top: 0; }
+    /* Ten columns cannot shrink gracefully, so let the card scroll rather than
+       the whole page. */
+    .scout-results { overflow-x: auto; }
+}

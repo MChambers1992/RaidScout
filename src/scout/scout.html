@@ -3,15 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RaidScout — Scout</title>
+    <title>RaidScout</title>
     <link rel="stylesheet" href="../shared.css">
     <link rel="stylesheet" href="scout.css">
 </head>
 <body>
+    <!-- Role icons as an inline sprite: three shapes, referenced by <use> from
+         every row, coloured through currentColor so the role tokens in
+         shared.css stay the single source of truth. Inline rather than files
+         because they are tiny and must never 404 mid-table. -->
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+        <symbol id="role-icon-tank" viewBox="0 0 24 24">
+            <path d="M12 2.2 20.4 5v6.3c0 4.9-3.6 8.7-8.4 10.5-4.8-1.8-8.4-5.6-8.4-10.5V5L12 2.2Z"/>
+        </symbol>
+        <symbol id="role-icon-healer" viewBox="0 0 24 24">
+            <path d="M9.6 2.6h4.8v6.9h6.9v4.8h-6.9v6.9H9.6v-6.9H2.7V9.5h6.9V2.6Z"/>
+        </symbol>
+        <symbol id="role-icon-dps" viewBox="0 0 24 24">
+            <!-- A single upright sword: blade, crossguard, grip, pommel. Crossed
+                 blades were the first attempt and collapsed into an indistinct
+                 red ✗ at 14px, which read as "rejected" rather than "damage". -->
+            <path d="M12 1l3.5 4.6v7.2H8.5V5.6L12 1Z"/>
+            <path d="M3.2 12.8h17.6v3.4H3.2v-3.4Z"/>
+            <path d="M10 16.2h4v3.6h-4v-3.6Z"/>
+            <path d="M8.2 19.8h7.6v2.8H8.2v-2.8Z"/>
+        </symbol>
+    </svg>
+
     <header class="scout-header">
         <div class="scout-title">
-            <h1>Scout</h1>
-            <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+            <img class="scout-logo" src="../../img/logo-48.png" alt="" width="32" height="32">
+            <div>
+                <h1>RaidScout</h1>
+                <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+            </div>
         </div>
         <div class="scout-actions">
             <button id="runScout" class="primary">🔎 Run scout</button>
@@ -22,19 +47,78 @@
     <section class="scout-progress" id="scoutProgress">
         <div class="source-chips" id="sourceChips"></div>
         <div class="progress-line" id="progressLine">Ready.</div>
+        <!-- Role split and parse coverage for the current result set. An officer
+             recruiting for a specific slot wants "how many healers" before they
+             want any individual row. -->
+        <div class="scout-summary" id="scoutSummary" hidden></div>
         <div class="scout-banner" id="scoutBanner" hidden></div>
     </section>
 
     <section class="scout-toolbar" id="scoutToolbar" hidden>
-        <input type="search" id="searchBox" placeholder="Filter by name, realm, class…" autocomplete="off">
-        <label class="inline-check" title="Hides candidates whose parse is below your thresholds, and candidates WarcraftLogs has no logs for. Candidates that could not be scored are always shown.">
+        <input type="search" id="searchBox" placeholder="Search name, realm, guild, class…" autocomplete="off">
+        <button id="toggleFilters" class="ghost" aria-expanded="false" aria-controls="scoutFilters">
+            <span class="filter-glyph">☰</span> Filters <span class="filter-count" id="filterCount" hidden></span>
+        </button>
+        <label class="inline-check" title="Hides candidates whose parse is below your WarcraftLogs thresholds, and candidates WarcraftLogs has no logs for. Candidates that could not be scored are always shown.">
             <input type="checkbox" id="hideBelowThresholds">
-            Hide below thresholds &amp; no logs
+            Hide below thresholds
         </label>
         <span class="result-count" id="resultCount"></span>
         <span class="spacer"></span>
         <button id="copyNames"  class="ghost" title="Copy Name-Realm for every visible row">📋 Copy names</button>
         <button id="exportCsv"  class="ghost">⬇ CSV</button>
+    </section>
+
+    <!-- Scout's own filters, applied to the merged list. Each source filters by
+         its own rules, so the merged list was only ever as strict as the loosest
+         one; these run after the merge, which is also why toggling re-filters
+         instantly instead of re-harvesting. -->
+    <section class="scout-filters" id="scoutFilters" hidden>
+        <div class="filter-group">
+            <span class="filter-label">Role</span>
+            <div class="toggle-row" id="filterRoles"></div>
+        </div>
+
+        <div class="filter-group">
+            <span class="filter-label">Class</span>
+            <div class="toggle-row toggle-row--classes" id="filterClasses"></div>
+        </div>
+
+        <div class="filter-group">
+            <span class="filter-label">Region</span>
+            <div class="toggle-row" id="filterRegions"></div>
+        </div>
+
+        <div class="filter-group filter-group--numbers">
+            <span class="filter-label">Minimums</span>
+            <div class="number-row">
+                <label class="num-field"><span>Item level</span>
+                    <input type="number" id="filterMinIlvl" min="0" max="1000" step="1" placeholder="any"></label>
+                <label class="num-field"><span>M+ score</span>
+                    <input type="number" id="filterMinMplus" min="0" max="5000" step="50" placeholder="any"></label>
+                <label class="num-field"><span>Mythic kills</span>
+                    <input type="number" id="filterMinMythic" min="0" max="20" step="1" placeholder="any"></label>
+                <label class="num-field"><span>Best parse</span>
+                    <input type="number" id="filterMinBest" min="0" max="100" step="5" placeholder="any"></label>
+                <label class="num-field"><span>Median parse</span>
+                    <input type="number" id="filterMinMedian" min="0" max="100" step="5" placeholder="any"></label>
+                <label class="num-field num-field--select"><span>Guild</span>
+                    <select id="filterGuild">
+                        <option value="any">Any</option>
+                        <option value="out">Guildless only</option>
+                        <option value="in">In a guild</option>
+                    </select></label>
+            </div>
+        </div>
+
+        <div class="filter-footer">
+            <label class="inline-check" title="With a minimum set, also drop candidates where no site published that value at all. Off by default, because a missing item level is not the same as a low one.">
+                <input type="checkbox" id="filterHideUnknown">
+                Also hide candidates with no data for a minimum
+            </label>
+            <span class="spacer"></span>
+            <button id="resetFilters" class="ghost">Reset filters</button>
+        </div>
     </section>
 
     <section class="scout-results">
@@ -43,13 +127,12 @@
                 <tr>
                     <th data-sort="name">Character</th>
                     <th data-sort="realm">Realm</th>
-                    <th data-sort="region">Region</th>
-                    <th data-sort="playerClass">Class</th>
+                    <th data-sort="playerClass" class="col-class" title="Sort by class">Class</th>
                     <th data-sort="role">Role</th>
                     <th data-sort="ilvl" class="num">ilvl</th>
                     <th data-sort="mplusScore" class="num">M+</th>
                     <th data-sort="mythicKills" class="num">Mythic</th>
-                    <th data-sort="wclMedian" class="num">WCL parse</th>
+                    <th data-sort="wclMedian">WCL parse</th>
                     <th data-sort="sources">Seen on</th>
                     <th>Links</th>
                 </tr>
