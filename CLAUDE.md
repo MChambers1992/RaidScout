@@ -29,13 +29,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - **Badge count persisted to `chrome.storage.session`** and rehydrated on service-worker restart (MV3 workers are killed after ~30s idle)
    - **Sender validation**: all messages are checked against `TRUSTED_HOSTS`; untrusted senders are rejected
    - **URL validation on `openTab`**: only allows URLs starting with `https://www.warcraftlogs.com/character/` to prevent malformed-URL injection
-   - Responds to (sync listener): `parseThresholdFailed`, `openTab`, `clearBadge`
-   - Responds to (async listener, returns `true` to keep the channel open): `fetchWclScore`, `wclHasCredentials`, `testWclCredentials`, `clearWclScoreCache`, `storeWclSecret`, `getRateLimitStatus`
+   - **Pre-flight scouting** (`scoutAndOpenTab`): scores a candidate through the API *before* creating a WarcraftLogs tab and skips the tab entirely for candidates below threshold — see "Scout flow" below
+   - Responds to (sync listener): `parseThresholdFailed`, `clearBadge`, `wclPageReady`
+   - Responds to (async listener, returns `true` to keep the channel open): `openTab`, `fetchWclScore`, `wclHasCredentials`, `testWclCredentials`, `clearWclScoreCache`, `storeWclSecret`, `getApiStatus`, `getClosedTabCount`, `getLastScoutSkip`
+
+1a. **Scout decision module** (`src/scout.js`) — ES module imported by the service worker **and by the unit tests directly**
+   - `roleForSpec(spec)` — maps a WarcraftLogs spec name to `healer` / `tank` / `dps` (spec names are unambiguous across classes for role purposes)
+   - `thresholdsForRole` / `failsWclThresholds` — **duplicates of the same functions in `content/common.js`**, which cannot import modules. Keep the two in sync; `tests/scout.test.js` covers this copy
+   - `buildScoutThresholds(options)` — storage snapshot → role-aware thresholds (same shape as `buildWclSettings` minus concurrency)
+   - `scoutVerdict(score, settings, role)` → `{ verdict: 'open' | 'reject' | 'unknown', reason }`. `unknown` is the fail-open case (no credentials, API error, rate limit, Cloudflare)
+   - `characterFromWclUrl` / `buildWclCharacterUrl` — WCL character URL ↔ `{region, realm, name}`
 
 1b. **WarcraftLogs API Client** (`src/wcl-api.js`) — imported by the service worker
    - Implements the WCL v2 GraphQL API client used for **proactive** scoring (distinct from the reactive tab-open/close flow)
    - OAuth client-credentials flow: exchanges `wclClientId` + `wclClientSecret` for a bearer token via `https://www.warcraftlogs.com/oauth/token`. Token cached in memory and persisted to `chrome.storage.local` under `wclToken` until ~60s before expiry
    - **Role-aware metric**: passes `metric: hps` for healers, `metric: dps` for DPS and tanks. Role is extracted by each content script and forwarded in the `fetchWclScore` message
+   - **Role auto-resolution** (`role: 'auto'`): one request fetches `dps:` and `hps:` `zoneRankings` under GraphQL aliases; `extractSpec()` reads the ranked spec (from `allStars[].spec`, falling back to `rankings[].bestSpec`) and `roleForSpec()` picks which block to read. Returns the resolved `role` and `spec` on the score. Used by the scout pre-flight (no page to read a spec icon from) and by the two sites whose role markup is unreliable — WoWProgress rows and the WCL recruitment search. Costs a slightly heavier query, so sites with dependable role markup (Raider.IO, GoW) still send the role they read
+   - **Cloudflare challenge detection**: `isCloudflareChallenge()` treats a 403/503 carrying `cf-mitigated`, a challenge-page body marker, or a `cf-ray` + HTML content type as a challenge rather than an API error. Sets a 5-minute cooldown in `chrome.storage.local` under `wclCloudflareUntil` and returns `{ error: 'CLOUDFLARE_BLOCKED:<seconds>', cloudflareMs }`. Cleared by the `wclPageReady` message when a real WCL page renders
    - **Fetch timeout**: every `fetch()` call is wrapped with `AbortController` (10 s). Times out as a transient error (fail-open)
    - **Rate-limit backoff**: reads `Retry-After` header on HTTP 429, stores cooldown in `chrome.storage.local` under `wclRateLimitUntil`. Returns `{ error: 'RATE_LIMITED:<seconds>', rateLimitMs }` so content scripts can show a "rate limited" badge state
    - **Secret stored locally only** (`chrome.storage.local` → `wclClientSecret`). Client ID in sync (not sensitive). The `storeSecret()` export handles migration and wipes the secret from sync
@@ -44,7 +54,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Queries `characterData.character(name, serverSlug, serverRegion).zoneRankings(metric: <dps|hps>)` and extracts `bestPerformanceAverage` / `medianPerformanceAverage`
    - In-flight request de-duplication so multiple rows asking for the same character trigger one fetch
    - `getCharacterScore()` **never throws** — returns `{ best, median, notFound?, error?, rateLimitMs? }`. Transient failures carry an `error` and are not cached; `notFound` (never logged) is cached
-   - **Exports**: `getCharacterScore`, `clearScoreCache`, `hasCredentials`, `testCredentials`, `storeSecret`, `getRateLimitStatus`
+   - **Exports**: `getCharacterScore`, `clearScoreCache`, `hasCredentials`, `testCredentials`, `storeSecret`, `getApiStatus`, `clearCloudflareBackoff`
    - The client secret never leaves the service worker; content scripts only ever send a `{region, realm, name, role}` tuple
 
 2. **Content Scripts** (injected per site via manifest `matches`)
@@ -54,11 +64,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
      - `requestWclScore(character)` — asks the background for a `{best, median, notFound?, error?, rateLimitMs?}` score. `character` must include `role` so the API uses the right metric
      - `failsWclThresholds(score, {minBest, minMedian, hideUnknown})` — pure decision function; never hides on transient errors
      - `runWithConcurrency(items, worker, limit)` — concurrency-limited async pool
-     - `makeBadge(state, score, thresholds)` / `setBadgeState(container, state, score, thresholds)` — renders inline parse badges with states: `pending`, `no-logs`, `error`, `rate-limited`, `score` (with warn/fail colour coding)
+     - `badgeStateForScore(score)` — maps a score result to a badge state; single source for the ladder all four sites used to repeat
+     - `effectiveRole(score, fallbackRole)` — prefers the API-resolved role over whatever the page markup suggested
+     - `makeBadge(state, score, thresholds)` / `setBadgeState(container, state, score, thresholds)` — renders inline parse badges with states: `pending`, `no-logs`, `error`, `rate-limited`, `blocked` (Cloudflare), `score` (with warn/fail colour coding)
      - `upsertFilterSummary(anchorEl, hidden, total)` — inserts/updates a "X of Y hidden" bar above the list
      - `watchSettings(keys, onSettingsChanged)` — wraps `chrome.storage.onChanged` so each site can re-evaluate WCL markers when settings change at runtime
      - `clearWclMarkers(elements)` — removes `wclScored` / `wclHidden` data attributes and badges so a re-pass can re-score
-   - **`src/content/warcraftlogs.js`** — Polls every 1s for DPS parse metrics; closes tab if below thresholds; 30s timeout cap
+   - **`src/content/warcraftlogs.js`** — Backstop for pre-flight scouting: asks the API for the score (role `auto`), closes the tab if below the role-aware thresholds; detects the Cloudflare interstitial and neither burns its 20-attempt budget nor closes a tab mid-challenge; signals `wclPageReady` when a real WCL page renders
    - **`src/content/wowprogress.js`** — Filters player table rows by region, item level range, class, and guild status; uses MutationObserver + 2s polling
    - **`src/content/raiderio.js`** — Converts character URLs to WarcraftLogs; enforces search sorting/published-date params; hides ads via injected `<style>`
    - **`src/content/guildsofwow.js`** — Filters `.card` elements on the recruits list by item level, mythic kills, M+ score, class, and role; uses MutationObserver for SPA pagination; body observer waits for `#recruits-list` to appear
@@ -78,6 +90,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Per-site enable toggle with disabled state: settings grey out and become non-interactive when a site is OFF
    - Saves on explicit button click; shows `✓ Settings saved` confirmation
    - Category selection persisted in `localStorage`
+
+### Scout flow (reactive)
+
+1. User lands on a WoWProgress character page (`webNavigation.onCompleted`) or a Raider.IO character page (content script sends `openTab`)
+2. Background calls `scoutAndOpenTab(wclUrl)`:
+   - Reads `scoutPreflight` (default **on**) and the shared thresholds
+   - With credentials: `getCharacterScore({...character, role: 'auto'})` → `scoutVerdict()`
+   - `reject` → **no tab is opened**; records the skip in `chrome.storage.session` (`lastScoutSkip`), increments the badge, and closes the source tab (WoWProgress only, matching the old behaviour)
+   - `open` / `unknown` → `chrome.tabs.create({ url, active: !scoutOpenInBackground })`
+3. Raider.IO's content script gets the `{opened, verdict, score}` response and shows a transient "skipped" notice on a reject
+4. If a tab did open, `warcraftlogs.js` still runs the older open-then-close check as a backstop — which is the only path for users without API credentials
+
+**Why it matters:** WarcraftLogs is behind Cloudflare. The old flow made *every* candidate, including the ones about to be discarded, clear a Cloudflare check first. Pre-flight means only candidates worth reading ever load a WCL page. Everything fails open — a lookup that can't answer yields `unknown` and the tab opens as before.
 
 ### Data Flow
 
@@ -143,6 +168,8 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `wclMinBestTank` | number | `0` | **Shared** min best DPS parse % for tanks — falls back to `bestParseThreshold` when 0 |
 | `wclMinMedianTank` | number | `0` | **Shared** min median DPS parse % for tanks — falls back to `parseThreshold` when 0 |
 | `wclHideUnknown` | boolean | `false` | **Shared** also hide characters WCL has no parse data for (proactive scoring) |
+| `scoutPreflight` | boolean | `true` | Score a candidate via the API before opening their WCL tab; skip the tab entirely for rejects. Needs credentials — falls back to open-then-close without them |
+| `scoutOpenInBackground` | boolean | `false` | Open scouted WCL tabs with `active: false` so they don't steal focus |
 | `wclSearchParseThreshold` | number | `0` | Min parse % for recruitment search results (0 = no minimum) |
 | `wclSearchProactive` | boolean | `false` | Also apply the proactive API scoring flow (role-aware thresholds + inline badges) to recruitment search results, on top of the flat `wclSearchParseThreshold` filter above. Requires API credentials |
 | `wclSelectedRegions` | string[] | `[]` | Filter recruitment search by region — empty shows all |
@@ -224,7 +251,7 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 10. **`wclHidden` flicker guard (Raider.IO + GoW):** Both sites use a MutationObserver. WCL-hidden rows/cards are marked `dataset.wclHidden = 'true'` so the standard filter never re-shows them and triggers a hide/show loop. WoWProgress is immune because it now also hides WCL-filtered rows (matching the other sites), not removes them. The `watchSettings` / `clearWclMarkers` mechanism clears these markers when WCL settings change at runtime, enabling live re-evaluation without a page refresh.
 
-11. **Score cache lives in `chrome.storage.local`, not `sync`:** Scores, the OAuth token, rate-limit cooldown, debug flag, and the client secret all use `local` (per-machine, not synced). Cache keys: `wclToken`, `wclRateLimitUntil`, `wclClientSecret`, `wclDebug`, and `wclScore:<region>/<realm>/<name>/<role>`. Role is included in the cache key so the same character's DPS and healer specs get separate cache entries.
+11. **Score cache lives in `chrome.storage.local`, not `sync`:** Scores, the OAuth token, rate-limit and Cloudflare cooldowns, debug flag, and the client secret all use `local` (per-machine, not synced). Cache keys: `wclToken`, `wclRateLimitUntil`, `wclCloudflareUntil`, `wclClientSecret`, `wclDebug`, and `wclScore:<region>/<realm>/<name>/<role>`. Role is included in the cache key so the same character's DPS and healer specs get separate cache entries. An `auto` lookup writes **two** entries — under `auto` and under the resolved role — so a later role-specific request hits the cache instead of the API.
 
 12. **Client secret is `storage.local` only (never synced):** The `storeSecret()` export in `wcl-api.js` writes to `local` and removes from `sync`. Options page calls `chrome.runtime.sendMessage({ action: 'storeWclSecret', secret })` on save and after test-connection. The client ID (not sensitive) stays in `sync` so it's available across devices without re-entry.
 
@@ -238,11 +265,15 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 17. **Sender validation:** The background validates `sender.tab.url` hostname against `TRUSTED_HOSTS` before acting on any message. `openTab` additionally validates the URL against `ALLOWED_TAB_PREFIXES` (WCL character URLs only) to prevent URL injection.
 
-18. **Unit tests:** `tests/common.test.js` (Vitest) covers 34 cases across `normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, and `normalizeCharacter`. Run with `npm test`.
+18. **Unit tests:** `tests/common.test.js` (Vitest) inlines copies of the content-script functions it covers (`normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, `normalizeCharacter`, `extractCharacterFromUrl`) because content scripts aren't modules — keep the copies in sync when you touch the originals. `tests/scout.test.js` imports `src/scout.js` directly. Run with `npm test`.
 
 19. **Sort by WCL parse:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
 
-20. **WCL recruitment search proactive layer is best-effort on role detection:** Unlike WoWProgress/Raider.IO/GoW, the WCL recruitment search page's spec/role markup wasn't available to verify against the live site, so `getRecruitmentRole()` in `warcraftlogs.js` degrades gracefully to `'dps'` when it can't confidently detect healer/tank specs. Enabling `wclSearchProactive` is safe even if this misfires — DPS thresholds are just applied to a healer/tank, same fail-open behaviour as everywhere else in the codebase.
+20. **Unreliable page role markup falls back to the API, not to `'dps'`:** `getRecruitmentRole()` (WCL recruitment search) and `getPlayerRole()` (WoWProgress) were both written against markup that couldn't be verified. They now return `null` when they can't tell, and the caller sends `role: 'auto'` so the API resolves the role from the spec the character actually ranked as. Raider.IO and GoW have dependable role markup and still send the role they read, which keeps their queries to a single metric.
+
+21. **Pre-flight scouting fails open on purpose:** `scoutVerdict` only ever returns `reject` on a real score below threshold (or `notFound` with `wclHideUnknown` on). No credentials, an API error, a rate limit and a Cloudflare challenge all yield `unknown`, which opens the tab exactly as the pre-1.4 flow did. A broken lookup must never silently hide a candidate.
+
+22. **Cloudflare backoff is cleared by a page load, not by time:** the 5-minute `wclCloudflareUntil` cooldown is a ceiling. What actually clears a challenge is the user loading warcraftlogs.com in a real tab, so `warcraftlogs.js` sends `wclPageReady` on any non-challenge WCL page and the background drops the backoff immediately.
 
 ## File Structure
 
@@ -256,8 +287,9 @@ RaidScout/
 │   ├── logo-48.png
 │   └── logo-128.png
 └── src/
-    ├── background.js          # Service worker (ES module) — tab management, badge, message routing, WCL score requests
-    ├── wcl-api.js             # WarcraftLogs v2 API client — OAuth, GraphQL scoring, token + score caching
+    ├── background.js          # Service worker (ES module) — pre-flight scouting, tab management, badge, message routing
+    ├── scout.js               # Pure scout decision logic (spec→role, thresholds, verdict, URL parsing) — imported by background + tests
+    ├── wcl-api.js             # WarcraftLogs v2 API client — OAuth, GraphQL scoring, role auto-resolution, Cloudflare backoff, caching
     ├── popup/
     │   ├── popup.html         # Quick-access popup (extension button click)
     │   ├── popup.css

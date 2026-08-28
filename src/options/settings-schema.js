@@ -34,6 +34,9 @@ const SCHEMA = [
     { key: 'wclCacheTtlHours',           type: 'float',  default: 6,     domId: 'wclCacheTtlHours' },
     { key: 'wclDebug',                   type: 'bool',   default: false, domId: 'wclDebug' },
     { key: 'wclConcurrency',             type: 'int',    default: 4,     domId: 'wclConcurrency' },
+    // Scout flow (shared by the WoWProgress and Raider.IO auto-open features)
+    { key: 'scoutPreflight',             type: 'bool',   default: true,  domId: 'scoutPreflight' },
+    { key: 'scoutOpenInBackground',      type: 'bool',   default: false, domId: 'scoutOpenInBackground' },
     { key: 'wclSelectedRegions',         type: 'checkboxGroup', default: [], selector: '.wclRegionFilter' },
     { key: 'wclSelectedClasses',         type: 'checkboxGroup', default: [], selector: '.wclClassFilter' },
 
