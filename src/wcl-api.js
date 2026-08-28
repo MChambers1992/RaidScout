@@ -3,9 +3,10 @@
 //
 // Changes from v1:
 //  - Role-aware metric: passes character role so healers get hps, tanks get dps
-//  - Role auto-resolution: role 'auto' asks for dps + hps in one query and picks
-//    the right one from the spec WarcraftLogs ranked the character as. This is
-//    what lets the scout flow decide about a character without opening a page.
+//  - Role auto-resolution: role 'auto' queries the dps metric, reads the spec
+//    WarcraftLogs ranked the character as, and only asks for hps when that spec
+//    is a healer's. This is what lets the scout flow decide about a character
+//    without opening a page, at roughly one request per character.
 //  - AbortController timeout (10 s) on every fetch to prevent hung requests
 //  - Rate-limit backoff: reads Retry-After header, stores cooldown in storage.local
 //  - Cloudflare challenge detection: a challenged request is reported as
@@ -190,17 +191,18 @@ function roleToMetric(role) {
 
 // ─── GraphQL query ─────────────────────────────────────────────────────────────
 
-// metric 'auto' fetches both metrics in a single request under aliases, so
-// resolving a character's role costs one round trip rather than two.
+// One concrete metric per request, always aliased to `dps` so the response
+// shape doesn't depend on which metric was asked for. Role 'auto' is resolved
+// by querying dps first and only asking for hps if the spec turns out to be a
+// healer — see queryCharacter. WarcraftLogs bills a points budget by query
+// complexity, and zoneRankings is the expensive part, so asking for both
+// metrics up front roughly doubled the cost of scoring a whole list.
 function buildQuery(metric) {
-    const rankings = metric === 'auto'
-        ? '      dps: zoneRankings(metric: dps)\n      hps: zoneRankings(metric: hps)'
-        : `      dps: zoneRankings(metric: ${metric})`;
     return `
 query ($name: String!, $serverSlug: String!, $serverRegion: String!) {
   characterData {
     character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
-${rankings}
+      dps: zoneRankings(metric: ${metric})
     }
   }
 }`.trim();
@@ -227,6 +229,24 @@ function extractSpec(zoneRankings) {
     return ranking ? (ranking.bestSpec || ranking.spec) : null;
 }
 
+// Does a role-'auto' lookup need a second request for the hps metric?
+//
+// Yes when the dps response named a healer spec — their damage percentiles are
+// not the numbers to judge them on.
+//
+// Also yes when the dps response told us nothing at all (no spec, no scores).
+// That is normally a character with no logs, where the second query costs a
+// request and confirms it. But it is also what a healer with no damage
+// rankings would look like, and scoring one of those as a DPS with no logs
+// would be wrong in the one direction that matters — so the ambiguous case
+// pays for the extra request. If WarcraftLogs turns out to always rank healers
+// on damage too, this second condition can be dropped and 'auto' costs one
+// request for everyone but healers.
+function needsHpsFollowUp(specRole, spec, scores) {
+    if (specRole === 'healer') return true;
+    return !spec && scores.best === null && scores.median === null;
+}
+
 async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', role = 'dps' }, retryOnAuth = true) {
     // Both cooldowns are stored as ms but reported as seconds, matching the
     // Retry-After header the 429 path echoes.
@@ -240,6 +260,10 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
     const debug = await isDebugEnabled();
     if (debug) dbg('querying', { name, serverSlug, serverRegion, metric });
 
+    // 'auto' starts with the dps metric: the response carries the ranked spec,
+    // which is what decides whether we need the hps numbers at all.
+    const queryMetric = metric === 'auto' ? 'dps' : metric;
+
     const res = await fetchWithTimeout(WCL_CLIENT_API, {
         method: 'POST',
         headers: {
@@ -247,7 +271,7 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            query: buildQuery(metric),
+            query: buildQuery(queryMetric),
             variables: { name, serverSlug, serverRegion },
         }),
     });
@@ -284,16 +308,32 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
     const character = json?.data?.characterData?.character;
     if (!character) return { best: null, median: null, notFound: true };
 
-    // Resolve role from the ranked spec, then read the scores for the metric
-    // that role actually cares about. Only 'auto' lets the spec pick the role —
-    // when the caller named a role, its numbers are the ones we returned, so
-    // overriding the role here would apply the wrong thresholds to them.
-    const spec     = extractSpec(character.dps) || extractSpec(character.hps);
+    const spec     = extractSpec(character.dps);
     const specRole = roleForSpec(spec);
-    const source   = (metric === 'auto' && specRole === 'healer') ? character.hps : character.dps;
-    const resolvedRole = metric === 'auto' ? (specRole || 'dps') : role;
+    const scores   = extractScores(character.dps);
 
-    const scores = extractScores(source);
+    // Only 'auto' lets the spec pick the role — when the caller named a role,
+    // the numbers we just read are that role's, so overriding it here would
+    // apply the wrong thresholds to them.
+    if (metric === 'auto' && needsHpsFollowUp(specRole, spec, scores)) {
+        if (debug) dbg('resolving as healer, re-querying for hps', { name, spec });
+        const healer = await queryCharacter(
+            { name, serverSlug, serverRegion, metric: 'hps', role: 'healer' }
+        );
+        const gotHealingData = healer.best !== null || healer.median !== null;
+        return {
+            ...healer,
+            // Only call them a healer if something backed it up — either the
+            // spec said so, or the hps query found rankings. A character with
+            // no logs at all reaches this branch too, and reporting them as a
+            // healer would be a guess dressed up as a resolved role.
+            role: gotHealingData ? 'healer' : (specRole || 'dps'),
+            // Keep the spec from whichever response actually reported one.
+            spec: healer.spec || spec || null,
+        };
+    }
+
+    const resolvedRole = metric === 'auto' ? (specRole || 'dps') : role;
     if (debug) dbg('scores', { ...scores, spec, role: resolvedRole });
     return { ...scores, notFound: false, spec: spec || null, role: resolvedRole };
 }
@@ -403,6 +443,11 @@ async function clearCloudflareBackoff() {
 }
 
 export {
+    // Pure response parsers, exported for the unit tests: role 'auto' now hinges
+    // on extractSpec finding the spec in a real zoneRankings blob.
+    extractScores,
+    extractSpec,
+    needsHpsFollowUp,
     getCharacterScore,
     clearScoreCache,
     hasCredentials,
