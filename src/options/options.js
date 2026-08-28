@@ -20,9 +20,33 @@ document.addEventListener('DOMContentLoaded', function () {
         showCategory(this.dataset.tab);
     }));
 
+    // ── Per-site enable toggles ───────────────────────────────────────────────
+    // Turning a site off greys out its settings (`.section-disabled` in
+    // options.css) and disables the controls, so it's obvious they aren't in
+    // effect. The enable toggle itself lives in `.section-header`, outside the
+    // `.option` blocks this disables, so it stays clickable.
+    const SITE_SECTIONS = ['warcraftlogs', 'wowprogress', 'raiderio', 'guildsofwow'];
+    const SECTION_CONTROLS = '.option input, .option select, .option button, '
+                           + '.option-group input, .option-group select, .option-group button';
+
+    function syncSectionEnabledState(sectionId) {
+        const section = document.getElementById(sectionId);
+        const toggle  = document.getElementById(sectionId + 'Enabled');
+        if (!section || !toggle) return;
+        const enabled = toggle.checked;
+        section.classList.toggle('section-disabled', !enabled);
+        section.querySelectorAll(SECTION_CONTROLS).forEach(el => { el.disabled = !enabled; });
+    }
+
+    for (const sectionId of SITE_SECTIONS) {
+        document.getElementById(sectionId + 'Enabled')
+            ?.addEventListener('change', () => syncSectionEnabledState(sectionId));
+    }
+
     // ── Load settings ─────────────────────────────────────────────────────────
     chrome.storage.sync.get(ALL_KEYS, function (data) {
         loadFromData(data);
+        SITE_SECTIONS.forEach(syncSectionEnabledState);
 
         // Secret is local-only — read separately
         chrome.storage.local.get('wclClientSecret', function (local) {
