@@ -51,6 +51,7 @@
             <div class="option">
                 <button type="button" id="clearWclScoreCache">Clear cached scores</button>
                 <span id="wclRateLimitStatus" style="font-size:12px;margin-left:8px;color:#f09020;"></span>
+                <p class="hint" id="wclCloudflareHint" style="display:none;color:#f09020;">WarcraftLogs is challenging API requests (Cloudflare). Open <strong>warcraftlogs.com</strong> in a tab and complete the check — RaidScout retries as soon as that page loads.</p>
                 <p class="hint">Scores are cached to limit API calls. Clear if you want fresh data immediately.</p>
             </div>
             <div class="option toggle-inline">
@@ -65,6 +66,23 @@
                 <label for="wclConcurrency">Max concurrent score lookups</label>
                 <input type="number" id="wclConcurrency" min="1" max="8" step="1" placeholder="4">
                 <p class="hint">How many WarcraftLogs API requests to run in parallel when scoring a list page. Lower = less API pressure, higher = faster results. Default 4.</p>
+            </div>
+            <p class="subsection-label">Scouting (WoWProgress &amp; Raider.IO auto-open)</p>
+            <div class="option toggle-inline">
+                <label for="scoutPreflight">Check parses before opening a tab</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scoutPreflight">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Scores the character through the API <em>first</em> and only opens their WarcraftLogs tab if they pass your thresholds — so rejected candidates never have to get through WarcraftLogs' Cloudflare check just to have their tab closed again. Needs API credentials; without them (or if a lookup fails) RaidScout falls back to opening the tab and checking afterwards. On by default.</p>
+            </div>
+            <div class="option toggle-inline">
+                <label for="scoutOpenInBackground">Open scouted tabs in the background</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scoutOpenInBackground">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Opens WarcraftLogs tabs without switching to them, so browsing a recruitment list isn't interrupted.</p>
             </div>
             <p class="subsection-label">Proactive Score Filter (all sites)</p>
             <p class="hint">Set your parse thresholds once here. They drive proactive WCL filtering on WoWProgress, Raider.IO and Guilds of WoW — switch it on per-site in each section. The DPS values also auto-close a WarcraftLogs character tab opened from those sites when the parse is below threshold.</p>

@@ -3,17 +3,28 @@
 //
 // Changes from v1:
 //  - Role-aware metric: passes character role so healers get hps, tanks get dps
+//  - Role auto-resolution: role 'auto' asks for dps + hps in one query and picks
+//    the right one from the spec WarcraftLogs ranked the character as. This is
+//    what lets the scout flow decide about a character without opening a page.
 //  - AbortController timeout (10 s) on every fetch to prevent hung requests
 //  - Rate-limit backoff: reads Retry-After header, stores cooldown in storage.local
+//  - Cloudflare challenge detection: a challenged request is reported as
+//    CLOUDFLARE_BLOCKED with its own cooldown rather than a generic HTTP error
 //  - Credential secret moved to storage.local (not synced across devices)
 //  - Debug logging toggle via wclDebug storage key
 //  - configurable cache TTL via wclCacheTtlHours storage key (default 6)
+
+import { roleForSpec } from './scout.js';
 
 const WCL_TOKEN_URL  = 'https://www.warcraftlogs.com/oauth/token';
 const WCL_CLIENT_API = 'https://www.warcraftlogs.com/api/v2/client';
 const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000;
 const CACHE_PREFIX   = 'wclScore:';
 const FETCH_TIMEOUT_MS = 10_000;
+// How long to stop hitting the API after Cloudflare challenges a request.
+// Retrying immediately only deepens the challenge; the user has to load
+// warcraftlogs.com in a tab to clear it.
+const CLOUDFLARE_COOLDOWN_MS = 5 * 60 * 1000;
 
 let tokenCache = null; // { accessToken, expiresAt }
 const inFlight = new Map();
@@ -79,6 +90,46 @@ async function clearRateLimitCooldown() {
     await chrome.storage.local.remove('wclRateLimitUntil');
 }
 
+// ─── Cloudflare challenge state ────────────────────────────────────────────────
+// WarcraftLogs sits behind Cloudflare. Extension requests normally sail through
+// on the bearer token, but a challenged network / VPN / fresh profile gets an
+// interstitial instead of JSON. That is not an API error and retrying makes it
+// worse, so we detect it, back off, and report it distinctly so the UI can tell
+// the user what actually fixes it (load warcraftlogs.com in a tab once).
+
+const CF_BODY_MARKERS = [
+    'cf-browser-verification',
+    'challenge-platform',
+    'cf_chl_opt',
+    'just a moment',
+    'attention required',
+    'enable javascript and cookies to continue',
+];
+
+function isCloudflareChallenge(res, bodyText = '') {
+    if (res.status !== 403 && res.status !== 503) return false;
+    if (res.headers.get('cf-mitigated')) return true;
+    const body = bodyText.toLowerCase();
+    if (CF_BODY_MARKERS.some(m => body.includes(m))) return true;
+    // A Cloudflare-served block page without any of the markers above still
+    // carries a cf-ray and is HTML rather than the JSON the API would return.
+    const contentType = res.headers.get('content-type') || '';
+    return !!res.headers.get('cf-ray') && contentType.includes('text/html');
+}
+
+async function getCloudflareCooldown() {
+    const { wclCloudflareUntil } = await chrome.storage.local.get('wclCloudflareUntil');
+    return wclCloudflareUntil ? Math.max(0, wclCloudflareUntil - Date.now()) : 0;
+}
+
+async function setCloudflareCooldown() {
+    await chrome.storage.local.set({ wclCloudflareUntil: Date.now() + CLOUDFLARE_COOLDOWN_MS });
+}
+
+async function clearCloudflareCooldown() {
+    await chrome.storage.local.remove('wclCloudflareUntil');
+}
+
 // ─── Token handling ────────────────────────────────────────────────────────────
 
 async function loadPersistedToken() {
@@ -104,6 +155,10 @@ async function fetchNewToken(creds) {
 
     if (!res.ok) {
         const text = await res.text().catch(() => '');
+        if (isCloudflareChallenge(res, text)) {
+            await setCloudflareCooldown();
+            throw new Error(`CLOUDFLARE_BLOCKED:${CLOUDFLARE_COOLDOWN_MS / 1000}`);
+        }
         throw new Error(`WCL token request failed (${res.status}): ${text.slice(0, 200)}`);
     }
 
@@ -126,6 +181,7 @@ async function getAccessToken() {
 // ─── Role → metric mapping ────────────────────────────────────────────────────
 // WCL metric names: dps | hps | tankhps (tank uses dps as primary, hps as secondary)
 // We use 'dps' for dps/tank, 'hps' for healer.
+// Role 'auto' is special: ask for both and let the ranked spec decide.
 
 function roleToMetric(role) {
     if (role === 'healer') return 'hps';
@@ -134,12 +190,17 @@ function roleToMetric(role) {
 
 // ─── GraphQL query ─────────────────────────────────────────────────────────────
 
+// metric 'auto' fetches both metrics in a single request under aliases, so
+// resolving a character's role costs one round trip rather than two.
 function buildQuery(metric) {
+    const rankings = metric === 'auto'
+        ? '      dps: zoneRankings(metric: dps)\n      hps: zoneRankings(metric: hps)'
+        : `      dps: zoneRankings(metric: ${metric})`;
     return `
 query ($name: String!, $serverSlug: String!, $serverRegion: String!) {
   characterData {
     character(name: $name, serverSlug: $serverSlug, serverRegion: $serverRegion) {
-      zoneRankings(metric: ${metric})
+${rankings}
     }
   }
 }`.trim();
@@ -152,9 +213,28 @@ function extractScores(zoneRankings) {
     return { best, median };
 }
 
-async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps' }, retryOnAuth = true) {
+// The zoneRankings blob carries the spec the character ranked as, either on the
+// all-stars entries or per encounter. Either is enough to derive their role.
+function extractSpec(zoneRankings) {
+    if (!zoneRankings || typeof zoneRankings !== 'object') return null;
+    const allStar = Array.isArray(zoneRankings.allStars)
+        ? zoneRankings.allStars.find(a => a && a.spec)
+        : null;
+    if (allStar) return allStar.spec;
+    const ranking = Array.isArray(zoneRankings.rankings)
+        ? zoneRankings.rankings.find(r => r && (r.bestSpec || r.spec))
+        : null;
+    return ranking ? (ranking.bestSpec || ranking.spec) : null;
+}
+
+async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', role = 'dps' }, retryOnAuth = true) {
+    // Both cooldowns are stored as ms but reported as seconds, matching the
+    // Retry-After header the 429 path echoes.
+    const cfCooldown = await getCloudflareCooldown();
+    if (cfCooldown > 0) throw new Error(`CLOUDFLARE_BLOCKED:${Math.ceil(cfCooldown / 1000)}`);
+
     const cooldown = await getRateLimitCooldown();
-    if (cooldown > 0) throw new Error(`RATE_LIMITED:${cooldown}`);
+    if (cooldown > 0) throw new Error(`RATE_LIMITED:${Math.ceil(cooldown / 1000)}`);
 
     const token = await getAccessToken();
     const debug = await isDebugEnabled();
@@ -175,7 +255,7 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps' }
     if (res.status === 401 && retryOnAuth) {
         tokenCache = null;
         await chrome.storage.local.remove('wclToken');
-        return queryCharacter({ name, serverSlug, serverRegion, metric }, false);
+        return queryCharacter({ name, serverSlug, serverRegion, metric, role }, false);
     }
 
     if (res.status === 429) {
@@ -184,10 +264,19 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps' }
         throw new Error(`RATE_LIMITED:${retryAfter || '60'}`);
     }
 
-    if (!res.ok) throw new Error(`WCL query failed (${res.status})`);
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        if (isCloudflareChallenge(res, text)) {
+            await setCloudflareCooldown();
+            if (debug) dbg('cloudflare challenge on API request', { status: res.status });
+            throw new Error(`CLOUDFLARE_BLOCKED:${CLOUDFLARE_COOLDOWN_MS / 1000}`);
+        }
+        throw new Error(`WCL query failed (${res.status})`);
+    }
 
-    // Successful response clears any stale rate-limit flag
+    // Successful response clears any stale backoff flags
     await clearRateLimitCooldown();
+    await clearCloudflareCooldown();
 
     const json = await res.json();
     if (json.errors?.length) throw new Error(`WCL GraphQL error: ${json.errors[0].message}`);
@@ -195,9 +284,18 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps' }
     const character = json?.data?.characterData?.character;
     if (!character) return { best: null, median: null, notFound: true };
 
-    const scores = extractScores(character.zoneRankings);
-    if (debug) dbg('scores', scores);
-    return { ...scores, notFound: false };
+    // Resolve role from the ranked spec, then read the scores for the metric
+    // that role actually cares about. Only 'auto' lets the spec pick the role —
+    // when the caller named a role, its numbers are the ones we returned, so
+    // overriding the role here would apply the wrong thresholds to them.
+    const spec     = extractSpec(character.dps) || extractSpec(character.hps);
+    const specRole = roleForSpec(spec);
+    const source   = (metric === 'auto' && specRole === 'healer') ? character.hps : character.dps;
+    const resolvedRole = metric === 'auto' ? (specRole || 'dps') : role;
+
+    const scores = extractScores(source);
+    if (debug) dbg('scores', { ...scores, spec, role: resolvedRole });
+    return { ...scores, notFound: false, spec: spec || null, role: resolvedRole };
 }
 
 // ─── Cache ─────────────────────────────────────────────────────────────────────
@@ -242,15 +340,21 @@ async function getCharacterScore({ region, realm, name, role }) {
 
     const promise = (async () => {
         try {
-            const metric = roleToMetric(role);
-            const scores = await queryCharacter({ name, serverSlug: realm, serverRegion: region, metric });
+            const metric = role === 'auto' ? 'auto' : roleToMetric(role);
+            const scores = await queryCharacter({ name, serverSlug: realm, serverRegion: region, metric, role: role || 'dps' });
             await writeCache(key, scores);
+            // An 'auto' lookup also answers the role-specific question, so write
+            // it under the resolved role too — a later proactive pass that knows
+            // the role from the page then hits the cache instead of the API.
+            if (role === 'auto' && scores.role) {
+                await writeCache(characterKey({ region, realm, name, role: scores.role }), scores);
+            }
             return scores;
         } catch (err) {
             const message = err?.message || 'UNKNOWN_ERROR';
-            const rateLimited = message.startsWith('RATE_LIMITED:');
-            const rateLimitMs = rateLimited ? parseInt(message.split(':')[1]) * 1000 : undefined;
-            return { best: null, median: null, error: message, rateLimitMs };
+            const rateLimitMs   = message.startsWith('RATE_LIMITED:')     ? parseInt(message.split(':')[1]) * 1000 : undefined;
+            const cloudflareMs  = message.startsWith('CLOUDFLARE_BLOCKED') ? (parseInt(message.split(':')[1]) * 1000 || CLOUDFLARE_COOLDOWN_MS) : undefined;
+            return { best: null, median: null, error: message, rateLimitMs, cloudflareMs };
         } finally {
             inFlight.delete(key);
         }
@@ -281,10 +385,21 @@ async function hasCredentials() {
     return (await getCredentials()) !== null;
 }
 
-async function getRateLimitStatus() {
-    const { wclRateLimitUntil } = await chrome.storage.local.get('wclRateLimitUntil');
-    if (!wclRateLimitUntil || wclRateLimitUntil < Date.now()) return { limited: false };
-    return { limited: true, remainingMs: wclRateLimitUntil - Date.now() };
+// Combined backoff status for the popup / options status bars.
+// { state: 'ok' | 'rate-limited' | 'cloudflare', remainingMs }
+async function getApiStatus() {
+    const cf = await getCloudflareCooldown();
+    if (cf > 0) return { state: 'cloudflare', remainingMs: cf };
+    const rate = await getRateLimitCooldown();
+    if (rate > 0) return { state: 'rate-limited', remainingMs: rate };
+    return { state: 'ok', remainingMs: 0 };
+}
+
+// Called when the user has (re)loaded warcraftlogs.com in a real tab, which is
+// what actually clears a Cloudflare challenge — drop the backoff so the next
+// lookup tries again immediately instead of waiting out the cooldown.
+async function clearCloudflareBackoff() {
+    await clearCloudflareCooldown();
 }
 
 export {
@@ -293,5 +408,6 @@ export {
     hasCredentials,
     testCredentials,
     storeSecret,
-    getRateLimitStatus,
+    getApiStatus,
+    clearCloudflareBackoff,
 };

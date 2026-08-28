@@ -36,6 +36,17 @@ Items deferred from the v1.3 improvement pass.
 
 ## Active backlog
 
+### Verify Cloudflare challenge detection against a live challenge (low effort, high value)
+
+`isCloudflareChallenge()` in `wcl-api.js` and `isCloudflareChallengePage()` in
+`content/warcraftlogs.js` were written from Cloudflare's documented challenge
+markers (`cf-mitigated`, `cf-ray` + HTML, `#challenge-running`, the
+`challenge-platform` script, "Just a moment" titles) rather than against a live
+challenge, which is hard to provoke on demand. Both fail safe if they miss — an
+undetected challenge just surfaces as a generic API error or wastes a couple of
+poll attempts — but confirming the markers against a real interstitial (a VPN exit
+node or a fresh profile is usually enough to trigger one) would close the loop.
+
 ### Automated selector smoke test (medium effort, medium value)
 
 `assertSelector()` in `common.js` logs warnings when a selector finds nothing. A
@@ -47,11 +58,12 @@ login, but WCL recruitment search requires a WoW account. A CI-safe approach wou
 be to test only the pages that don't need auth, and rely on `assertSelector` warnings
 for the rest.
 
-This would also validate the role-detection selectors added for the WCL recruitment
-search's proactive scoring layer (`getRecruitmentRole` in `warcraftlogs.js`), which
-were written defensively (`[class*="spec"], [class*="role"]`, defaulting to `'dps'`)
-without a live page to confirm against — a smoke test with an authenticated session
-is the most reliable way to verify or correct them.
+The role-detection selectors this was also meant to validate (`getRecruitmentRole` in
+`warcraftlogs.js`, `getPlayerRole` in `wowprogress.js`) matter less since v1.4: both
+now return `null` when the markup doesn't say and the API resolves the role from the
+character's ranked spec instead. A smoke test would still confirm whether the DOM
+path ever fires — if it never does on the live site, the selectors can be deleted and
+those two sites can always use `role: 'auto'`.
 
 ### Localization / i18n (low priority)
 

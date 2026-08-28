@@ -55,11 +55,13 @@ To install from a packaged release instead, download the `.zip` from the [Releas
 
 RaidScout has two complementary filtering modes that work independently and can both be active at the same time.
 
-### Reactive filtering
+### Reactive filtering (scouting)
 
-When you visit a character page on WoWProgress or Raider.IO, RaidScout opens their WarcraftLogs page in a new tab. It then checks their parse scores — if they fall below your configured median or best parse thresholds, the tab closes automatically. The extension icon badge counts how many tabs have been closed in the current session.
+When you visit a character page on WoWProgress or Raider.IO, RaidScout checks their WarcraftLogs parse scores and opens their WarcraftLogs page in a new tab if they're worth a look. Candidates below your configured median or best parse thresholds are skipped. The extension icon badge counts how many were skipped in the current session, and the popup shows the most recent one.
 
-This works with no API key and no extra setup. It just adds automation to what you'd do manually.
+**With API credentials configured**, the parse check happens *before* the tab opens ("Check parses before opening a tab", on by default). Nothing opens for a candidate you'd reject — which also means they never have to clear WarcraftLogs' Cloudflare check on their way to being discarded. This is the main reason to set up credentials even if you don't use proactive list filtering.
+
+**Without credentials**, it falls back to the original behaviour: the tab opens, the parse is checked, and the tab closes again if the candidate is below threshold. That works with no API key and no extra setup — it just adds automation to what you'd do manually. RaidScout also falls back to it whenever a lookup fails, so a rate limit or a network hiccup never causes a candidate to be silently skipped.
 
 ### Proactive filtering
 
@@ -75,8 +77,8 @@ Proactive filtering requires a one-time setup described below.
 
 ### WarcraftLogs
 
-- **Reactive tab close** — Opens a character's WarcraftLogs page when you visit them on WoWProgress or Raider.IO, then auto-closes it if their parse falls below your thresholds
-- **Closed-tab badge** — The extension icon badge counts tabs auto-closed this session; resets when you click the badge area in the popup
+- **Scouting** — Checks a character's parse when you visit them on WoWProgress or Raider.IO and only opens their WarcraftLogs page if they pass your thresholds (falls back to open-then-close without API credentials)
+- **Skipped-candidate badge** — The extension icon badge counts candidates skipped this session; resets when you click the badge area in the popup
 - **Recruitment search filter** — On the WarcraftLogs recruitment search page (`/recruitment/`), filters candidates by parse score, region, class, and mythic kill count
 
 ### WoWProgress
@@ -179,6 +181,8 @@ Role is detected automatically from each candidate row. On Raider.IO it reads th
 | Min. Best % (Tank override) | — | **Shared** — overrides the DPS best threshold for tanks only |
 | Min. Median % (Tank override) | — | **Shared** — overrides the DPS median threshold for tanks only |
 | Hide characters with no logs | Off | **Shared** — also hide characters WarcraftLogs has no parse data for |
+| Check parses before opening a tab | On | Scout via the API first and only open a WarcraftLogs tab for candidates who pass. Needs credentials; falls back to open-then-close without them |
+| Open scouted tabs in the background | Off | Open WarcraftLogs tabs without switching to them |
 | Recruitment search parse filter | — | Minimum parse % on the WarcraftLogs recruitment search page |
 | Min mythic kills (WCL search) | — | Minimum current-tier mythic kill count on the WCL recruitment search page |
 | Client ID | — | WarcraftLogs v2 API client ID (synced across devices) |
@@ -235,7 +239,7 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 - Check that "Enable proactive WCL filtering" is toggled on for the relevant site in Full Settings
 - Click **Test connection** in the WarcraftLogs tab to confirm your credentials work
 - Check that you've set at least one threshold value (Min Best % or Min Median %) — all zeros means no filtering
-- If the popup or Full Settings shows "🚦 WCL rate limited", wait for the cooldown to expire or click **Clear cached scores**
+- If the popup or Full Settings shows "🚦 WCL rate limited" or "☁ Cloudflare check", wait for the cooldown to expire or click **Clear cached scores**
 
 **Parse badges show "⚠ WCL err"**
 - This is a transient lookup failure — the character stays visible (filtering always fails open)
@@ -250,6 +254,17 @@ All settings sync across Chrome devices via Chrome Sync, except the WarcraftLogs
 - Make sure you're on a character page, not a realm listing page
 - Confirm "Auto-open WarcraftLogs" is on in Full Settings → WoWProgress
 - Check that the WoWProgress site toggle is enabled
+- If nothing opened for a character, check the popup's badge — pre-flight scouting may have skipped them for being below threshold. The popup shows the most recent skip with their parse
+
+**"☁ Cloudflare check" in the popup, or `☁ CF check` badges on rows**
+- WarcraftLogs is challenging RaidScout's API requests. This isn't a credentials problem
+- Open **warcraftlogs.com** in a tab and complete the check. RaidScout retries as soon as a real WarcraftLogs page loads — you don't need to wait out the countdown
+- While it's active, nothing gets filtered out: scouting falls back to opening tabs and list filtering leaves everyone visible
+
+**Everyone's tabs are opening even though they're bad parses**
+- Pre-flight scouting needs API credentials. Without them RaidScout opens the tab first and closes it afterwards, which is the older behaviour
+- Confirm "Check parses before opening a tab" is on in Full Settings → WarcraftLogs → Scouting
+- Check the popup for a rate-limit or Cloudflare countdown — both make scouting fail open on purpose
 
 **Settings changed but the page didn't update**
 - WCL filter settings propagate live without a page refresh

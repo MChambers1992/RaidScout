@@ -9,9 +9,11 @@ function isRecruitmentSearchPage() {
 }
 
 // ─── Character page: reactive tab-close via API ───────────────────────────────
-// Replaces the brittle DOM-scraping polling loop. Extracts character identity
-// from the current URL (the background opened this tab so the URL is canonical)
-// and asks the background to score it via the WCL API.
+// Backstop for the pre-flight scouting the background now does before opening
+// this tab: it still runs for users without API credentials, and for tabs
+// opened before settings changed. Scoring comes from the API, so this no
+// longer needs anything from the page — which is what lets it work while
+// Cloudflare is still showing its interstitial.
 
 function extractCharacterFromUrl(url) {
     try {
@@ -22,72 +24,83 @@ function extractCharacterFromUrl(url) {
         return {
             region: parts[idx + 1].toLowerCase(),
             realm:  parts[idx + 2].toLowerCase(),
-            name:   parts[idx + 3].split('?')[0],
-            role:   null, // will be detected below via page DOM
+            name:   decodeURIComponent(parts[idx + 3].split('?')[0]),
+            // 'auto' — the API resolves the role from the spec it ranked them
+            // as, so we don't have to wait for the page to render a spec icon.
+            role:   'auto',
         };
     } catch {
         return null;
     }
 }
 
-// Try to read the character's primary role from the spec icon shown on their page.
-// WCL renders a spec icon with an alt like "Restoration Druid" or "Protection Paladin".
-function detectRoleFromPage() {
-    const specIcon = document.querySelector('.player-character-spec img[alt]');
-    if (!specIcon) return null;
-    const alt = specIcon.alt.toLowerCase();
-    const healerSpecs = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation'];
-    const tankSpecs   = ['protection', 'guardian', 'blood', 'brewmaster', 'vengeance'];
-    if (healerSpecs.some(s => alt.startsWith(s))) return 'healer';
-    if (tankSpecs.some(s => alt.startsWith(s)))   return 'tank';
-    return 'dps';
+// Cloudflare interstitial ("Just a moment…", managed challenge, or a block
+// page). The real character page replaces it after the check passes, which
+// re-runs this content script, so there is nothing to poll for meanwhile —
+// and closing the tab mid-challenge is exactly what we want to avoid.
+function isCloudflareChallengePage() {
+    if (document.getElementById('challenge-running') ||
+        document.getElementById('cf-challenge-running') ||
+        document.getElementById('challenge-error-title')) return true;
+    if (document.querySelector('script[src*="challenge-platform"]')) return true;
+    const title = (document.title || '').toLowerCase();
+    return title.startsWith('just a moment') || title.includes('attention required');
 }
 
 let reactiveCheckTimer = null;
 let reactiveAttempts   = 0;
 const MAX_REACTIVE_ATTEMPTS = 20;
 
+function stopReactiveChecks() {
+    clearInterval(reactiveCheckTimer);
+    reactiveCheckTimer = null;
+}
+
 function checkAndCloseViaApi(character, thresholds) {
+    // Don't burn the attempt budget — or close the tab — while Cloudflare is
+    // still verifying. The page reloads itself once the check clears.
+    if (isCloudflareChallengePage()) return;
+
     reactiveAttempts++;
     if (reactiveAttempts > MAX_REACTIVE_ATTEMPTS) {
-        clearInterval(reactiveCheckTimer);
+        stopReactiveChecks();
         return;
     }
-
-    // Detect role from the rendered spec icon (loads async — wait up to 5 polls)
-    const detectedRole = detectRoleFromPage();
-    if (!detectedRole && reactiveAttempts < 5) return;
-    character.role = detectedRole || character.role || 'dps';
 
     // Ask background for the score (uses the proactive API path + cache)
     chrome.runtime.sendMessage({ action: 'fetchWclScore', character }, function (score) {
         if (!score || score.error) return;           // transient — keep polling
-        if (score.notFound) { clearInterval(reactiveCheckTimer); return; } // no logs — leave tab open
-        if (score.best === null && score.median === null) return; // not loaded yet
+        if (score.notFound) { stopReactiveChecks(); return; } // no logs — leave tab open
+        if (score.best === null && score.median === null) { stopReactiveChecks(); return; }
 
-        clearInterval(reactiveCheckTimer);
+        stopReactiveChecks();
 
-        const { parseThreshold = 0, bestParseThreshold = 0 } = thresholds;
-        const belowThreshold =
-            (score.median !== null && parseThreshold    > 0 && score.median < parseThreshold) ||
-            (score.best   !== null && bestParseThreshold > 0 && score.best   < bestParseThreshold);
-
-        if (belowThreshold) {
-            sendMessageToBackground('parseThresholdFailed', { warcraftLogsUrl: window.location.href });
+        // Role-aware: the API resolved the character's role from their ranked
+        // spec, so a healer is judged against the healer thresholds here too
+        // rather than against the DPS ones.
+        const wclSettings = buildWclSettings(thresholds);
+        if (failsWclThresholds(score, wclSettings, score.role)) {
+            sendMessageToBackground('parseThresholdFailed', {
+                warcraftLogsUrl: window.location.href,
+                score,
+            });
         }
     });
 }
 
 function waitForPageLoad(character) {
-    chrome.storage.sync.get(['parseThreshold', 'bestParseThreshold'], function (thresholds) {
+    chrome.storage.sync.get(SHARED_WCL_KEYS, function (thresholds) {
         const startCheck = () => {
+            // Run once immediately: the score comes from the API, so there is
+            // no reason to wait a second (or for Cloudflare) before asking.
+            checkAndCloseViaApi(character, thresholds);
             reactiveCheckTimer = setInterval(
                 () => checkAndCloseViaApi(character, thresholds),
                 1000
             );
         };
-        if (document.readyState === 'complete') startCheck();
-        else window.addEventListener('load', startCheck);
+        if (document.readyState === 'interactive' || document.readyState === 'complete') startCheck();
+        else document.addEventListener('DOMContentLoaded', startCheck);
     });
 }
 
@@ -169,20 +182,22 @@ function getRecruitmentCharacter(card) {
         region: parts[idx + 1].toLowerCase(),
         realm:  parts[idx + 2].toLowerCase(),
         name:   decodeURIComponent(parts[idx + 3]),
-        role:   getRecruitmentRole(card),
+        role:   getRecruitmentRole(card) || 'auto',
     };
 }
 
 // Best-effort role detection from the result card. WCL's recruitment search
-// markup for spec/role isn't confirmed here, so this degrades gracefully to
-// 'dps' (the safe default used across the extension) rather than failing.
+// markup for spec/role isn't confirmed here, so this returns null when it
+// can't tell and the caller asks the API to resolve the role from the spec the
+// character actually ranked as.
 function getRecruitmentRole(card) {
     const roleText = (card.querySelector('[class*="spec"], [class*="role"]')?.textContent || '').toLowerCase();
+    if (!roleText) return null;
     const healerSpecs = ['restoration', 'holy', 'discipline', 'mistweaver', 'preservation', 'healer'];
     const tankSpecs   = ['protection', 'guardian', 'blood', 'brewmaster', 'vengeance', 'tank'];
     if (healerSpecs.some(s => roleText.includes(s))) return 'healer';
     if (tankSpecs.some(s => roleText.includes(s)))   return 'tank';
-    return 'dps';
+    return null;
 }
 
 function applyProactiveScoring(options) {
@@ -215,14 +230,12 @@ function applyProactiveScoring(options) {
         const score = await requestWclScore(character);
         card.dataset.wclScored = 'done';
 
-        let badgeState = 'score';
-        if (score.error && score.rateLimitMs)                                    badgeState = 'rate-limited';
-        else if (score.error)                                                     badgeState = 'error';
-        else if (score.notFound || (score.best === null && score.median === null)) badgeState = 'no-logs';
+        const badgeState = badgeStateForScore(score);
+        const role       = effectiveRole(score, character.role);
 
-        setBadgeState(nameCell, badgeState, score, wclSettings, character.role);
+        setBadgeState(nameCell, badgeState, score, wclSettings, role);
 
-        if (failsWclThresholds(score, wclSettings, character.role)) {
+        if (failsWclThresholds(score, wclSettings, role)) {
             card.dataset.wclHidden = 'true';
             card.style.display = 'none';
             hidden++;
@@ -284,6 +297,13 @@ function initRecruitmentFiltering() {
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 if (isWarcraftLogsPage()) {
+    // Tell the background a real WarcraftLogs page rendered — that means this
+    // browser has cleared any Cloudflare challenge, so API lookups that were
+    // backed off can start again immediately.
+    if (!isCloudflareChallengePage()) {
+        sendMessageToBackground('wclPageReady');
+    }
+
     chrome.storage.sync.get('warcraftlogsEnabled', function (options) {
         if (options.warcraftlogsEnabled !== false) {
             if (isRecruitmentSearchPage()) {

@@ -33,10 +33,10 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('wclDebug').checked = !!local.wclDebug;
         });
 
-        // Rate-limit status — counts down and clears at zero
-        chrome.runtime.sendMessage({ action: 'getRateLimitStatus' }, function (status) {
-            if (status?.limited) {
-                startRateLimitCountdown(status.remainingMs);
+        // API backoff status (rate limit or Cloudflare) — counts down, clears at zero
+        chrome.runtime.sendMessage({ action: 'getApiStatus' }, function (status) {
+            if (status && status.state !== 'ok') {
+                startBackoffCountdown(status.state, status.remainingMs);
             }
         });
     });
@@ -154,18 +154,23 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, ms);
     }
 
-    let rateLimitTimer = null;
-    function startRateLimitCountdown(remainingMs) {
-        const el = document.getElementById('wclRateLimitStatus');
-        clearInterval(rateLimitTimer);
+    let backoffTimer = null;
+    function startBackoffCountdown(state, remainingMs) {
+        const el   = document.getElementById('wclRateLimitStatus');
+        const hint = document.getElementById('wclCloudflareHint');
+        const label = state === 'cloudflare' ? '☁ Cloudflare check' : '⚠ Rate limited';
+        clearInterval(backoffTimer);
+        if (hint) hint.style.display = state === 'cloudflare' ? '' : 'none';
+
         let secs = Math.ceil(remainingMs / 1000);
-        const render = () => { el.textContent = `⚠ Rate limited — retry in ${secs}s`; };
+        const render = () => { el.textContent = `${label} — retry in ${secs}s`; };
         render();
-        rateLimitTimer = setInterval(() => {
+        backoffTimer = setInterval(() => {
             secs--;
             if (secs <= 0) {
-                clearInterval(rateLimitTimer);
+                clearInterval(backoffTimer);
                 el.textContent = '';
+                if (hint) hint.style.display = 'none';
                 return;
             }
             render();
