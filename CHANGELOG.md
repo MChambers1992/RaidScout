@@ -8,6 +8,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [1.4.0] — Unreleased
 
+### Fixed
+- **Per-site enable toggles now actually grey out their section.** `options.css` has carried a `.section-disabled` rule since the settings page was written, but nothing ever applied the class — turning a site off left its settings looking and behaving exactly as before, with no sign they were inert. `options.js` now toggles the class and disables the section's controls on load and on every toggle change. The section header keeps its enable switch interactive, disabled inputs keep their values (so Save is unaffected), and the greying now also covers the bare subsection labels and hints between option blocks.
+
 ### Added
 - **Pre-flight scouting** — The scout flow now scores a candidate through the WarcraftLogs API *before* opening their character tab, and only opens one for candidates that pass your thresholds. Rejected candidates no longer have a tab opened and immediately closed again, so they never have to clear WarcraftLogs' Cloudflare check on the way to being discarded. Controlled by **Check parses before opening a tab** (`scoutPreflight`, default on) in the WarcraftLogs section and the popup. Requires API credentials; without them (or if a lookup fails for any reason) RaidScout falls back to the original open-then-check flow, so scouting never gets stricter because a lookup failed.
 - **Open scouted tabs in the background** — New `scoutOpenInBackground` setting (default off) opens WarcraftLogs tabs without stealing focus.

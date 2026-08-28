@@ -87,7 +87,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. **Full Settings Page** (`src/options/`)
    - Opened via right-click → Options or the popup's Full Settings button
    - Tab navigation (WarcraftLogs / WoWProgress / Raider.IO / Guilds of WoW)
-   - Per-site enable toggle with disabled state: settings grey out and become non-interactive when a site is OFF
+   - Per-site enable toggle with disabled state: `syncSectionEnabledState()` in `options.js` adds `.section-disabled` to the site's `.category-content` and sets `disabled` on its controls when the site is OFF, so they grey out (CSS) and drop out of the tab order (the `disabled` attribute — `pointer-events: none` alone still lets keyboard focus reach them). The enable toggle sits in `.section-header`, which is excluded, so it stays clickable. Disabled inputs keep their values, so Save still writes them
    - Saves on explicit button click; shows `✓ Settings saved` confirmation
    - Category selection persisted in `localStorage`
 
