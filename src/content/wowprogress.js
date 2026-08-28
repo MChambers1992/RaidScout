@@ -13,7 +13,8 @@ function getPlayerClass(playerRow) {
 }
 
 // WoWProgress shows role via a class icon — attempt to derive from spec icon name
-// in the character link tooltip or title. Falls back to null (treated as DPS).
+// in the character link tooltip or title. Returns null when the markup doesn't
+// say; callers then ask the API to resolve the role instead of assuming DPS.
 function getPlayerRole(playerRow) {
     const icon = playerRow.querySelector('img[src*="spec_icon"], img[alt*="Healer"], img[alt*="Tank"]');
     if (!icon) return null;
@@ -65,7 +66,9 @@ function getWowProgressCharacter(playerRow) {
         region: parts[idx + 1].toLowerCase(),
         realm:  parts[idx + 2].replace(/\s/g, '-').toLowerCase(),
         name:   decodeURIComponent(parts[idx + 3].split('?')[0]),
-        role:   role || 'dps',
+        // 'auto' → the API picks the metric from the spec they ranked as, so a
+        // healer isn't silently judged on DPS parses they'll never post.
+        role:   role || 'auto',
     };
 }
 
@@ -117,14 +120,12 @@ async function applyWclScoring(wclSettings) {
         if (score.best   !== null && score.best   !== undefined) row.dataset.wclBest   = String(score.best);
         if (score.median !== null && score.median !== undefined) row.dataset.wclMedian = String(score.median);
 
-        let badgeState = 'score';
-        if (score.error && score.rateLimitMs) badgeState = 'rate-limited';
-        else if (score.error)                 badgeState = 'error';
-        else if (score.notFound || (score.best === null && score.median === null)) badgeState = 'no-logs';
+        const badgeState = badgeStateForScore(score);
+        const role       = effectiveRole(score, character.role);
 
-        if (nameCell) setBadgeState(nameCell, badgeState, score, wclThresholds, character.role);
+        if (nameCell) setBadgeState(nameCell, badgeState, score, wclThresholds, role);
 
-        if (failsWclThresholds(score, wclThresholds, character.role)) {
+        if (failsWclThresholds(score, wclThresholds, role)) {
             row.dataset.wclHidden = 'true';
             row.style.display = 'none';
             hiddenByWcl++;

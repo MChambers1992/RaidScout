@@ -53,9 +53,38 @@ function handleWarcraftLogsRedirection(enabled) {
         setTimeout(() => {
             if (warcraftLogsRedirected) return;
             const url = convertRaiderIoToWarcraftLogs(window.location.href);
-            if (url) { sendMessageToBackground('openTab', { url }); warcraftLogsRedirected = true; }
+            if (!url) return;
+            warcraftLogsRedirected = true;
+            // The background pre-flights the parse check and may decide this
+            // character isn't worth a tab. Nothing opening is the *point*, so
+            // say why rather than looking like the feature broke.
+            sendMessageToBackground('openTab', { url }, response => {
+                if (response && response.opened === false && response.verdict === 'reject') {
+                    showScoutSkipNotice(response.score);
+                }
+            });
         }, 500);
     }
+}
+
+// Small transient banner explaining a skipped WarcraftLogs tab.
+const RIO_NOTICE_ID = 'raidscout-scout-notice';
+function showScoutSkipNotice(score) {
+    document.getElementById(RIO_NOTICE_ID)?.remove();
+
+    const fmt = v => (typeof v === 'number' ? Math.round(v) + '%' : '?');
+    const el = document.createElement('div');
+    el.id = RIO_NOTICE_ID;
+    el.textContent = `RaidScout: skipped WarcraftLogs — ${fmt(score?.best)} best / ${fmt(score?.median)} median is below your thresholds`;
+    el.style.cssText = [
+        'position:fixed', 'bottom:16px', 'right:16px', 'z-index:2147483647',
+        'background:#2d0000', 'color:#f0a0a0', 'border:1px solid #7a0000',
+        'border-radius:4px', 'padding:8px 12px', 'font-size:12px', 'font-weight:600',
+        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+        'box-shadow:0 2px 8px rgba(0,0,0,.4)',
+    ].join(';');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 6000);
 }
 
 function hideAds() {
@@ -126,7 +155,8 @@ function getRowCharacter(group) {
         region: parts[idx + 1].toLowerCase(),
         realm:  parts[idx + 2].replace(/\s/g, '-').toLowerCase(),
         name:   decodeURIComponent(parts[idx + 3]),
-        role:   data?.role || 'dps',
+        // 'auto' when this row's role cell didn't parse — see guildsofwow.js
+        role:   data?.role || 'auto',
     };
 }
 
@@ -196,14 +226,12 @@ async function applyWclScoring() {
         if (score.best   !== null && score.best   !== undefined) group.dataset.wclBest   = String(score.best);
         if (score.median !== null && score.median !== undefined) group.dataset.wclMedian = String(score.median);
 
-        let badgeState = 'score';
-        if (score.error && score.rateLimitMs)                                   badgeState = 'rate-limited';
-        else if (score.error)                                                    badgeState = 'error';
-        else if (score.notFound || (score.best === null && score.median === null)) badgeState = 'no-logs';
+        const badgeState = badgeStateForScore(score);
+        const role       = effectiveRole(score, character.role);
 
-        if (nameCell) setBadgeState(nameCell, badgeState, score, wclSettings, character.role);
+        if (nameCell) setBadgeState(nameCell, badgeState, score, wclSettings, role);
 
-        if (failsWclThresholds(score, wclSettings, character.role)) {
+        if (failsWclThresholds(score, wclSettings, role)) {
             group.dataset.wclHidden = 'true';
             group.style.display = 'none';
             wclHiddenCount++;

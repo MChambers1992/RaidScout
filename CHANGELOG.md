@@ -6,6 +6,27 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.4.0] — Unreleased
+
+### Added
+- **Pre-flight scouting** — The scout flow now scores a candidate through the WarcraftLogs API *before* opening their character tab, and only opens one for candidates that pass your thresholds. Rejected candidates no longer have a tab opened and immediately closed again, so they never have to clear WarcraftLogs' Cloudflare check on the way to being discarded. Controlled by **Check parses before opening a tab** (`scoutPreflight`, default on) in the WarcraftLogs section and the popup. Requires API credentials; without them (or if a lookup fails for any reason) RaidScout falls back to the original open-then-check flow, so scouting never gets stricter because a lookup failed.
+- **Open scouted tabs in the background** — New `scoutOpenInBackground` setting (default off) opens WarcraftLogs tabs without stealing focus.
+- **Role auto-resolution (`role: 'auto'`)** — A single GraphQL request now fetches both the `dps` and `hps` rankings under aliases and picks the right one from the spec WarcraftLogs ranked the character as. This is what makes pre-flight possible without a page to read a spec icon from, and it replaces the guesswork on the two pages where role markup was unreliable: WoWProgress rows and the WCL recruitment search. Sites with dependable role markup (Raider.IO, Guilds of WoW) still send the role they read and skip the extra metric.
+- **Cloudflare-aware API client** — A challenged request (403/503 with Cloudflare headers or an interstitial body) is now reported as `CLOUDFLARE_BLOCKED` with its own 5-minute backoff instead of a generic HTTP error. The popup and Full Settings show a countdown explaining that loading warcraftlogs.com in a tab clears it, rows get a `☁ CF check` badge, and the backoff is dropped the moment a real WarcraftLogs page renders (`wclPageReady`).
+- **Skip visibility** — With no tab flashing open and shut there is nothing to see when a candidate is filtered, so Raider.IO shows a transient "skipped WarcraftLogs" notice on the character page and the popup shows the most recent skip (`getLastScoutSkip`).
+- **`src/scout.js`** — Pure decision module (spec→role map, role-aware thresholds, verdict, WCL character URL parsing) shared by the service worker and covered directly by `tests/scout.test.js` (51 cases) rather than through inlined copies.
+
+### Changed
+- **The WCL character-page content script no longer needs the page.** Scores come from the API, so it asks immediately instead of polling for a spec icon, detects the Cloudflare interstitial and neither burns its attempt budget nor closes a tab mid-challenge, and applies the same role-aware thresholds the rest of the extension uses (it previously compared everyone against the DPS pair).
+- **Badge counter counts skipped candidates**, from both pre-flight skips and the older open-then-close path. Popup label changed from "closed" to "skipped".
+- `getApiStatus` replaces `getRateLimitStatus` — one status covering both rate-limit and Cloudflare backoff, used by the popup and Full Settings.
+- `badgeStateForScore()` in `common.js` replaces the four copies of the same badge-state ladder in the site scripts; `effectiveRole()` prefers the API-resolved role over whatever the page markup suggested.
+
+### Fixed
+- **Rate-limit cooldown reported 1000× too long.** The cached-cooldown path threw `RATE_LIMITED:<ms>` while the 429 path threw `RATE_LIMITED:<seconds>`, and the consumer multiplied both by 1000 — a 60-second cooldown surfaced as a 16-hour one in the badge and status bar. Both paths now report seconds.
+
+---
+
 ## [1.3.0] — Unreleased
 
 ### Added
