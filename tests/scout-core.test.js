@@ -370,7 +370,7 @@ describe('isScored', () => {
     });
 });
 
-// Mirrors isBelowThreshold() in scout.js, which delegates to common.js's
+// Mirrors isBelowThreshold() in scout/scout.js, which delegates to common.js's
 // failsWclThresholds and adds only the not-scored-yet guard. Re-declared here
 // because common.js is a classic content script with no export surface — keep
 // this copy in sync with the original when you touch it.

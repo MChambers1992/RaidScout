@@ -2,7 +2,7 @@
 // Tests the one adapter that parses markup itself: the WoWProgress fetch path.
 // The tab-mode adapters delegate extraction to the live content scripts, so
 // there is no markup here to test — their failure mode is covered by the
-// harvest error handling in scout.js instead.
+// harvest error handling in scout/scout.js instead.
 
 import { describe, it, expect } from 'vitest';
 import { JSDOM } from 'jsdom';

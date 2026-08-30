@@ -1,6 +1,6 @@
-// tests/scout.test.js
-// Unit tests for the scout decision logic. Unlike common.test.js (which inlines
-// its copies because content scripts aren't modules), this imports src/scout.js
+// tests/preflight.test.js
+// Unit tests for the pre-flight decision logic. Unlike common.test.js (which inlines
+// its copies because content scripts aren't modules), this imports src/preflight.js
 // directly — it is a plain ES module with no browser globals.
 
 import { describe, it, expect } from 'vitest';
@@ -12,7 +12,7 @@ import {
     scoutVerdict,
     characterFromWclUrl,
     buildWclCharacterUrl,
-} from '../src/scout.js';
+} from '../src/preflight.js';
 
 // ─── roleForSpec ──────────────────────────────────────────────────────────────
 

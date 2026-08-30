@@ -1,4 +1,4 @@
-// scout.js — pure decision logic for the scout flow.
+// preflight.js — pure decision logic for the pre-flight scout flow.
 //
 // "Scouting" is the reactive flow: you land on a candidate's page (WoWProgress
 // or Raider.IO) and RaidScout decides whether they are worth a look on

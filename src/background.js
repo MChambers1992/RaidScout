@@ -2,7 +2,7 @@ import {
     getCharacterScore, clearScoreCache, hasCredentials, testCredentials,
     storeSecret, getApiStatus, clearCloudflareBackoff,
 } from './wcl-api.js';
-import { buildScoutThresholds, scoutVerdict, characterFromWclUrl, WCL_ORIGIN as SCOUT_WCL_ORIGIN } from './scout.js';
+import { buildScoutThresholds, scoutVerdict, characterFromWclUrl, WCL_ORIGIN as SCOUT_WCL_ORIGIN } from './preflight.js';
 
 // ─── Badge / skipped-candidate count (persisted across service-worker restarts) ─
 // Counts candidates the scout flow rejected — pre-flight skips (no tab ever

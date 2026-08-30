@@ -14,7 +14,7 @@
 //  - Debug logging toggle via wclDebug storage key
 //  - configurable cache TTL via wclCacheTtlHours storage key (default 6)
 
-import { roleForSpec } from './scout.js';
+import { roleForSpec } from './preflight.js';
 
 const WCL_TOKEN_URL  = 'https://www.warcraftlogs.com/oauth/token';
 const WCL_CLIENT_API = 'https://www.warcraftlogs.com/api/v2/client';
