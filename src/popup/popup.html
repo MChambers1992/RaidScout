@@ -12,7 +12,7 @@
         <span class="popup-title">RaidScout</span>
         <div class="badge-area" id="badgeArea">
             <span id="badgeCount"></span>
-            <span class="badge-label">closed</span>
+            <span class="badge-label">skipped</span>
             <button id="clearBadge" title="Reset counter">×</button>
         </div>
     </div>
@@ -41,6 +41,14 @@
                         <input type="number" id="q-bestParseThreshold" min="0" max="100" step="1">
                     </div>
                 </div>
+                <label class="quick-check">
+                    <input type="checkbox" id="q-scoutPreflight">
+                    Check parses before opening a tab
+                </label>
+                <label class="quick-check">
+                    <input type="checkbox" id="q-scoutOpenInBackground">
+                    Open scouted tabs in background
+                </label>
                 <div class="quick-label">Recruit search region</div>
                 <div class="quick-regions">
                     <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="EU"> EU</label>
@@ -212,6 +220,7 @@
         <button id="openSettings">⚙ Full Settings</button>
         <div class="saved-indicator" id="savedIndicator"></div>
         <div id="wclStatusBar" style="font-size:11px;color:#f09020;padding:4px 8px;display:none;"></div>
+        <div id="lastSkipBar" style="font-size:11px;color:#888;padding:0 8px 4px;display:none;"></div>
         <div class="support-row">
             <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">☕ Support</a>
             <span class="support-sep">·</span>

@@ -62,7 +62,9 @@ function getCardCharacter(card) {
         || '').trim();
     if (!name) return null;
 
-    const role = getCardRole(card) || 'dps';
+    // 'auto' when this card's role icon didn't parse — the API resolves it
+    // from the ranked spec rather than defaulting a healer to DPS thresholds.
+    const role = getCardRole(card) || 'auto';
 
     const renderSrc = card.querySelector('.card-icon img[src*="render.worldofwarcraft.com"]')?.getAttribute('src') || '';
     const rm = renderSrc.match(/render\.worldofwarcraft\.com\/([a-z]+)\/character\/([^/?]+)/i);
@@ -154,14 +156,12 @@ async function applyWclScoring(wclSettings) {
         if (score.best   !== null && score.best   !== undefined) card.dataset.wclBest   = String(score.best);
         if (score.median !== null && score.median !== undefined) card.dataset.wclMedian = String(score.median);
 
-        let badgeState = 'score';
-        if (score.error && score.rateLimitMs)                                    badgeState = 'rate-limited';
-        else if (score.error)                                                     badgeState = 'error';
-        else if (score.notFound || (score.best === null && score.median === null)) badgeState = 'no-logs';
+        const badgeState = badgeStateForScore(score);
+        const role       = effectiveRole(score, character.role);
 
-        setBadgeState(nameEl, badgeState, score, gowWclThresholds, character.role);
+        setBadgeState(nameEl, badgeState, score, gowWclThresholds, role);
 
-        if (failsWclThresholds(score, gowWclThresholds, character.role)) {
+        if (failsWclThresholds(score, gowWclThresholds, role)) {
             card.dataset.wclHidden = 'true';
             card.style.display = 'none';
             gowHiddenCount++;

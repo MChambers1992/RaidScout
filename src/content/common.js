@@ -14,7 +14,15 @@ function normalizeClassName(name) {
     return lower.replace(/ /g, '_');
 }
 
-function sendMessageToBackground(action, data = {}) {
+function sendMessageToBackground(action, data = {}, callback) {
+    if (typeof callback === 'function') {
+        chrome.runtime.sendMessage({ action, ...data }, response => {
+            // Swallow "receiving end does not exist" — the worker may be
+            // restarting; callers treat a missing response as "unknown".
+            callback(chrome.runtime.lastError ? null : response);
+        });
+        return;
+    }
     chrome.runtime.sendMessage({ action, ...data });
 }
 
@@ -48,6 +56,12 @@ function requestWclScore(character) {
             }
         );
     });
+}
+
+// The API resolves a character's role from the spec WarcraftLogs ranked them
+// as, which beats whatever the page markup suggested. Prefer it when present.
+function effectiveRole(score, fallbackRole) {
+    return (score && score.role) || fallbackRole || 'dps';
 }
 
 // Returns the right threshold pair for a given role.
@@ -237,12 +251,20 @@ function makeBadge(state, score, settings, role) {
         el.textContent = '🚦 Rate limited';
         return el;
     }
+    if (state === 'blocked') {
+        el.classList.add('rs-badge--limited');
+        el.title = 'RaidScout: WarcraftLogs is challenging API requests (Cloudflare). '
+                 + 'Open warcraftlogs.com in a tab and complete the check, then reload this page.';
+        el.textContent = '☁ CF check';
+        return el;
+    }
 
     // Scored state — use role-aware thresholds for colour coding
     el.classList.add('rs-badge--score');
     const { best, median } = score;
+    role = effectiveRole(score, role);
     const fails = settings ? failsWclThresholds(score, settings, role) : false;
-    const { minBest, minMedian } = settings ? thresholdsForRole(role || 'dps', settings) : {};
+    const { minBest, minMedian } = settings ? thresholdsForRole(role, settings) : {};
     const warnOnly = !fails && settings && (
         (minBest   > 0 && best   !== null && best   < (minBest   || 0) * 1.1) ||
         (minMedian > 0 && median !== null && median < (minMedian || 0) * 1.1)
@@ -256,6 +278,17 @@ function makeBadge(state, score, settings, role) {
     el.textContent = `WCL ${fmt(best)} / ${fmt(median)}`;
     el.title = `RaidScout WarcraftLogs ${metric}: Best ${fmt(best)}, Median ${fmt(median)}`;
     return el;
+}
+
+// Map a score result to its badge state. Every site scored rows the same way,
+// with the Cloudflare case newly folded in here rather than four times over.
+function badgeStateForScore(score) {
+    if (!score) return 'error';
+    if (score.error && score.cloudflareMs) return 'blocked';
+    if (score.error && score.rateLimitMs)  return 'rate-limited';
+    if (score.error)                       return 'error';
+    if (score.notFound || (score.best === null && score.median === null)) return 'no-logs';
+    return 'score';
 }
 
 function setBadgeState(container, state, score, settings, role) {

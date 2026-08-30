@@ -1,5 +1,6 @@
 const SETTINGS_KEYS = [
     'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
+    'scoutPreflight', 'scoutOpenInBackground',
     'wowprogressEnabled', 'openWarcraftLogsTab', 'minIlvl', 'maxIlvl', 'selectedRegions', 'guildFilter',
     'wpWclEnabled',
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
@@ -43,6 +44,9 @@ function applySettings(data) {
     document.getElementById('q-warcraftlogsEnabled').checked = data.warcraftlogsEnabled !== false;
     document.getElementById('q-parseThreshold').value = data.parseThreshold ?? 50;
     document.getElementById('q-bestParseThreshold').value = data.bestParseThreshold ?? 60;
+
+    document.getElementById('q-scoutPreflight').checked = data.scoutPreflight !== false;
+    document.getElementById('q-scoutOpenInBackground').checked = !!data.scoutOpenInBackground;
 
     document.getElementById('q-wclSearchParseThreshold').value = data.wclSearchParseThreshold || '';
 
@@ -114,6 +118,8 @@ function saveAll() {
         wclSearchParseThreshold: parseInt(document.getElementById('q-wclSearchParseThreshold').value) || 0,
         wclSelectedRegions,
         wclMinMythicKills: parseInt(document.getElementById('q-wclMinMythicKills').value) || 0,
+        scoutPreflight: document.getElementById('q-scoutPreflight').checked,
+        scoutOpenInBackground: document.getElementById('q-scoutOpenInBackground').checked,
 
         wowprogressEnabled: document.getElementById('q-wowprogressEnabled').checked,
         openWarcraftLogsTab: document.getElementById('q-openWarcraftLogsTab').checked,
@@ -140,23 +146,37 @@ function saveAll() {
     }, showSaved);
 }
 
-let rateLimitTimer = null;
+let backoffTimer = null;
 
-function startRateLimitCountdown(bar, remainingMs) {
-    clearInterval(rateLimitTimer);
+function startBackoffCountdown(bar, state, remainingMs) {
+    clearInterval(backoffTimer);
+    const label = state === 'cloudflare'
+        ? '☁ WarcraftLogs Cloudflare check — open warcraftlogs.com to clear it'
+        : '🚦 WCL rate limited';
     let secs = Math.ceil(remainingMs / 1000);
-    const render = () => { bar.textContent = `🚦 WCL rate limited — ${secs}s remaining`; };
+    const render = () => { bar.textContent = `${label} — ${secs}s`; };
     render();
     bar.style.display = 'block';
-    rateLimitTimer = setInterval(() => {
+    backoffTimer = setInterval(() => {
         secs--;
         if (secs <= 0) {
-            clearInterval(rateLimitTimer);
+            clearInterval(backoffTimer);
             bar.style.display = 'none';
             return;
         }
         render();
     }, 1000);
+}
+
+// With pre-flight scouting there is no tab flashing open and shut, so show the
+// most recent skip to make the filtering visible.
+function renderLastSkip(skip) {
+    const bar = document.getElementById('lastSkipBar');
+    if (!bar) return;
+    if (!skip || !skip.name) { bar.style.display = 'none'; return; }
+    const fmt = v => (typeof v === 'number' ? Math.round(v) + '%' : '?');
+    bar.textContent = `Last skipped: ${skip.name} — ${fmt(skip.best)} best / ${fmt(skip.median)} median`;
+    bar.style.display = 'block';
 }
 
 function showSaved() {
@@ -171,12 +191,16 @@ document.addEventListener('DOMContentLoaded', function () {
     chrome.storage.sync.get(SETTINGS_KEYS, applySettings);
     loadBadge();
 
-    // Rate-limit indicator — counts down and hides at zero
-    chrome.runtime.sendMessage({ action: 'getRateLimitStatus' }, function (status) {
+    // API backoff indicator (rate limit / Cloudflare) — counts down, hides at zero
+    chrome.runtime.sendMessage({ action: 'getApiStatus' }, function (status) {
         const bar = document.getElementById('wclStatusBar');
-        if (bar && status?.limited) {
-            startRateLimitCountdown(bar, status.remainingMs);
+        if (bar && status && status.state !== 'ok') {
+            startBackoffCountdown(bar, status.state, status.remainingMs);
         }
+    });
+
+    chrome.runtime.sendMessage({ action: 'getLastScoutSkip' }, function (res) {
+        renderLastSkip(res?.skip);
     });
 
     // Detect current tab's site and expand its panel
@@ -206,12 +230,16 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('clearBadge').addEventListener('click', function () {
         chrome.runtime.sendMessage({ action: 'clearBadge' });
         renderBadge(0);
+        renderLastSkip(null);
     });
 
     // Live-update the closed-tab count while the popup is open
     chrome.runtime.onMessage.addListener(function (message) {
         if (message.action === 'badgeUpdated') {
             renderBadge(message.count ?? 0);
+            chrome.runtime.sendMessage({ action: 'getLastScoutSkip' }, function (res) {
+                renderLastSkip(res?.skip);
+            });
         }
     });
 

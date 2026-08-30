@@ -370,15 +370,20 @@ describe('isScored', () => {
     });
 });
 
-// Mirrors isBelowThreshold() in scout.js, which composes hasNoLogs with
-// common.js's failsWclThresholds. Re-declared here because common.js is a
-// classic content script with no export surface.
+// Mirrors isBelowThreshold() in scout.js, which delegates to common.js's
+// failsWclThresholds and adds only the not-scored-yet guard. Re-declared here
+// because common.js is a classic content script with no export surface — keep
+// this copy in sync with the original when you touch it.
 describe('Scout hide rule (no logs counts as below threshold)', () => {
-    function failsWclThresholds(score, { minBest = 0, minMedian = 0, hideUnknown = false }) {
-        if (!score) return !!hideUnknown;
+    function hasNoWclLogs(score) {
+        if (!score || score.error) return false;
+        return !!score.notFound || (score.best === null && score.median === null);
+    }
+
+    function failsWclThresholds(score, { minBest = 0, minMedian = 0 }) {
+        if (!score) return false;
         if (score.error) return false;
-        const haveData = score.best !== null || score.median !== null;
-        if (!haveData) return !!hideUnknown;
+        if (hasNoWclLogs(score)) return true;
         if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
         if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
         return false;
@@ -386,14 +391,13 @@ describe('Scout hide rule (no logs counts as below threshold)', () => {
 
     const isBelowThreshold = (wcl, settings = { minBest: 60, minMedian: 50 }) => {
         if (!wcl) return false;
-        if (hasNoLogs(wcl)) return true;
         return failsWclThresholds(wcl, settings);
     };
 
-    it('hides a no-logs candidate even when hideUnknown is off', () => {
+    it('hides a no-logs candidate, with no setting to opt out of it', () => {
         // The reported bug: these were showing up alongside qualified raiders.
-        expect(isBelowThreshold({ best: null, median: null, notFound: true },
-            { minBest: 60, minMedian: 50, hideUnknown: false })).toBe(true);
+        expect(isBelowThreshold({ best: null, median: null, notFound: true })).toBe(true);
+        expect(isBelowThreshold({ best: null, median: null })).toBe(true);
     });
 
     it('still hides a genuinely low parse', () => {

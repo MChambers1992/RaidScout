@@ -87,8 +87,10 @@ h1 {
 }
 
 /* ── Disabled section state ── */
-.category-content.section-disabled .option,
-.category-content.section-disabled .option-group {
+/* Applied by options.js when a site's enable toggle is off. Everything except
+   the section header (which carries that toggle) greys out, including the bare
+   subsection labels and hints between the option blocks. */
+.category-content.section-disabled > *:not(.section-header) {
     opacity: 0.35;
     pointer-events: none;
     user-select: none;

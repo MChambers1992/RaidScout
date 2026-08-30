@@ -310,8 +310,8 @@ function extractCharacterFromUrl(url) {
         return {
             region: parts[idx + 1].toLowerCase(),
             realm:  parts[idx + 2].toLowerCase(),
-            name:   parts[idx + 3].split('?')[0],
-            role:   null,
+            name:   decodeURIComponent(parts[idx + 3].split('?')[0]),
+            role:   'auto',
         };
     } catch { return null; }
 }
@@ -319,7 +319,7 @@ function extractCharacterFromUrl(url) {
 describe('extractCharacterFromUrl', () => {
     it('parses a standard WCL character URL', () => {
         const c = extractCharacterFromUrl('https://www.warcraftlogs.com/character/eu/kazzak/heroname');
-        expect(c).toEqual({ region: 'eu', realm: 'kazzak', name: 'heroname', role: null });
+        expect(c).toEqual({ region: 'eu', realm: 'kazzak', name: 'heroname', role: 'auto' });
     });
     it('lowercases region and realm', () => {
         const c = extractCharacterFromUrl('https://www.warcraftlogs.com/character/US/Area-52/Hero');
