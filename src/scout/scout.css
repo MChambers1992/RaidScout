@@ -67,6 +67,9 @@ button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 .source-chip.is-running { border-color: #4a90d9; }
 .source-chip.is-running .chip-state { color: #4a90d9; }
 .source-chip.is-done    .chip-state { color: #4caf50; }
+/* Rendered, but matched nobody — a different outcome from a successful
+   harvest, and the banner says so too. */
+.source-chip.is-empty   .chip-state { color: #c9a227; }
 .source-chip.is-failed  { border-color: #7a2020; }
 .source-chip.is-failed  .chip-state { color: #f04040; }
 .source-chip.is-skipped { opacity: 0.5; }
@@ -111,6 +114,14 @@ button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 }
 #searchBox:focus { outline: none; border-color: #007bff; }
 
+/* Every interactive control needs a visible focus ring; only the search box
+   had one, which left keyboard users unable to see where they were. */
+:where(button, a, input, th[data-sort]):focus-visible {
+    outline: 2px solid #4a90d9;
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
 .inline-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; cursor: pointer; }
 .result-count { color: #888; font-size: 12px; }
 
@@ -120,7 +131,12 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 thead th {
     position: sticky;
-    top: 88px;
+    /* Set from the header's measured height by trackHeaderHeight() in scout.js.
+       The literal 88px this replaced was a guess at a box whose height changes
+       with viewport width, so the header either overlapped the first row or
+       left a gap that rows slid through. The fallback matches the default
+       desktop height for the moment before the first measurement. */
+    top: var(--header-h, 88px);
     background: #242424;
     text-align: left;
     padding: 9px 10px;
@@ -128,11 +144,11 @@ thead th {
     font-size: 12px;
     color: #aaa;
     border-bottom: 1px solid #383838;
-    cursor: pointer;
     white-space: nowrap;
     user-select: none;
 }
-thead th:hover { color: #fff; }
+thead th[data-sort] { cursor: pointer; }
+thead th[data-sort]:hover { color: #fff; }
 thead th.num { text-align: right; }
 thead th.sorted-asc::after  { content: ' ▲'; color: #007bff; }
 thead th.sorted-desc::after { content: ' ▼'; color: #007bff; }
@@ -144,7 +160,12 @@ tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
    reads as the stronger signal. */
 tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.018); }
 tbody tr:hover { background: #2c2c2c; }
-tbody tr.below-threshold { opacity: 0.45; }
+/* Dimmed, not erased: unticking the hide box is a request to read these rows,
+   so they keep enough contrast to actually be read. The left edge marks them
+   without relying on the dimming alone. */
+tbody tr.below-threshold { opacity: 0.62; }
+tbody tr.below-threshold td:first-child { box-shadow: inset 2px 0 0 #6a4a2a; }
+tbody tr.below-threshold:hover { opacity: 0.85; }
 
 .char-name { font-weight: 600; color: var(--class-color, #e8e8e8); }
 .multi-source { color: #f0b060; font-size: 11px; margin-left: 5px; }
@@ -184,6 +205,9 @@ tbody tr.below-threshold { opacity: 0.45; }
     display: inline-block;
 }
 
+/* Three short links that were wrapping onto three lines on a narrow window,
+   tripling the height of every row. */
+.row-links { white-space: nowrap; }
 .row-links a { color: #6aa9e0; text-decoration: none; font-size: 12px; margin-right: 8px; }
 .row-links a:hover { text-decoration: underline; }
 
@@ -218,3 +242,23 @@ tbody tr.below-threshold { opacity: 0.45; }
     transition: color 0.15s;
 }
 .support-link:hover { color: #f0b060; text-decoration: underline; }
+
+/* ── Narrow viewports ───────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+    body { padding: 0 12px 32px; }
+
+    /* Eleven columns cannot fit, so the page scrolls sideways — and a sticky
+       box does not scroll with it, tearing the header off the table below.
+       Static positioning keeps them together. (An overflow-x wrapper would be
+       the other fix, but it becomes the scrollport and breaks the sticky
+       header outright, which is worse.) */
+    .scout-header, thead th { position: static; }
+
+    .scout-header { align-items: flex-start; flex-wrap: wrap; }
+    .scout-toolbar #searchBox { min-width: 0; flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+}

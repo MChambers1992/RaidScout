@@ -112,7 +112,7 @@ function renderChips(sourceIds, allIds) {
 function setChip(sourceId, stateName, text) {
     const chip = document.getElementById(`chip-${sourceId}`);
     if (!chip) return;
-    chip.classList.remove('is-running', 'is-done', 'is-failed');
+    chip.classList.remove('is-running', 'is-done', 'is-empty', 'is-failed');
     if (stateName) chip.classList.add(stateName);
     chip.querySelector('.chip-state').textContent = text;
 }
@@ -201,6 +201,10 @@ async function runScout() {
     setProgress('Harvesting…');
     const raw = [];
     let rowTotal = 0;
+    // Sources that rendered but matched nobody. Collected rather than warned
+    // about one at a time: the sentence is identical for each, and three
+    // repetitions of it buried the warnings that actually differ.
+    const cameBackEmpty = [];
 
     await runWithConcurrency(sourceIds, async (sourceId) => {
         const result = await harvestSource(sourceId, settings);
@@ -220,17 +224,26 @@ async function runScout() {
         rowTotal += normalized.length;
         raw.push(...normalized);
 
-        setChip(sourceId, 'is-done', `${normalized.length}`);
+        // A source that matched nobody is not the same result as one that
+        // found candidates, so it does not get the green "done" treatment.
+        setChip(sourceId, normalized.length ? 'is-done' : 'is-empty', `${normalized.length}`);
         for (const w of result.warnings || []) warn(`<strong>${SOURCE_META[sourceId].label}</strong>: ${escapeHtml(w)}`);
         if (dropped > 0) {
             warn(`<strong>${SOURCE_META[sourceId].label}</strong>: ${dropped} row(s) skipped — no readable ` +
                  `character name/realm/region, so they could not be scored.`);
         }
-        if (normalized.length === 0) {
-            warn(`<strong>${SOURCE_META[sourceId].label}</strong> rendered but produced no candidates. ` +
-                 `Its filters may be excluding everyone, or the listing URL is wrong.`);
-        }
+        if (normalized.length === 0) cameBackEmpty.push(SOURCE_META[sourceId].label);
     }, HARVEST_CONCURRENCY);
+
+    if (cameBackEmpty.length) {
+        const names = cameBackEmpty.map(label => `<strong>${label}</strong>`);
+        const list  = names.length === 1
+            ? names[0]
+            : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+        warn(`${list} rendered but produced no candidates. ` +
+             `${names.length === 1 ? 'Its filters may be' : 'Their filters may be'} excluding everyone, ` +
+             `or the listing ${names.length === 1 ? 'URL is' : 'URLs are'} wrong.`);
+    }
 
     let merged = mergeCandidates(raw);
     const uniqueCount = merged.length;
@@ -445,13 +458,22 @@ function render() {
 
     el.empty.hidden = rows.length > 0;
     if (rows.length === 0 && state.candidates.length > 0) {
+        // Names the checkbox as it is actually labelled in the toolbar.
         el.empty.textContent = 'Every candidate is filtered out by the search box, your parse thresholds, ' +
-            'or having no WarcraftLogs data. Untick “Hide below parse thresholds” to see them.';
+            'or having no WarcraftLogs data. Untick “Hide below thresholds & no logs” to see them.';
+    } else if (rows.length === 0 && !el.empty.textContent) {
+        // The box is unhidden whenever there are no rows, so it must never be
+        // shown blank — finishRun() supplies its own message on the paths it owns.
+        el.empty.textContent = 'No candidates yet. Run a scout to gather some.';
     }
 
     document.querySelectorAll('thead th[data-sort]').forEach(th => {
-        th.classList.remove('sorted-asc', 'sorted-desc');
-        if (th.dataset.sort === state.sortKey) th.classList.add(`sorted-${state.sortDir}`);
+        const sorted = th.dataset.sort === state.sortKey;
+        th.classList.toggle('sorted-asc',  sorted && state.sortDir === 'asc');
+        th.classList.toggle('sorted-desc', sorted && state.sortDir === 'desc');
+        // The ▲/▼ is CSS content, invisible to a screen reader; aria-sort is
+        // what actually announces the order.
+        th.setAttribute('aria-sort', sorted ? (state.sortDir === 'asc' ? 'ascending' : 'descending') : 'none');
     });
 }
 
@@ -481,16 +503,25 @@ el.hideBelow.addEventListener('change', () => {
     render();
 });
 
+function sortBy(key) {
+    if (state.sortKey === key) {
+        state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+        state.sortKey = key;
+        // Text sorts read best A→Z; numbers and parses read best highest-first.
+        state.sortDir = ['name', 'realm', 'region', 'playerClass', 'role'].includes(key) ? 'asc' : 'desc';
+    }
+    render();
+}
+
 document.querySelectorAll('thead th[data-sort]').forEach(th => {
-    th.addEventListener('click', () => {
-        const key = th.dataset.sort;
-        if (state.sortKey === key) {
-            state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
-        } else {
-            state.sortKey = key;
-            state.sortDir = ['name', 'realm', 'region', 'playerClass', 'role'].includes(key) ? 'asc' : 'desc';
-        }
-        render();
+    th.addEventListener('click', () => sortBy(th.dataset.sort));
+    // The headers are focusable, so they have to answer the keys a button
+    // would. Space is prevented first or it scrolls the page instead.
+    th.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        sortBy(th.dataset.sort);
     });
 });
 
@@ -515,6 +546,22 @@ el.exportCsv.addEventListener('click', () => {
     a.click();
     URL.revokeObjectURL(url);
 });
+
+// The table head sticks directly beneath the page header, whose height changes
+// with viewport width (the actions wrap) and with its own content. Publishing
+// the measured height beats the hardcoded guess it replaced, which left either
+// a gap rows slid through or an overlap hiding the first row.
+function trackHeaderHeight() {
+    const header = document.querySelector('.scout-header');
+    if (!header) return;
+    const apply = () => document.documentElement.style
+        .setProperty('--header-h', `${Math.round(header.getBoundingClientRect().height)}px`);
+    apply();
+    if (typeof ResizeObserver === 'function') new ResizeObserver(apply).observe(header);
+    else window.addEventListener('resize', apply);
+}
+
+trackHeaderHeight();
 
 // Opened on demand from the popup — start immediately rather than making the
 // officer click twice.

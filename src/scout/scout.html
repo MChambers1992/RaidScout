@@ -21,36 +21,37 @@
 
     <section class="scout-progress" id="scoutProgress">
         <div class="source-chips" id="sourceChips"></div>
-        <div class="progress-line" id="progressLine">Ready.</div>
-        <div class="scout-banner" id="scoutBanner" hidden></div>
+        <div class="progress-line" id="progressLine" role="status" aria-live="polite">Ready.</div>
+        <div class="scout-banner" id="scoutBanner" role="status" aria-live="polite" hidden></div>
     </section>
 
     <section class="scout-toolbar" id="scoutToolbar" hidden>
-        <input type="search" id="searchBox" placeholder="Filter by name, realm, class…" autocomplete="off">
+        <input type="search" id="searchBox" aria-label="Filter candidates by name, realm or class"
+               placeholder="Filter by name, realm, class…" autocomplete="off">
         <label class="inline-check" title="Hides candidates whose parse is below your thresholds, and candidates WarcraftLogs has no logs for. Candidates that could not be scored are always shown.">
             <input type="checkbox" id="hideBelowThresholds">
             Hide below thresholds &amp; no logs
         </label>
-        <span class="result-count" id="resultCount"></span>
+        <span class="result-count" id="resultCount" role="status" aria-live="polite"></span>
         <span class="spacer"></span>
         <button id="copyNames"  class="ghost" title="Copy Name-Realm for every visible row">📋 Copy names</button>
         <button id="exportCsv"  class="ghost">⬇ CSV</button>
     </section>
 
     <section class="scout-results">
-        <table id="resultsTable" hidden>
+        <table id="resultsTable" aria-label="Scouted candidates" hidden>
             <thead>
                 <tr>
-                    <th data-sort="name">Character</th>
-                    <th data-sort="realm">Realm</th>
-                    <th data-sort="region">Region</th>
-                    <th data-sort="playerClass">Class</th>
-                    <th data-sort="role">Role</th>
-                    <th data-sort="ilvl" class="num">ilvl</th>
-                    <th data-sort="mplusScore" class="num">M+</th>
-                    <th data-sort="mythicKills" class="num">Mythic</th>
-                    <th data-sort="wclMedian" class="num">WCL parse</th>
-                    <th data-sort="sources">Seen on</th>
+                    <th data-sort="name" tabindex="0" role="columnheader" aria-sort="none">Character</th>
+                    <th data-sort="realm" tabindex="0" role="columnheader" aria-sort="none">Realm</th>
+                    <th data-sort="region" tabindex="0" role="columnheader" aria-sort="none">Region</th>
+                    <th data-sort="playerClass" tabindex="0" role="columnheader" aria-sort="none">Class</th>
+                    <th data-sort="role" tabindex="0" role="columnheader" aria-sort="none">Role</th>
+                    <th data-sort="ilvl" class="num" tabindex="0" role="columnheader" aria-sort="none">ilvl</th>
+                    <th data-sort="mplusScore" class="num" tabindex="0" role="columnheader" aria-sort="none">M+</th>
+                    <th data-sort="mythicKills" class="num" tabindex="0" role="columnheader" aria-sort="none">Mythic</th>
+                    <th data-sort="wclMedian" class="num" tabindex="0" role="columnheader" aria-sort="none">WCL parse</th>
+                    <th data-sort="sources" tabindex="0" role="columnheader" aria-sort="none">Seen on</th>
                     <th>Links</th>
                 </tr>
             </thead>
