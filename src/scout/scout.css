@@ -171,6 +171,7 @@ tbody tr.below-threshold { opacity: 0.45; }
     background: #2f2f2f;
     border-left: 3px solid var(--role-color, #555);
 }
+.role-pill--resolved { border-bottom: 1px dotted #888; cursor: help; }
 .role-tank   { --role-color: var(--role-tank); }
 .role-healer { --role-color: var(--role-healer); }
 .role-dps    { --role-color: var(--role-dps); }

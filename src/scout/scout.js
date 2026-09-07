@@ -305,6 +305,19 @@ async function scoreCandidates(candidates) {
         });
 
         candidate.wcl = score;
+
+        // An 'auto' lookup resolves the role from the spec WarcraftLogs actually
+        // ranked them as, and effectiveRole() already judges the thresholds by
+        // it. Write it back so the role column and the role sort agree with the
+        // judgment, instead of showing the listing's claim (or nothing at all)
+        // while the row is scored as something else. Only ever set from a role
+        // the API really resolved — never fabricate one. Merging finished before
+        // scoring started, so `origins` is no longer consulted.
+        if (score?.role && score.role !== candidate.role) {
+            if (candidate.role) candidate.listedRole = candidate.role;
+            candidate.role = score.role;
+        }
+
         scored++;
 
         if (score?.error && score.rateLimitMs) {
@@ -362,6 +375,20 @@ function wclBadgeFor(candidate) {
     return makeBadge(badgeStateForScore(score), score, state.wclSettings, candidate.role);
 }
 
+// The role shown is the one the thresholds were applied against. Where that came
+// from the API and disagrees with what the site listed, the disagreement is worth
+// keeping: "advertised as a healer, ranks as dps" is a recruitment signal, not a
+// glitch, and overwriting the pill silently would throw it away.
+function roleCellHtml(candidate) {
+    if (!candidate.role) return '<span class="muted">—</span>';
+    if (!candidate.listedRole) {
+        return `<span class="role-pill role-${escapeHtml(candidate.role)}">${escapeHtml(candidate.role)}</span>`;
+    }
+    const title = `Listed as ${candidate.listedRole} — WarcraftLogs ranks them as ${candidate.role}`;
+    return `<span class="role-pill role-${escapeHtml(candidate.role)} role-pill--resolved" `
+         + `title="${escapeHtml(title)}">${escapeHtml(candidate.role)}</span>`;
+}
+
 function buildRow(candidate) {
     const tr = document.createElement('tr');
     if (isBelowThreshold(candidate)) tr.classList.add('below-threshold');
@@ -376,7 +403,7 @@ function buildRow(candidate) {
         <td>${escapeHtml(candidate.realm)}</td>
         <td>${escapeHtml(candidate.region.toUpperCase())}</td>
         <td>${candidate.playerClass ? escapeHtml(classLabel(candidate.playerClass)) : '<span class="muted">—</span>'}</td>
-        <td>${candidate.role ? `<span class="role-pill role-${escapeHtml(candidate.role)}">${escapeHtml(candidate.role)}</span>` : '<span class="muted">—</span>'}</td>
+        <td class="role-cell">${roleCellHtml(candidate)}</td>
         <td class="num">${candidate.ilvl ?? '<span class="muted">—</span>'}</td>
         <td class="num">${candidate.mplusScore ?? '<span class="muted">—</span>'}</td>
         <td class="num">${candidate.mythicKills ?? '<span class="muted">—</span>'}</td>
@@ -436,6 +463,9 @@ function updateRow(candidate) {
     const cell = tr.querySelector('.wcl-cell');
     cell.innerHTML = '';
     cell.appendChild(wclBadgeFor(candidate));
+    // Scoring may have resolved the role, so refresh that cell too rather than
+    // leaving it stale until the run finishes and render() rebuilds the table.
+    tr.querySelector('.role-cell').innerHTML = roleCellHtml(candidate);
     tr.classList.toggle('below-threshold', isBelowThreshold(candidate));
 }
 

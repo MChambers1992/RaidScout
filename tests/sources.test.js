@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { parseWowProgressDocument, DEFAULT_SOURCE_URLS, adapterFor } from '../src/scout/sources.js';
+import { parseWowProgressDocument, DEFAULT_SOURCE_URLS, adapterFor, isCloudflareChallenge } from '../src/scout/sources.js';
 import { normalizeCandidate, mergeCandidates } from '../src/scout/scout-core.js';
 
 // Mirrors the markup wowprogress.js targets: a .rating table whose rows carry
@@ -108,5 +108,48 @@ describe('adapter registry', () => {
 
     it('returns null for an unknown source', () => {
         expect(adapterFor('nope')).toBeNull();
+    });
+});
+
+// Cloudflare in front of WoWProgress is why the fetch harvester needs a tab
+// fallback at all. Misreading a challenge as a normal HTTP error, or as changed
+// markup, is what used to send the officer off checking their listing URL.
+describe('isCloudflareChallenge', () => {
+    const html = '<html><head><title>Just a moment...</title></head><body></body></html>';
+
+    it('spots the cf-mitigated header whatever the status', () => {
+        expect(isCloudflareChallenge({ status: 200, header: n => (n === 'cf-mitigated' ? 'challenge' : '') }))
+            .toBe(true);
+    });
+
+    it('spots a challenge status carrying a cf-ray', () => {
+        const header = n => (n === 'cf-ray' ? '8a1b2c3d4e5f' : '');
+        expect(isCloudflareChallenge({ status: 403, header })).toBe(true);
+        expect(isCloudflareChallenge({ status: 503, header })).toBe(true);
+    });
+
+    it('spots the interstitial from the body alone', () => {
+        // Response headers are not readable in every context, so the body
+        // markers have to stand on their own.
+        expect(isCloudflareChallenge({ status: 200, body: html })).toBe(true);
+        expect(isCloudflareChallenge({ status: 403, body: '<div id="challenge-platform"></div>' })).toBe(true);
+    });
+
+    it('does not fire on a normal listing response', () => {
+        expect(isCloudflareChallenge({
+            status: 200,
+            header: () => '',
+            body: '<table class="rating"><tr><td>Someone</td></tr></table>',
+        })).toBe(false);
+    });
+
+    it('does not treat an ordinary server error as a challenge', () => {
+        // A 503 with no Cloudflare fingerprint is WoWProgress being down, which
+        // the tab fallback cannot fix — it must stay a plain failure.
+        expect(isCloudflareChallenge({ status: 503, header: () => '', body: 'Service Unavailable' })).toBe(false);
+    });
+
+    it('tolerates being called with nothing', () => {
+        expect(isCloudflareChallenge()).toBe(false);
     });
 });
