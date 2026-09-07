@@ -251,7 +251,12 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     // whether it actually opens. The response lets the content script tell the
     // user the candidate was skipped instead of silently doing nothing.
     if (message.action === 'openTab') {
-        if (!trusted || !isAllowedTabUrl(message.url)) {
+        // Tab-bound action: it reads sender.tab.id and can close the source tab,
+        // so it takes the host-allowlist check specifically, not the widened
+        // `trusted` that also admits extension pages. An extension page reaching
+        // here would have thrown on sender.tab.id and left the caller's message
+        // channel hanging.
+        if (!isTrustedTabSender(sender) || !isAllowedTabUrl(message.url)) {
             sendResponse({ opened: false, verdict: 'unknown', reason: 'BLOCKED' });
             return true;
         }

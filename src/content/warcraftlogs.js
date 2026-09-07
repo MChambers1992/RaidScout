@@ -333,6 +333,12 @@ registerHarvester('warcraftlogs', '.recruitment-search-result', function () {
             const href = card.querySelector('a[href*="/character/"]')?.getAttribute('href');
             return {
                 ...character,
+                // 'auto' is a directive to the scoring API, not a role. Scout
+                // stores what it harvests, so leaking it here would render an
+                // "auto" role pill, sort as a string, and — because WCL outranks
+                // Guilds of WoW in SOURCE_META — beat a real role read from a
+                // GoW card during merge. null is the "unknown" the merge expects.
+                role:        character.role === 'auto' ? null : character.role,
                 playerClass: getRecruitmentClass(card),
                 mythicKills: getRecruitmentMythicKills(card),
                 link:        href ? new URL(href, 'https://www.warcraftlogs.com').toString() : null,

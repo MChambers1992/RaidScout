@@ -110,6 +110,35 @@ describe('mergeCandidate', () => {
         expect(mergeCandidate(wpNull, gowDps).role).toBe('tank');
     });
 
+    // Regression: the priority comparison used to read existing.sources[0],
+    // which stops identifying the surviving value the moment a candidate has
+    // been merged once. Here WoWProgress contributes no role, so after the
+    // first merge the role is GoW's — but the candidate still lists
+    // wowprogress first, and comparing on that weighed a GoW role with
+    // WoWProgress's authority and kept it over Raider.IO's.
+    it('weighs a merged role by the source it came from, not the first source', () => {
+        const wpNull  = normalizeCandidate(raw({ role: null }),     'wowprogress'); // priority 1
+        const gowTank = normalizeCandidate(raw({ role: 'tank' }),   'guildsofwow'); // priority 4
+        const rioHeal = normalizeCandidate(raw({ role: 'healer' }), 'raiderio');    // priority 2
+
+        const merged = mergeCandidate(mergeCandidate(wpNull, gowTank), rioHeal);
+        expect(merged.role).toBe('healer');
+    });
+
+    it('records which source supplied the surviving role and class', () => {
+        const wpNull = normalizeCandidate(raw({ role: null, playerClass: null }), 'wowprogress');
+        const gow    = normalizeCandidate(raw({ role: 'tank', playerClass: 'warrior' }), 'guildsofwow');
+        const merged = mergeCandidate(wpNull, gow);
+        expect(merged.origins).toEqual({ role: 'guildsofwow', playerClass: 'guildsofwow' });
+    });
+
+    it('keeps the more authoritative class across three sources', () => {
+        const wpNull = normalizeCandidate(raw({ playerClass: null }),     'wowprogress');
+        const gow    = normalizeCandidate(raw({ playerClass: 'warrior' }), 'guildsofwow');
+        const rio    = normalizeCandidate(raw({ playerClass: 'priest' }),  'raiderio');
+        expect(mergeCandidate(mergeCandidate(wpNull, gow), rio).playerClass).toBe('priest');
+    });
+
     it('unions sources without duplicating', () => {
         const a = normalizeCandidate(raw(), 'wowprogress');
         const b = normalizeCandidate(raw(), 'wowprogress');

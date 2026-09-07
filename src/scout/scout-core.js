@@ -95,6 +95,12 @@ export function normalizeCandidate(raw, source) {
         mplusScore:  num(raw.mplusScore),
         note:        raw.note ? String(raw.note).trim().slice(0, 300) : null,
         sources:     [source],
+        // Which source supplied role/playerClass. Only meaningful once a
+        // candidate has been merged, when `sources[0]` no longer identifies it.
+        origins:     {
+            role:        raw.role        ? source : null,
+            playerClass: raw.playerClass ? source : null,
+        },
         links:       raw.link ? { [source]: raw.link } : {},
         wcl:         null,
     };
@@ -108,12 +114,18 @@ function preferHigher(a, b) {
     return Math.max(a, b);
 }
 
+// Picks between two values by source authority and reports which source the
+// winner came from, so the merged candidate can remember it (see mergeCandidate).
+// A null/undefined never wins over a real value, whatever its source ranks.
 function preferByPriority(a, b, sourceA, sourceB) {
-    if (a === null || a === undefined) return b ?? null;
-    if (b === null || b === undefined) return a;
+    const hasA = a !== null && a !== undefined;
+    const hasB = b !== null && b !== undefined;
+    if (!hasA && !hasB) return { value: null,  source: null };
+    if (!hasA)          return { value: b,     source: sourceB };
+    if (!hasB)          return { value: a,     source: sourceA };
     const pa = SOURCE_META[sourceA]?.priority ?? 99;
     const pb = SOURCE_META[sourceB]?.priority ?? 99;
-    return pa <= pb ? a : b;
+    return pa <= pb ? { value: a, source: sourceA } : { value: b, source: sourceB };
 }
 
 // Merge `incoming` into `existing`, in place-safe fashion (returns a new object).
@@ -122,13 +134,27 @@ function preferByPriority(a, b, sourceA, sourceB) {
 // different time, and gear/progress only goes up, so the max is the freshest
 // reading. Class/role take the more authoritative source (see SOURCE_META).
 export function mergeCandidate(existing, incoming) {
-    const primarySource  = existing.sources[0];
     const incomingSource = incoming.sources[0];
+
+    // Compare against the source that actually supplied each surviving value,
+    // not existing.sources[0]. After an earlier merge the two differ: a
+    // candidate first seen on WoWProgress with no role, then given one by
+    // Guilds of WoW, still lists WoWProgress first — so comparing on
+    // sources[0] would weigh a GoW role with WoWProgress's authority and let it
+    // beat a Raider.IO role arriving next. `origins` carries that provenance.
+    const originOf = (candidate, field) =>
+        candidate.origins?.[field] ?? candidate.sources[0];
+
+    const role        = preferByPriority(existing.role, incoming.role,
+                                         originOf(existing, 'role'), originOf(incoming, 'role'));
+    const playerClass = preferByPriority(existing.playerClass, incoming.playerClass,
+                                         originOf(existing, 'playerClass'), originOf(incoming, 'playerClass'));
 
     return {
         ...existing,
-        role:        preferByPriority(existing.role, incoming.role, primarySource, incomingSource),
-        playerClass: preferByPriority(existing.playerClass, incoming.playerClass, primarySource, incomingSource),
+        role:        role.value,
+        playerClass: playerClass.value,
+        origins:     { role: role.source, playerClass: playerClass.source },
         ilvl:        preferHigher(existing.ilvl, incoming.ilvl),
         mythicKills: preferHigher(existing.mythicKills, incoming.mythicKills),
         mplusScore:  preferHigher(existing.mplusScore, incoming.mplusScore),

@@ -83,8 +83,12 @@ const SCHEMA = [
       default: ['wowprogress', 'raiderio', 'warcraftlogs', 'guildsofwow'], selector: '.scoutSourceFilter' },
 ];
 
+// Superseded keys that are still read so their value can be carried into the
+// key that replaced them. They are never written back — see migrateLegacy().
+const LEGACY_KEYS = ['wpWclSort', 'rioWclSort', 'gowWclSort'];
+
 // All sync keys (used for chrome.storage.sync.get)
-const ALL_KEYS = SCHEMA.map(s => s.key);
+const ALL_KEYS = [...SCHEMA.map(s => s.key), ...LEGACY_KEYS];
 
 // Default values as a plain object
 const DEFAULTS = Object.fromEntries(SCHEMA.map(s => [s.key, s.default]));
@@ -98,8 +102,25 @@ function parseValue(entry, rawValue) {
     return rawValue;
 }
 
+// Carry superseded settings into the keys that replaced them, before the DOM
+// is populated from them.
+//
+// wclSortByParse replaced the three per-site sort toggles in 1.4.0, and
+// wclSortEnabled() in common.js falls back to them only while the new key is
+// absent. Without seeding the checkbox here, the first visit to this page shows
+// the schema default (off) and Save writes `false` — ending the migration for
+// exactly the installs it was written for, without the user touching it.
+function migrateLegacy(data) {
+    if (typeof data.wclSortByParse !== 'boolean' &&
+        (data.wpWclSort || data.rioWclSort || data.gowWclSort)) {
+        return { ...data, wclSortByParse: true };
+    }
+    return data;
+}
+
 // Populate DOM from a storage data object
-function loadFromData(data) {
+function loadFromData(rawData) {
+    const data = migrateLegacy(rawData);
     for (const entry of SCHEMA) {
         const value = data[entry.key] ?? entry.default;
         if (entry.type === 'checkboxGroup') {

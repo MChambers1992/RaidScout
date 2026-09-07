@@ -188,9 +188,11 @@ async function runScout() {
 
     // A site whose integration toggle is off still harvests, but its content
     // script never filtered the page — say so rather than quietly returning a
-    // list that ignores the officer's per-site criteria.
+    // list that ignores the officer's per-site criteria. Only 'tab' sources are
+    // affected: the fetch adapter filters in-process (passesWowProgressFilters)
+    // and does not care whether the site integration is switched on.
     for (const id of sourceIds) {
-        if (settings[SITE_ENABLED_KEYS[id]] === false) {
+        if (adapterFor(id)?.mode === 'tab' && settings[SITE_ENABLED_KEYS[id]] === false) {
             warn(`<strong>${SOURCE_META[id].label}</strong> is switched off in settings, so its own ` +
                  `filters (item level, class, role…) were not applied to its results.`);
         }
@@ -294,7 +296,12 @@ async function scoreCandidates(candidates) {
             region: candidate.region,
             realm:  candidate.realm,
             name:   candidate.name,
-            role:   candidate.role || 'dps',
+            // A candidate whose row markup never yielded a role is sent as
+            // 'auto' so the API resolves it from the spec they actually ranked
+            // as — the same contract all four content scripts use. Defaulting
+            // to 'dps' here would query DPS rankings for a healer, come back
+            // empty, and then hide them under the no-logs rule.
+            role:   candidate.role || 'auto',
         });
 
         candidate.wcl = score;
@@ -338,17 +345,21 @@ function visibleCandidates() {
 // renders rows before scoring has run.
 function isBelowThreshold(candidate) {
     if (!candidate.wcl) return false;                    // not scored yet
-    return failsWclThresholds(candidate.wcl, state.wclSettings, candidate.role || 'dps');
+    // effectiveRole prefers the role the API resolved from the ranked spec over
+    // whatever the listing markup suggested. Without it a candidate harvested as
+    // 'auto' falls through thresholdsForRole's dps branch, so a healer's HPS
+    // parses get measured against the DPS minimums.
+    return failsWclThresholds(candidate.wcl, state.wclSettings,
+                              effectiveRole(candidate.wcl, candidate.role));
 }
 
 function wclBadgeFor(candidate) {
     const score = candidate.wcl;
     if (!score) return makeBadge('pending', null, state.wclSettings, candidate.role);
-    let badgeState = 'score';
-    if (score.error && score.rateLimitMs)                                      badgeState = 'rate-limited';
-    else if (score.error)                                                       badgeState = 'error';
-    else if (score.notFound || (score.best === null && score.median === null))  badgeState = 'no-logs';
-    return makeBadge(badgeState, score, state.wclSettings, candidate.role || 'dps');
+    // badgeStateForScore is the shared ladder every site uses; reusing it also
+    // picks up the Cloudflare 'blocked' state, which the copy here had missed
+    // and rendered as a generic error. makeBadge applies effectiveRole itself.
+    return makeBadge(badgeStateForScore(score), score, state.wclSettings, candidate.role);
 }
 
 function buildRow(candidate) {
