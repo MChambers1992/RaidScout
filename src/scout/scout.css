@@ -125,6 +125,118 @@ button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 .inline-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; cursor: pointer; }
 .result-count { color: #888; font-size: 12px; }
 
+/* ── Filters ────────────────────────────────────────────────────────────── */
+
+.filter-count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: #007bff;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.scout-filters {
+    padding: 14px 0 16px;
+    border-top: 1px solid #333;
+}
+
+/* Flex rather than an auto-fit grid: fixed track widths left half of the first
+   row empty while squeezing the four source chips onto three lines. Groups size
+   to their content and wrap when they run out of room. */
+.filter-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 28px;
+    align-items: flex-start;
+}
+/* Thirteen class chips get a row to themselves. */
+.filter-group--wide { flex: 1 1 100%; }
+
+.filter-group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+.filter-group legend {
+    padding: 0 0 6px;
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* A real checkbox inside a label: keyboard and screen-reader behaviour comes
+   free, and only the box itself is visually replaced by the chip. */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 12px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    font-size: 12px;
+    color: #bbb;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.filter-chip:hover { background: #333; color: #eee; }
+.filter-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+.filter-chip:has(input:checked) {
+    background: #223449;
+    border-color: #4a90d9;
+    color: #eaf2fb;
+}
+.filter-chip:has(input:focus-visible) { outline: 2px solid #4a90d9; outline-offset: 2px; }
+
+/* The swatch carries the class or source colour, so a checked chip is not
+   identified by its blue tint alone. */
+.chip-swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--chip-colour, #666);
+    flex: none;
+}
+
+.filter-numbers { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.filter-numbers label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: #999;
+}
+.filter-numbers input {
+    width: 84px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    padding: 5px 7px;
+    font-size: 13px;
+    font-family: inherit;
+}
+.filter-numbers input:focus { outline: none; border-color: #007bff; }
+
+.filter-note { margin: 7px 0 0; font-size: 11px; color: #6a6a6a; }
+
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+.filter-summary { font-size: 12px; color: #888; }
+
 /* ── Table ──────────────────────────────────────────────────────────────── */
 
 table { width: 100%; border-collapse: collapse; font-size: 13px; }

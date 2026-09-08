@@ -13,6 +13,7 @@
 import {
     SOURCE_META, SOURCE_IDS, normalizeCandidate, mergeCandidates, hasNoLogs, classLabel,
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency,
+    matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS } from './sources.js';
 
@@ -24,7 +25,16 @@ const SCOUT_DEFAULTS = {
     scoutPagesPerSource:      1,
     scoutWclEnabled:          true,
     scoutHideBelowThresholds: true,
+    scoutFilters:             DEFAULT_FILTERS,
+    scoutSortKey:             'wclMedian',
+    scoutSortDir:             'desc',
 };
+
+// Regions the four sites actually publish. Kept here rather than derived from
+// the harvest so the chips do not appear and vanish between runs.
+const FILTER_REGIONS = ['eu', 'us', 'oc', 'kr', 'tw'];
+
+const ROLE_LABELS = { tank: 'Tank', healer: 'Healer', dps: 'DPS' };
 
 const SOURCE_URL_KEYS = {
     wowprogress:  'scoutUrlWowprogress',
@@ -47,6 +57,7 @@ const state = {
     sortKey:    'wclMedian',
     sortDir:    'desc',
     query:      '',
+    filters:    { ...DEFAULT_FILTERS },
     running:    false,
     rowIndex:   new Map(),
     warnings:   [],
@@ -69,6 +80,19 @@ const el = {
     table:        document.getElementById('resultsTable'),
     tbody:        document.getElementById('resultsBody'),
     empty:        document.getElementById('emptyState'),
+    filters:      document.getElementById('scoutFilters'),
+    toggleFilters: document.getElementById('toggleFilters'),
+    filterCount:  document.getElementById('filterCount'),
+    clearFilters: document.getElementById('clearFilters'),
+    filterSummary: document.getElementById('filterSummary'),
+    filterRoles:   document.getElementById('filterRoles'),
+    filterRegions: document.getElementById('filterRegions'),
+    filterClasses: document.getElementById('filterClasses'),
+    filterSources: document.getElementById('filterSources'),
+    filterMultiSource: document.getElementById('filterMultiSource'),
+    minIlvl:      document.getElementById('filterMinIlvl'),
+    minMplus:     document.getElementById('filterMinMplus'),
+    minMythic:    document.getElementById('filterMinMythic'),
 };
 
 // ─── Settings ──────────────────────────────────────────────────────────────────
@@ -176,6 +200,7 @@ async function runScout() {
     state.settings = settings;
     state.wclSettings = buildWclSettings(settings);
     el.hideBelow.checked = settings.scoutHideBelowThresholds !== false;
+    restoreFilters(settings);
 
     const requested = Array.isArray(settings.scoutSources) ? settings.scoutSources : SCOUT_DEFAULTS.scoutSources;
     const sourceIds = SOURCE_IDS.filter(id => requested.includes(id));
@@ -361,6 +386,7 @@ function visibleCandidates() {
     const hideBelow = el.hideBelow.checked;
     return sortCandidates(state.candidates, state.sortKey, state.sortDir)
         .filter(c => matchesQuery(c, state.query))
+        .filter(c => matchesFilters(c, state.filters))
         .filter(c => !(hideBelow && isBelowThreshold(c)));
 }
 
@@ -491,6 +517,133 @@ function updateRow(candidate) {
     tr.classList.toggle('below-threshold', isBelowThreshold(candidate));
 }
 
+// ─── Filters ───────────────────────────────────────────────────────────────────
+
+// Chips are real checkboxes in a label: keyboard handling, focus and the
+// screen-reader announcement all come free, and only the box is restyled.
+function buildChips(container, items, groupName) {
+    container.innerHTML = '';
+    for (const { value, label, colour } of items) {
+        const chip = document.createElement('label');
+        chip.className = 'filter-chip';
+        if (colour) chip.style.setProperty('--chip-colour', colour);
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = value;
+        input.dataset.group = groupName;
+
+        const swatch = document.createElement('span');
+        swatch.className = 'chip-swatch';
+
+        const text = document.createElement('span');
+        text.textContent = label;
+
+        chip.append(input, ...(colour ? [swatch] : []), text);
+        container.appendChild(chip);
+    }
+}
+
+function buildFilterControls() {
+    buildChips(el.filterRoles, Object.entries(ROLE_LABELS)
+        .map(([value, label]) => ({ value, label, colour: `var(--role-${value})` })), 'roles');
+
+    buildChips(el.filterRegions, FILTER_REGIONS
+        .map(value => ({ value, label: value.toUpperCase() })), 'regions');
+
+    // WOW_CLASS_NAMES is a common.js global; classLabel spells the two
+    // irregular names ('deathknight' → 'Death Knight') correctly.
+    buildChips(el.filterClasses, WOW_CLASS_NAMES
+        .map(value => ({ value, label: classLabel(value), colour: `var(--wow-${value.replace('_', '')})` })), 'classes');
+
+    buildChips(el.filterSources, SOURCE_IDS
+        .map(value => ({ value, label: SOURCE_META[value].label, colour: SOURCE_META[value].colour })), 'sources');
+}
+
+// State → controls. Runs on load and after Clear, never on every keystroke.
+function syncFilterControls() {
+    const f = state.filters;
+    for (const input of el.filters.querySelectorAll('input[data-group]')) {
+        input.checked = f[input.dataset.group].includes(input.value);
+    }
+    el.filterMultiSource.checked = f.multiSource;
+    el.minIlvl.value   = f.minIlvl   || '';
+    el.minMplus.value  = f.minMplus  || '';
+    el.minMythic.value = f.minMythic || '';
+}
+
+// Controls → state.
+function readFilterControls() {
+    const group = (name) => Array.from(
+        el.filters.querySelectorAll(`input[data-group="${name}"]:checked`), i => i.value);
+
+    return normalizeFilters({
+        roles:       group('roles'),
+        regions:     group('regions'),
+        classes:     group('classes'),
+        sources:     group('sources'),
+        multiSource: el.filterMultiSource.checked,
+        minIlvl:     parseFloat(el.minIlvl.value),
+        minMplus:    parseFloat(el.minMplus.value),
+        minMythic:   parseFloat(el.minMythic.value),
+    });
+}
+
+function renderFilterState() {
+    const count = activeFilterCount(state.filters);
+    el.filterCount.hidden = count === 0;
+    el.filterCount.textContent = count;
+    el.clearFilters.disabled = count === 0;
+    el.filterSummary.textContent = count === 0
+        ? 'No filters applied.'
+        : `${count} filter${count === 1 ? '' : 's'} applied.`;
+}
+
+// Filters and sort order are remembered, so an officer who only recruits EU
+// healers is not rebuilding that on every run. The search box deliberately is
+// not: it answers "where is Thrall", and a query restored from a fortnight ago
+// would look like a harvest that lost most of its rows.
+function persistFilters() {
+    chrome.storage.sync.set({
+        scoutFilters: state.filters,
+        scoutSortKey: state.sortKey,
+        scoutSortDir: state.sortDir,
+    });
+}
+
+function onFiltersChanged() {
+    state.filters = readFilterControls();
+    renderFilterState();
+    persistFilters();
+    render();
+}
+
+// Restores what was remembered from the last visit. normalizeFilters absorbs
+// anything stored by an older version; the sort key is checked against the
+// table's own headers, because an unknown key silently disables sorting rather
+// than erroring, and the officer would just see an unordered list.
+function restoreFilters(settings) {
+    state.filters = normalizeFilters(settings.scoutFilters);
+
+    const sortable = new Set(Array.from(
+        document.querySelectorAll('thead th[data-sort]'), th => th.dataset.sort));
+    if (sortable.has(settings.scoutSortKey)) {
+        state.sortKey = settings.scoutSortKey;
+        state.sortDir = settings.scoutSortDir === 'asc' ? 'asc' : 'desc';
+    }
+
+    syncFilterControls();
+    renderFilterState();
+    // Open the panel unprompted when something is filtering, so a short list is
+    // explained by what is on screen rather than hidden behind a closed panel.
+    if (activeFilterCount(state.filters) > 0) setFiltersOpen(true);
+}
+
+function setFiltersOpen(open) {
+    el.filters.hidden = !open;
+    el.toggleFilters.setAttribute('aria-expanded', String(open));
+}
+
 // ─── Events ────────────────────────────────────────────────────────────────────
 
 el.run.addEventListener('click', runScout);
@@ -503,6 +656,23 @@ el.hideBelow.addEventListener('change', () => {
     render();
 });
 
+el.toggleFilters.addEventListener('click', () => setFiltersOpen(el.filters.hidden));
+
+// One delegated listener rather than one per control: the chips are rebuilt
+// from data, so binding them individually would mean rebinding on every build.
+el.filters.addEventListener('change', onFiltersChanged);
+el.filters.addEventListener('input', (event) => {
+    if (event.target.type === 'number') onFiltersChanged();
+});
+
+el.clearFilters.addEventListener('click', () => {
+    state.filters = { ...DEFAULT_FILTERS };
+    syncFilterControls();
+    renderFilterState();
+    persistFilters();
+    render();
+});
+
 function sortBy(key) {
     if (state.sortKey === key) {
         state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
@@ -511,6 +681,7 @@ function sortBy(key) {
         // Text sorts read best A→Z; numbers and parses read best highest-first.
         state.sortDir = ['name', 'realm', 'region', 'playerClass', 'role'].includes(key) ? 'asc' : 'desc';
     }
+    persistFilters();
     render();
 }
 
@@ -561,6 +732,8 @@ function trackHeaderHeight() {
     else window.addEventListener('resize', apply);
 }
 
+buildFilterControls();
+renderFilterState();
 trackHeaderHeight();
 
 // Opened on demand from the popup — start immediately rather than making the

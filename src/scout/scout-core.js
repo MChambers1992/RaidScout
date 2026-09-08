@@ -277,6 +277,97 @@ export function matchesQuery(candidate, query) {
 
 // ─── Profile links ─────────────────────────────────────────────────────────────
 
+// ─── Structured filters ────────────────────────────────────────────────────────
+// The search box answers "where is Thrall"; these answer "who is worth talking
+// to". Kept here, pure and testable, rather than inline in the page: they decide
+// what an officer does and does not see, which is exactly the logic that should
+// not live only in an event handler.
+//
+// Every field is opt-in — an empty list or a zero minimum means "no opinion" —
+// so the default shape hides nobody. That matters because these persist: a
+// filter an officer set weeks ago is still applied on their next run, and one
+// that silently excluded everyone would look like a broken harvest.
+
+export const DEFAULT_FILTERS = {
+    roles:       [],   // 'tank' | 'healer' | 'dps'
+    classes:     [],   // storage class names, e.g. 'demon_hunter'
+    regions:     [],   // lowercase, e.g. 'eu'
+    sources:     [],   // SOURCE_IDS
+    minIlvl:     0,
+    minMplus:    0,
+    minMythic:   0,
+    multiSource: false,
+};
+
+// Coerces whatever came back from storage into the shape the filter expects.
+// Stored settings outlive the code that wrote them: a key that has since changed
+// type, or a list that arrived as a string, must not throw during a render.
+export function normalizeFilters(raw) {
+    const list = (value) => (Array.isArray(value) ? value.filter(v => typeof v === 'string' && v) : []);
+    const num  = (value) => {
+        const n = typeof value === 'number' ? value : parseFloat(value);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    const input = raw && typeof raw === 'object' ? raw : {};
+    return {
+        roles:       list(input.roles).map(r => r.toLowerCase()),
+        classes:     list(input.classes),
+        regions:     list(input.regions).map(r => r.toLowerCase()),
+        sources:     list(input.sources),
+        minIlvl:     num(input.minIlvl),
+        minMplus:    num(input.minMplus),
+        minMythic:   num(input.minMythic),
+        multiSource: input.multiSource === true,
+    };
+}
+
+// How many filters are actually narrowing the list — drives the count on the
+// Filters button, so an officer can tell at a glance that a short list is their
+// own doing rather than a bad harvest.
+export function activeFilterCount(filters) {
+    const f = normalizeFilters(filters);
+    return f.roles.length + f.classes.length + f.regions.length + f.sources.length
+         + (f.minIlvl   > 0 ? 1 : 0)
+         + (f.minMplus  > 0 ? 1 : 0)
+         + (f.minMythic > 0 ? 1 : 0)
+         + (f.multiSource ? 1 : 0);
+}
+
+export function hasActiveFilters(filters) {
+    return activeFilterCount(filters) > 0;
+}
+
+// A missing value never fails a minimum. Sites report different subsets — a
+// WoWProgress row carries no M+ score at all — so treating absent as zero would
+// quietly drop every candidate from the sites that do not publish that stat,
+// which is the same trap the site-side filters avoid (quirk 6).
+function passesMinimum(value, minimum) {
+    if (!(minimum > 0)) return true;
+    return value === null || value === undefined || value >= minimum;
+}
+
+export function matchesFilters(candidate, filters) {
+    if (!candidate) return false;
+    const f = normalizeFilters(filters);
+
+    if (f.roles.length   && !(candidate.role        && f.roles.includes(candidate.role))) return false;
+    if (f.classes.length && !(candidate.playerClass && f.classes.includes(candidate.playerClass))) return false;
+    if (f.regions.length && !(candidate.region      && f.regions.includes(String(candidate.region).toLowerCase()))) return false;
+
+    if (f.sources.length) {
+        const seen = Array.isArray(candidate.sources) ? candidate.sources : [];
+        if (!seen.some(source => f.sources.includes(source))) return false;
+    }
+
+    if (f.multiSource && !(Array.isArray(candidate.sources) && candidate.sources.length > 1)) return false;
+
+    if (!passesMinimum(candidate.ilvl,        f.minIlvl))   return false;
+    if (!passesMinimum(candidate.mplusScore,  f.minMplus))  return false;
+    if (!passesMinimum(candidate.mythicKills, f.minMythic)) return false;
+
+    return true;
+}
+
 export function profileLinks(candidate) {
     const { region, realm, name } = candidate;
     return {

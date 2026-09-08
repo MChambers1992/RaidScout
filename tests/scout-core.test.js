@@ -8,6 +8,7 @@ import {
     slugRealm, makeCandidateKey, normalizeCandidate, mergeCandidate, mergeCandidates,
     passesWowProgressFilters, sortCandidates, matchesQuery, profileLinks,
     toCsv, toWhisperList, runWithConcurrency, hasNoLogs, isScored, classLabel,
+    matchesFilters, normalizeFilters, activeFilterCount, hasActiveFilters, DEFAULT_FILTERS,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -465,5 +466,110 @@ describe('classLabel', () => {
     it('returns null for an unknown class', () => {
         expect(classLabel(null)).toBeNull();
         expect(classLabel('')).toBeNull();
+    });
+});
+
+// ─── Structured filters ────────────────────────────────────────────────────────
+// These persist between runs, so the failure that matters is a filter that
+// quietly excludes everyone — an officer would read a short list as a bad
+// harvest rather than as their own setting from a fortnight ago.
+
+describe('matchesFilters', () => {
+    const candidate = (over = {}) => normalizeCandidate(raw({
+        role: 'healer', playerClass: 'priest', ilvl: 635, mplusScore: 2800, mythicKills: 6, ...over,
+    }), over.source || 'wowprogress');
+
+    it('keeps everyone when nothing is set', () => {
+        expect(matchesFilters(candidate(), DEFAULT_FILTERS)).toBe(true);
+        expect(matchesFilters(candidate(), {})).toBe(true);
+        expect(matchesFilters(candidate(), undefined)).toBe(true);
+    });
+
+    it('filters by role, class and region', () => {
+        expect(matchesFilters(candidate(), { roles: ['healer'] })).toBe(true);
+        expect(matchesFilters(candidate(), { roles: ['tank'] })).toBe(false);
+        expect(matchesFilters(candidate(), { roles: ['tank', 'healer'] })).toBe(true);
+
+        expect(matchesFilters(candidate(), { classes: ['priest'] })).toBe(true);
+        expect(matchesFilters(candidate(), { classes: ['mage'] })).toBe(false);
+
+        expect(matchesFilters(candidate(), { regions: ['eu'] })).toBe(true);
+        expect(matchesFilters(candidate(), { regions: ['us'] })).toBe(false);
+        expect(matchesFilters(candidate(), { regions: ['EU'] })).toBe(true);   // case-insensitive
+    });
+
+    it('excludes a candidate whose role or class was never resolved', () => {
+        // Asking for healers and being shown someone whose role is unknown
+        // would waste the officer's time; the honest answer is to leave them
+        // out of a role-filtered list.
+        expect(matchesFilters(candidate({ role: null }), { roles: ['healer'] })).toBe(false);
+        expect(matchesFilters(candidate({ playerClass: null }), { classes: ['priest'] })).toBe(false);
+    });
+
+    it('applies numeric minimums', () => {
+        expect(matchesFilters(candidate(), { minIlvl: 630 })).toBe(true);
+        expect(matchesFilters(candidate(), { minIlvl: 640 })).toBe(false);
+        expect(matchesFilters(candidate(), { minMplus: 3000 })).toBe(false);
+        expect(matchesFilters(candidate(), { minMythic: 6 })).toBe(true);
+    });
+
+    it('never fails a minimum on a stat the site did not report', () => {
+        // WoWProgress rows carry no M+ score at all. Treating absent as zero
+        // would silently drop every candidate from the sites that omit a stat.
+        const noStats = candidate({ mplusScore: null, mythicKills: null, ilvl: null });
+        expect(matchesFilters(noStats, { minMplus: 3000, minMythic: 9, minIlvl: 700 })).toBe(true);
+    });
+
+    it('filters by the sources a candidate was seen on', () => {
+        expect(matchesFilters(candidate({ source: 'raiderio' }), { sources: ['raiderio'] })).toBe(true);
+        expect(matchesFilters(candidate({ source: 'raiderio' }), { sources: ['guildsofwow'] })).toBe(false);
+    });
+
+    it('can require a candidate to have been seen on more than one site', () => {
+        const single = candidate();
+        const merged = mergeCandidate(candidate(), normalizeCandidate(raw(), 'raiderio'));
+        expect(matchesFilters(single, { multiSource: true })).toBe(false);
+        expect(matchesFilters(merged, { multiSource: true })).toBe(true);
+    });
+
+    it('combines every clause as AND', () => {
+        const filters = { roles: ['healer'], regions: ['eu'], minIlvl: 630 };
+        expect(matchesFilters(candidate(), filters)).toBe(true);
+        expect(matchesFilters(candidate({ ilvl: 620 }), filters)).toBe(false);
+    });
+});
+
+describe('normalizeFilters', () => {
+    it('returns the do-nothing shape for junk', () => {
+        for (const junk of [null, undefined, 'nonsense', 42, []]) {
+            expect(normalizeFilters(junk)).toEqual(DEFAULT_FILTERS);
+        }
+    });
+
+    it('survives stored settings whose types have since changed', () => {
+        // Storage outlives the code that wrote it; a render must not throw
+        // because an old install saved a string where a list now lives.
+        const out = normalizeFilters({ roles: 'healer', classes: [1, 'priest', null], minIlvl: 'abc', multiSource: 'yes' });
+        expect(out.roles).toEqual([]);
+        expect(out.classes).toEqual(['priest']);
+        expect(out.minIlvl).toBe(0);
+        expect(out.multiSource).toBe(false);
+    });
+
+    it('discards negative and zero minimums as "no opinion"', () => {
+        expect(normalizeFilters({ minIlvl: -5 }).minIlvl).toBe(0);
+        expect(normalizeFilters({ minIlvl: 0 }).minIlvl).toBe(0);
+    });
+});
+
+describe('activeFilterCount', () => {
+    it('counts nothing for the default shape', () => {
+        expect(activeFilterCount(DEFAULT_FILTERS)).toBe(0);
+        expect(hasActiveFilters(DEFAULT_FILTERS)).toBe(false);
+    });
+
+    it('counts each selected value and each minimum in use', () => {
+        expect(activeFilterCount({ roles: ['tank', 'healer'], minIlvl: 630, multiSource: true })).toBe(4);
+        expect(hasActiveFilters({ minMythic: 1 })).toBe(true);
     });
 });
