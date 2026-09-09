@@ -1,0 +1,376 @@
+/* scout.css — Scout aggregator page. Palette matches options.css. */
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 0 24px 48px;
+    background-color: #1e1e1e;
+    color: #e8e8e8;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.scout-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 24px 0 16px;
+    border-bottom: 1px solid #333;
+    position: sticky;
+    top: 0;
+    background: #1e1e1e;
+    z-index: 5;
+}
+
+.scout-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+.scout-sub { margin: 4px 0 0; color: #888; font-size: 13px; }
+.scout-actions { display: flex; gap: 8px; }
+
+button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background-color: #007bff; color: #fff; }
+button.primary:hover:not(:disabled) { background-color: #0056b3; }
+button.ghost { background-color: #3a3a3a; color: #ccc; border-color: #4a4a4a; }
+button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
+
+/* ── Progress ───────────────────────────────────────────────────────────── */
+
+.scout-progress { padding: 16px 0; }
+
+.source-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+
+.source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-left: 3px solid var(--source-colour, #555);
+    font-size: 12px;
+    color: #bbb;
+}
+.source-chip .chip-state { color: #777; }
+.source-chip.is-running { border-color: #4a90d9; }
+.source-chip.is-running .chip-state { color: #4a90d9; }
+.source-chip.is-done    .chip-state { color: #4caf50; }
+/* Rendered, but matched nobody — a different outcome from a successful
+   harvest, and the banner says so too. */
+.source-chip.is-empty   .chip-state { color: #c9a227; }
+.source-chip.is-failed  { border-color: #7a2020; }
+.source-chip.is-failed  .chip-state { color: #f04040; }
+.source-chip.is-skipped { opacity: 0.5; }
+
+.progress-line { font-size: 13px; color: #aaa; min-height: 18px; }
+
+.scout-banner {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.5;
+    background: #2d1a00;
+    border: 1px solid #7a4a00;
+    color: #f0b060;
+}
+.scout-banner ul { margin: 6px 0 0; padding-left: 18px; }
+.scout-banner li { margin: 3px 0; }
+.scout-banner code { color: #ddd; font-size: 12px; }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+
+.scout-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid #333;
+    flex-wrap: wrap;
+}
+.scout-toolbar .spacer { flex: 1; }
+
+#searchBox {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    padding: 7px 10px;
+    font-size: 13px;
+    min-width: 260px;
+    font-family: inherit;
+}
+#searchBox:focus { outline: none; border-color: #007bff; }
+
+/* Every interactive control needs a visible focus ring; only the search box
+   had one, which left keyboard users unable to see where they were. */
+:where(button, a, input, th[data-sort]):focus-visible {
+    outline: 2px solid #4a90d9;
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+.inline-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; cursor: pointer; }
+.result-count { color: #888; font-size: 12px; }
+
+/* ── Filters ────────────────────────────────────────────────────────────── */
+
+.filter-count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: #007bff;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.scout-filters {
+    padding: 14px 0 16px;
+    border-top: 1px solid #333;
+}
+
+/* Flex rather than an auto-fit grid: fixed track widths left half of the first
+   row empty while squeezing the four source chips onto three lines. Groups size
+   to their content and wrap when they run out of room. */
+.filter-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 28px;
+    align-items: flex-start;
+}
+/* Thirteen class chips get a row to themselves. */
+.filter-group--wide { flex: 1 1 100%; }
+
+.filter-group {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+.filter-group legend {
+    padding: 0 0 6px;
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* A real checkbox inside a label: keyboard and screen-reader behaviour comes
+   free, and only the box itself is visually replaced by the chip. */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border-radius: 12px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    font-size: 12px;
+    color: #bbb;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.filter-chip:hover { background: #333; color: #eee; }
+.filter-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+.filter-chip:has(input:checked) {
+    background: #223449;
+    border-color: #4a90d9;
+    color: #eaf2fb;
+}
+.filter-chip:has(input:focus-visible) { outline: 2px solid #4a90d9; outline-offset: 2px; }
+
+/* The swatch carries the class or source colour, so a checked chip is not
+   identified by its blue tint alone. */
+.chip-swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--chip-colour, #666);
+    flex: none;
+}
+
+.filter-numbers { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.filter-numbers label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+    color: #999;
+}
+.filter-numbers input {
+    width: 84px;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    padding: 5px 7px;
+    font-size: 13px;
+    font-family: inherit;
+}
+.filter-numbers input:focus { outline: none; border-color: #007bff; }
+
+.filter-note { margin: 7px 0 0; font-size: 11px; color: #6a6a6a; }
+
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+}
+.filter-summary { font-size: 12px; color: #888; }
+
+/* ── Table ──────────────────────────────────────────────────────────────── */
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+thead th {
+    position: sticky;
+    /* Set from the header's measured height by trackHeaderHeight() in scout.js.
+       The literal 88px this replaced was a guess at a box whose height changes
+       with viewport width, so the header either overlapped the first row or
+       left a gap that rows slid through. The fallback matches the default
+       desktop height for the moment before the first measurement. */
+    top: var(--header-h, 88px);
+    background: #242424;
+    text-align: left;
+    padding: 9px 10px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #aaa;
+    border-bottom: 1px solid #383838;
+    white-space: nowrap;
+    user-select: none;
+}
+thead th[data-sort] { cursor: pointer; }
+thead th[data-sort]:hover { color: #fff; }
+thead th.num { text-align: right; }
+thead th.sorted-asc::after  { content: ' ▲'; color: #007bff; }
+thead th.sorted-desc::after { content: ' ▼'; color: #007bff; }
+
+tbody td { padding: 7px 10px; border-bottom: 1px solid #2c2c2c; vertical-align: middle; }
+tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Eleven columns over a hundred-odd rows: a faint stripe is what keeps the eye
+   on one candidate all the way across. Kept below the hover tint so hover still
+   reads as the stronger signal. */
+tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.018); }
+tbody tr:hover { background: #2c2c2c; }
+/* Dimmed, not erased: unticking the hide box is a request to read these rows,
+   so they keep enough contrast to actually be read. The left edge marks them
+   without relying on the dimming alone. */
+tbody tr.below-threshold { opacity: 0.62; }
+tbody tr.below-threshold td:first-child { box-shadow: inset 2px 0 0 #6a4a2a; }
+tbody tr.below-threshold:hover { opacity: 0.85; }
+
+.char-name { font-weight: 600; color: var(--class-color, #e8e8e8); }
+.multi-source { color: #f0b060; font-size: 11px; margin-left: 5px; }
+
+.class-warrior      { --class-color: var(--wow-warrior); }
+.class-paladin      { --class-color: var(--wow-paladin); }
+.class-hunter       { --class-color: var(--wow-hunter); }
+.class-rogue        { --class-color: var(--wow-rogue); }
+.class-priest       { --class-color: var(--wow-priest); }
+.class-shaman       { --class-color: var(--wow-shaman); }
+.class-mage         { --class-color: var(--wow-mage); }
+.class-warlock      { --class-color: var(--wow-warlock); }
+.class-monk         { --class-color: var(--wow-monk); }
+.class-druid        { --class-color: var(--wow-druid); }
+.class-deathknight  { --class-color: var(--wow-deathknight); }
+.class-demon_hunter { --class-color: var(--wow-demonhunter); }
+.class-evoker       { --class-color: var(--wow-evoker); }
+
+.role-pill {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 11px;
+    background: #2f2f2f;
+    border-left: 3px solid var(--role-color, #555);
+}
+.role-pill--resolved { border-bottom: 1px dotted #888; cursor: help; }
+.role-tank   { --role-color: var(--role-tank); }
+.role-healer { --role-color: var(--role-healer); }
+.role-dps    { --role-color: var(--role-dps); }
+
+.source-dots { display: inline-flex; gap: 4px; }
+.source-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--source-colour, #555);
+    display: inline-block;
+}
+
+/* Three short links that were wrapping onto three lines on a narrow window,
+   tripling the height of every row. */
+.row-links { white-space: nowrap; }
+.row-links a { color: #6aa9e0; text-decoration: none; font-size: 12px; margin-right: 8px; }
+.row-links a:hover { text-decoration: underline; }
+
+.muted { color: #5a5a5a; }
+
+.empty-state {
+    padding: 48px 0;
+    text-align: center;
+    color: #777;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+.scout-footer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 32px;
+    padding: 14px 0 4px;
+    border-top: 1px solid #2c2c2c;
+    font-size: 12px;
+}
+
+.footer-note { color: #666; }
+
+.support-link {
+    color: #8a8a8a;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.support-link:hover { color: #f0b060; text-decoration: underline; }
+
+/* ── Narrow viewports ───────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+    body { padding: 0 12px 32px; }
+
+    /* Eleven columns cannot fit, so the page scrolls sideways — and a sticky
+       box does not scroll with it, tearing the header off the table below.
+       Static positioning keeps them together. (An overflow-x wrapper would be
+       the other fix, but it becomes the scrollport and breaks the sticky
+       header outright, which is worse.) */
+    .scout-header, thead th { position: static; }
+
+    .scout-header { align-items: flex-start; flex-wrap: wrap; }
+    .scout-toolbar #searchBox { min-width: 0; flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+}

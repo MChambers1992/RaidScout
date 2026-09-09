@@ -1,4 +1,4 @@
-// scout.js — pure decision logic for the scout flow.
+// preflight.js — pure decision logic for the pre-flight scout flow.
 //
 // "Scouting" is the reactive flow: you land on a candidate's page (WoWProgress
 // or Raider.IO) and RaidScout decides whether they are worth a look on
@@ -40,31 +40,34 @@ function roleForSpec(spec) {
 function thresholdsForRole(role, settings) {
     if (role === 'healer') {
         return {
-            minBest:     settings.minBestHealer   || 0,
-            minMedian:   settings.minMedianHealer || 0,
-            hideUnknown: settings.hideUnknown,
+            minBest:   settings.minBestHealer   || 0,
+            minMedian: settings.minMedianHealer || 0,
         };
     }
     if (role === 'tank') {
         return {
-            minBest:     settings.minBestTank   || settings.minBest   || 0,
-            minMedian:   settings.minMedianTank || settings.minMedian || 0,
-            hideUnknown: settings.hideUnknown,
+            minBest:   settings.minBestTank   || settings.minBest   || 0,
+            minMedian: settings.minMedianTank || settings.minMedian || 0,
         };
     }
     return {
-        minBest:     settings.minBest   || 0,
-        minMedian:   settings.minMedian || 0,
-        hideUnknown: settings.hideUnknown,
+        minBest:   settings.minBest   || 0,
+        minMedian: settings.minMedian || 0,
     };
 }
 
+// True when WarcraftLogs gave a definitive answer that this character has no
+// logs, as opposed to a lookup that failed or never ran.
+function hasNoWclLogs(score) {
+    if (!score || score.error) return false;
+    return !!score.notFound || (score.best === null && score.median === null);
+}
+
 function failsWclThresholds(score, settings, role) {
-    const { minBest, minMedian, hideUnknown } = thresholdsForRole(role || 'dps', settings);
-    if (!score) return !!hideUnknown;
+    const { minBest, minMedian } = thresholdsForRole(role || 'dps', settings);
+    if (!score) return false;                               // never scored → keep
     if (score.error) return false;                          // transient failure → keep
-    const haveData = score.best !== null || score.median !== null;
-    if (!haveData) return !!hideUnknown;
+    if (hasNoWclLogs(score)) return true;                   // no logs → below any threshold
     if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
     if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
     return false;
@@ -81,7 +84,6 @@ function buildScoutThresholds(options = {}) {
         minMedianHealer: parseInt(options.wclMinMedianHealer) || 0,
         minBestTank:     parseInt(options.wclMinBestTank)     || 0,
         minMedianTank:   parseInt(options.wclMinMedianTank)   || 0,
-        hideUnknown:     !!options.wclHideUnknown,
     };
 }
 
@@ -96,12 +98,12 @@ function scoutVerdict(score, settings, role) {
     if (!score)               return { verdict: 'unknown', reason: 'NO_SCORE' };
     if (score.error)          return { verdict: 'unknown', reason: score.error };
 
-    const haveData = score.best !== null || score.median !== null;
-    if (!haveData) {
-        return settings.hideUnknown
-            ? { verdict: 'reject', reason: 'NO_LOGS' }
-            : { verdict: 'open',   reason: 'NO_LOGS' };
-    }
+    // A no-logs character keeps their tab, even though the list filters in
+    // common.js hide them. Those filters shorten a page you can still read; this
+    // decides whether you get to look at the profile you deliberately navigated
+    // to at all. An empty profile is an answer worth seeing, so pre-flight never
+    // withholds it.
+    if (hasNoWclLogs(score)) return { verdict: 'open', reason: 'NO_LOGS' };
 
     return failsWclThresholds(score, settings, role)
         ? { verdict: 'reject', reason: 'BELOW_THRESHOLD' }

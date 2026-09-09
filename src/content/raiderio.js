@@ -7,7 +7,7 @@ let wclSettings = {
     minBest: 0, minMedian: 0,
     minBestHealer: 0, minMedianHealer: 0,
     minBestTank: 0, minMedianTank: 0,
-    hideUnknown: false, concurrency: 4,
+    concurrency: 4,
 };
 
 function isRaiderIoCharacterPage() {
@@ -247,7 +247,7 @@ async function applyWclScoring() {
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const RIO_WCL_KEYS = ['rioWclEnabled', 'rioWclSort', ...SHARED_WCL_KEYS];
+const RIO_WCL_KEYS = ['rioWclEnabled', ...SHARED_WCL_KEYS];
 
 watchSettings(RIO_WCL_KEYS, () => {
     const allGroups = Array.from(document.querySelectorAll('.rt-tr-group'));
@@ -256,7 +256,7 @@ watchSettings(RIO_WCL_KEYS, () => {
 
     // Re-read all WCL settings from storage so no key is missed
     chrome.storage.sync.get(RIO_WCL_KEYS, (options) => {
-        wclSettings = { enabled: !!options.rioWclEnabled, sort: !!options.rioWclSort, ...buildWclSettings(options) };
+        wclSettings = { enabled: !!options.rioWclEnabled, sort: wclSortEnabled(options), ...buildWclSettings(options) };
         filterSearchRows();
     });
 });
@@ -279,7 +279,7 @@ function observePageChanges(wclEnabled) {
 chrome.storage.sync.get([
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedClasses', 'rioSelectedRoles', 'rioSelectedRegions',
-    'rioWclEnabled', 'rioWclSort', ...SHARED_WCL_KEYS,
+    'rioWclEnabled', ...SHARED_WCL_KEYS,
 ], function(options) {
     if (options.raiderioEnabled === false) return;
 
@@ -290,7 +290,7 @@ chrome.storage.sync.get([
         selectedRoles:   options.rioSelectedRoles    || [],
         selectedRegions: options.rioSelectedRegions  || [],
     };
-    wclSettings = { enabled: !!options.rioWclEnabled, sort: !!options.rioWclSort, ...buildWclSettings(options) };
+    wclSettings = { enabled: !!options.rioWclEnabled, sort: wclSortEnabled(options), ...buildWclSettings(options) };
 
     enforceSortingAndPublishedColumn();
     observePageChanges(wclEnabled);
@@ -298,4 +298,29 @@ chrome.storage.sync.get([
     filterSearchRows();
 
     if (options.hideRaiderIoAds) hideAds();
+});
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// Raider.IO renders its recruitment table client-side, so Scout cannot fetch and
+// parse it — it opens this page in a background tab and collects the rows that
+// survive filterSearchRows() here instead.
+
+registerHarvester('raiderio', '.rt-tr-group', function () {
+    return Array.from(document.querySelectorAll('.rt-tr-group'))
+        .filter(group => group.style.display !== 'none' && group.dataset.wclHidden !== 'true')
+        .map(group => {
+            const character = getRowCharacter(group);
+            if (!character) return null;
+            const row  = group.querySelector('.rt-tr');
+            const data = row ? getRowData(row) : null;
+            const href = group.querySelector('a[href*="/characters/"]')?.getAttribute('href');
+            return {
+                ...character,
+                role:        data?.role ?? null,
+                playerClass: data?.playerClass ?? null,
+                ilvl:        data?.ilvl ?? null,
+                link:        href ? new URL(href, 'https://raider.io').toString() : null,
+            };
+        })
+        .filter(Boolean);
 });

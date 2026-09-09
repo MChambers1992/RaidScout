@@ -1,0 +1,432 @@
+// scout-core.js
+// Pure logic for the Scout aggregator: candidate normalisation, cross-source
+// de-duplication/merging, sorting, filtering and CSV export.
+//
+// Deliberately free of `chrome`, `document` and `window` so it can be imported
+// directly by Vitest (tests/scout-core.test.js) as well as by the Scout page.
+
+// ─── Source metadata ───────────────────────────────────────────────────────────
+// `priority` breaks ties when two sources disagree on a non-numeric field:
+// lower wins. Ordering reflects how canonical each site's character identity is
+// (WoWProgress/Raider.IO link to a real character page; GoW is reconstructed
+// from a Blizzard render URL, so it is the least authoritative).
+
+export const SOURCE_META = {
+    wowprogress:  { label: 'WoWProgress',   colour: '#4a90d9', priority: 1 },
+    raiderio:     { label: 'Raider.IO',     colour: '#00b35a', priority: 2 },
+    warcraftlogs: { label: 'WarcraftLogs',  colour: '#e8670d', priority: 3 },
+    guildsofwow:  { label: 'Guilds of WoW', colour: '#9B59B6', priority: 4 },
+};
+
+export const SOURCE_IDS = Object.keys(SOURCE_META);
+
+// ─── Identity ──────────────────────────────────────────────────────────────────
+
+// Realms arrive in three shapes across the four sites: "Tarren Mill",
+// "tarren-mill" and "Tarren-Mill", plus apostrophes ("Kil'jaeden"). Dedup only
+// works if all of them collapse to one slug — this is what makes the same
+// player posting on three sites become one row instead of three.
+export function slugRealm(realm) {
+    let value = String(realm || '').trim();
+
+    // WoWProgress percent-encodes spaces in its character hrefs
+    // ("/character/eu/Tarren%20Mill/…"), so without decoding first this yields
+    // "tarren%20mill" and never matches Raider.IO's "tarren-mill" — every
+    // multi-word realm would defeat de-duplication. decodeURIComponent throws
+    // on a stray '%', so an undecodable value is used as-is.
+    try { value = decodeURIComponent(value); } catch { /* keep raw */ }
+
+    return value
+        .toLowerCase()
+        .replace(/['’]/g, '')
+        .replace(/[\s_]+/g, '-')
+        .replace(/-+/g, '-');
+}
+
+export function makeCandidateKey({ region, realm, name }) {
+    return `${String(region || '').toLowerCase()}/${slugRealm(realm)}/${String(name || '').trim().toLowerCase()}`;
+}
+
+// ─── Display names ─────────────────────────────────────────────────────────────
+
+// Storage uses lowercase underscore keys ('demon_hunter', 'deathknight').
+// Naively replacing underscores gets 'demon hunter' right but leaves
+// 'deathknight' as one word, so the two irregular names are spelled out.
+const CLASS_LABELS = {
+    deathknight:  'Death Knight',
+    demon_hunter: 'Demon Hunter',
+};
+
+export function classLabel(playerClass) {
+    if (!playerClass) return null;
+    if (CLASS_LABELS[playerClass]) return CLASS_LABELS[playerClass];
+    return playerClass.charAt(0).toUpperCase() + playerClass.slice(1);
+}
+
+// ─── Normalisation ─────────────────────────────────────────────────────────────
+
+function num(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = typeof value === 'number' ? value : parseFloat(value);
+    return Number.isFinite(n) ? n : null;
+}
+
+// Turn one raw scraped row into a canonical candidate. Returns null when the
+// row lacks the identity needed to score it — a nameless row is not a lead.
+export function normalizeCandidate(raw, source) {
+    if (!raw) return null;
+    const name   = String(raw.name || '').trim();
+    const realm  = slugRealm(raw.realm);
+    const region = String(raw.region || '').trim().toLowerCase();
+    if (!name || !realm || !region) return null;
+
+    return {
+        key:         makeCandidateKey({ region, realm, name }),
+        name,
+        realm,
+        region,
+        // role is intentionally left null when unknown rather than defaulted to
+        // 'dps' here: a null loses to a real role during merge, a fake 'dps'
+        // would win and score a healer against a DPS threshold.
+        role:        raw.role || null,
+        playerClass: raw.playerClass || null,
+        ilvl:        num(raw.ilvl),
+        mythicKills: num(raw.mythicKills),
+        mplusScore:  num(raw.mplusScore),
+        note:        raw.note ? String(raw.note).trim().slice(0, 300) : null,
+        sources:     [source],
+        // Which source supplied role/playerClass. Only meaningful once a
+        // candidate has been merged, when `sources[0]` no longer identifies it.
+        origins:     {
+            role:        raw.role        ? source : null,
+            playerClass: raw.playerClass ? source : null,
+        },
+        links:       raw.link ? { [source]: raw.link } : {},
+        wcl:         null,
+    };
+}
+
+// ─── Merge ─────────────────────────────────────────────────────────────────────
+
+function preferHigher(a, b) {
+    if (a === null || a === undefined) return b ?? null;
+    if (b === null || b === undefined) return a;
+    return Math.max(a, b);
+}
+
+// Picks between two values by source authority and reports which source the
+// winner came from, so the merged candidate can remember it (see mergeCandidate).
+// A null/undefined never wins over a real value, whatever its source ranks.
+function preferByPriority(a, b, sourceA, sourceB) {
+    const hasA = a !== null && a !== undefined;
+    const hasB = b !== null && b !== undefined;
+    if (!hasA && !hasB) return { value: null,  source: null };
+    if (!hasA)          return { value: b,     source: sourceB };
+    if (!hasB)          return { value: a,     source: sourceA };
+    const pa = SOURCE_META[sourceA]?.priority ?? 99;
+    const pb = SOURCE_META[sourceB]?.priority ?? 99;
+    return pa <= pb ? { value: a, source: sourceA } : { value: b, source: sourceB };
+}
+
+// Merge `incoming` into `existing`, in place-safe fashion (returns a new object).
+//
+// Numeric stats take the HIGHER value: each site snapshots a character at a
+// different time, and gear/progress only goes up, so the max is the freshest
+// reading. Class/role take the more authoritative source (see SOURCE_META).
+export function mergeCandidate(existing, incoming) {
+    const incomingSource = incoming.sources[0];
+
+    // Compare against the source that actually supplied each surviving value,
+    // not existing.sources[0]. After an earlier merge the two differ: a
+    // candidate first seen on WoWProgress with no role, then given one by
+    // Guilds of WoW, still lists WoWProgress first — so comparing on
+    // sources[0] would weigh a GoW role with WoWProgress's authority and let it
+    // beat a Raider.IO role arriving next. `origins` carries that provenance.
+    const originOf = (candidate, field) =>
+        candidate.origins?.[field] ?? candidate.sources[0];
+
+    const role        = preferByPriority(existing.role, incoming.role,
+                                         originOf(existing, 'role'), originOf(incoming, 'role'));
+    const playerClass = preferByPriority(existing.playerClass, incoming.playerClass,
+                                         originOf(existing, 'playerClass'), originOf(incoming, 'playerClass'));
+
+    return {
+        ...existing,
+        role:        role.value,
+        playerClass: playerClass.value,
+        origins:     { role: role.source, playerClass: playerClass.source },
+        ilvl:        preferHigher(existing.ilvl, incoming.ilvl),
+        mythicKills: preferHigher(existing.mythicKills, incoming.mythicKills),
+        mplusScore:  preferHigher(existing.mplusScore, incoming.mplusScore),
+        note:        existing.note || incoming.note,
+        sources:     existing.sources.includes(incomingSource)
+                        ? existing.sources
+                        : [...existing.sources, incomingSource],
+        links:       { ...incoming.links, ...existing.links },
+    };
+}
+
+// Collapse a flat list of candidates from every source into unique players.
+// Preserves first-seen order so the harvest order (source order) is stable.
+export function mergeCandidates(candidates) {
+    const byKey = new Map();
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        const existing = byKey.get(candidate.key);
+        byKey.set(candidate.key, existing ? mergeCandidate(existing, candidate) : candidate);
+    }
+    return Array.from(byKey.values());
+}
+
+// ─── Score classification ──────────────────────────────────────────────────────
+
+// True when WarcraftLogs gave a definitive answer that this character has no
+// logs — as opposed to a lookup that failed or never ran.
+//
+// The distinction carries the whole no-logs filtering rule: `notFound` (or a
+// successful lookup with both metrics null) is real information about the
+// candidate, so Scout can act on it. An `error` is information about the
+// *request*, not the player, so it must never remove anyone.
+export function hasNoLogs(score) {
+    if (!score || score.error) return false;
+    return !!score.notFound || (score.best === null && score.median === null);
+}
+
+// Whether a score was actually obtained (used to tell "we know they're empty"
+// apart from "we never asked").
+export function isScored(score) {
+    return !!score && !score.error;
+}
+
+// ─── Filtering ─────────────────────────────────────────────────────────────────
+
+// Applies the WoWProgress-tab filters to a candidate. Used by the fetch adapter,
+// which parses raw HTML and therefore has no content script to filter for it.
+// Mirrors filterPlayers() in src/content/wowprogress.js — a null field always
+// passes, matching the "never hide on missing data" rule used site-side.
+export function passesWowProgressFilters(candidate, settings = {}) {
+    const {
+        selectedRegions = [], minIlvl = 0, maxIlvl = 0,
+        selectedClasses = [], guildFilter = 'any',
+    } = settings;
+
+    if (selectedRegions.length && candidate.region &&
+        !selectedRegions.some(r => r.toLowerCase() === candidate.region)) return false;
+
+    if (candidate.ilvl !== null) {
+        if (minIlvl > 0 && candidate.ilvl < minIlvl) return false;
+        if (maxIlvl > 0 && candidate.ilvl > maxIlvl) return false;
+    }
+
+    if (selectedClasses.length && candidate.playerClass &&
+        !selectedClasses.includes(candidate.playerClass)) return false;
+
+    if (guildFilter === 'in'  && candidate.inGuild === false) return false;
+    if (guildFilter === 'out' && candidate.inGuild === true)  return false;
+
+    return true;
+}
+
+// ─── Sorting ───────────────────────────────────────────────────────────────────
+
+const SORT_ACCESSORS = {
+    name:        c => c.name?.toLowerCase() ?? '',
+    realm:       c => c.realm ?? '',
+    region:      c => c.region ?? '',
+    playerClass: c => c.playerClass ?? '',
+    role:        c => c.role ?? '',
+    ilvl:        c => c.ilvl,
+    mythicKills: c => c.mythicKills,
+    mplusScore:  c => c.mplusScore,
+    wclBest:     c => c.wcl?.best ?? null,
+    wclMedian:   c => c.wcl?.median ?? null,
+    sources:     c => c.sources.length,
+};
+
+// Sorts a copy. Missing values always sort last regardless of direction — an
+// unscored row sinking to the bottom is far more useful to an officer than it
+// jumping to the top on an ascending sort.
+export function sortCandidates(candidates, key, direction = 'desc') {
+    const accessor = SORT_ACCESSORS[key];
+    if (!accessor) return [...candidates];
+    const sign = direction === 'asc' ? 1 : -1;
+
+    return [...candidates].sort((a, b) => {
+        const av = accessor(a);
+        const bv = accessor(b);
+        const aMissing = av === null || av === undefined || av === '';
+        const bMissing = bv === null || bv === undefined || bv === '';
+        if (aMissing && bMissing) return 0;
+        if (aMissing) return 1;
+        if (bMissing) return -1;
+        if (typeof av === 'string' || typeof bv === 'string') {
+            return String(av).localeCompare(String(bv)) * sign;
+        }
+        return (av - bv) * sign;
+    });
+}
+
+// ─── Text search ───────────────────────────────────────────────────────────────
+
+export function matchesQuery(candidate, query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return true;
+    return [candidate.name, candidate.realm, candidate.region, candidate.playerClass, candidate.role, candidate.note]
+        .some(field => field && String(field).toLowerCase().includes(q));
+}
+
+// ─── Profile links ─────────────────────────────────────────────────────────────
+
+// ─── Structured filters ────────────────────────────────────────────────────────
+// The search box answers "where is Thrall"; these answer "who is worth talking
+// to". Kept here, pure and testable, rather than inline in the page: they decide
+// what an officer does and does not see, which is exactly the logic that should
+// not live only in an event handler.
+//
+// Every field is opt-in — an empty list or a zero minimum means "no opinion" —
+// so the default shape hides nobody. That matters because these persist: a
+// filter an officer set weeks ago is still applied on their next run, and one
+// that silently excluded everyone would look like a broken harvest.
+
+export const DEFAULT_FILTERS = {
+    roles:       [],   // 'tank' | 'healer' | 'dps'
+    classes:     [],   // storage class names, e.g. 'demon_hunter'
+    regions:     [],   // lowercase, e.g. 'eu'
+    sources:     [],   // SOURCE_IDS
+    minIlvl:     0,
+    minMplus:    0,
+    minMythic:   0,
+    multiSource: false,
+};
+
+// Coerces whatever came back from storage into the shape the filter expects.
+// Stored settings outlive the code that wrote them: a key that has since changed
+// type, or a list that arrived as a string, must not throw during a render.
+export function normalizeFilters(raw) {
+    const list = (value) => (Array.isArray(value) ? value.filter(v => typeof v === 'string' && v) : []);
+    const num  = (value) => {
+        const n = typeof value === 'number' ? value : parseFloat(value);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    const input = raw && typeof raw === 'object' ? raw : {};
+    return {
+        roles:       list(input.roles).map(r => r.toLowerCase()),
+        classes:     list(input.classes),
+        regions:     list(input.regions).map(r => r.toLowerCase()),
+        sources:     list(input.sources),
+        minIlvl:     num(input.minIlvl),
+        minMplus:    num(input.minMplus),
+        minMythic:   num(input.minMythic),
+        multiSource: input.multiSource === true,
+    };
+}
+
+// How many filters are actually narrowing the list — drives the count on the
+// Filters button, so an officer can tell at a glance that a short list is their
+// own doing rather than a bad harvest.
+export function activeFilterCount(filters) {
+    const f = normalizeFilters(filters);
+    return f.roles.length + f.classes.length + f.regions.length + f.sources.length
+         + (f.minIlvl   > 0 ? 1 : 0)
+         + (f.minMplus  > 0 ? 1 : 0)
+         + (f.minMythic > 0 ? 1 : 0)
+         + (f.multiSource ? 1 : 0);
+}
+
+export function hasActiveFilters(filters) {
+    return activeFilterCount(filters) > 0;
+}
+
+// A missing value never fails a minimum. Sites report different subsets — a
+// WoWProgress row carries no M+ score at all — so treating absent as zero would
+// quietly drop every candidate from the sites that do not publish that stat,
+// which is the same trap the site-side filters avoid (quirk 6).
+function passesMinimum(value, minimum) {
+    if (!(minimum > 0)) return true;
+    return value === null || value === undefined || value >= minimum;
+}
+
+export function matchesFilters(candidate, filters) {
+    if (!candidate) return false;
+    const f = normalizeFilters(filters);
+
+    if (f.roles.length   && !(candidate.role        && f.roles.includes(candidate.role))) return false;
+    if (f.classes.length && !(candidate.playerClass && f.classes.includes(candidate.playerClass))) return false;
+    if (f.regions.length && !(candidate.region      && f.regions.includes(String(candidate.region).toLowerCase()))) return false;
+
+    if (f.sources.length) {
+        const seen = Array.isArray(candidate.sources) ? candidate.sources : [];
+        if (!seen.some(source => f.sources.includes(source))) return false;
+    }
+
+    if (f.multiSource && !(Array.isArray(candidate.sources) && candidate.sources.length > 1)) return false;
+
+    if (!passesMinimum(candidate.ilvl,        f.minIlvl))   return false;
+    if (!passesMinimum(candidate.mplusScore,  f.minMplus))  return false;
+    if (!passesMinimum(candidate.mythicKills, f.minMythic)) return false;
+
+    return true;
+}
+
+export function profileLinks(candidate) {
+    const { region, realm, name } = candidate;
+    return {
+        ...candidate.links,
+        warcraftlogs: `https://www.warcraftlogs.com/character/${region}/${realm}/${encodeURIComponent(name)}`,
+        raiderio:     candidate.links.raiderio ||
+                      `https://raider.io/characters/${region}/${realm}/${encodeURIComponent(name)}`,
+    };
+}
+
+// ─── Export ────────────────────────────────────────────────────────────────────
+
+const CSV_COLUMNS = [
+    ['name',        c => c.name],
+    ['realm',       c => c.realm],
+    ['region',      c => c.region],
+    ['class',       c => c.playerClass],
+    ['role',        c => c.role],
+    ['ilvl',        c => c.ilvl],
+    ['mythic_kills', c => c.mythicKills],
+    ['mplus_score', c => c.mplusScore],
+    ['wcl_best',    c => c.wcl?.best],
+    ['wcl_median',  c => c.wcl?.median],
+    ['sources',     c => c.sources.join(' ')],
+    ['note',        c => c.note],
+    ['warcraftlogs_url', c => profileLinks(c).warcraftlogs],
+];
+
+function csvCell(value) {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+export function toCsv(candidates) {
+    const header = CSV_COLUMNS.map(([name]) => name).join(',');
+    const rows = candidates.map(c => CSV_COLUMNS.map(([, get]) => csvCell(get(c))).join(','));
+    return [header, ...rows].join('\n');
+}
+
+// In-game whisper lists want Name-Realm, which is what the WoW client accepts
+// for a cross-realm whisper. Realm slugs are de-slugified back to PascalCase.
+export function toWhisperList(candidates) {
+    return candidates
+        .map(c => `${c.name}-${c.realm.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('')}`)
+        .join('\n');
+}
+
+// ─── Concurrency ───────────────────────────────────────────────────────────────
+// Same pool as common.js runWithConcurrency, re-exported here so the Scout page
+// and the tests can use it without depending on a content-script global.
+
+export async function runWithConcurrency(items, worker, limit = 4) {
+    const queue = [...items];
+    const runners = [];
+    for (let i = 0; i < Math.min(limit, queue.length); i++) {
+        runners.push((async () => {
+            while (queue.length) await worker(queue.shift());
+        })());
+    }
+    await Promise.all(runners);
+}

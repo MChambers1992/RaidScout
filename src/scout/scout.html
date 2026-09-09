@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RaidScout — Scout</title>
+    <link rel="stylesheet" href="../shared.css">
+    <link rel="stylesheet" href="scout.css">
+</head>
+<body>
+    <header class="scout-header">
+        <div class="scout-title">
+            <h1>Scout</h1>
+            <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+        </div>
+        <div class="scout-actions">
+            <button id="runScout" class="primary">🔎 Run scout</button>
+            <button id="openSettings" class="ghost">⚙ Settings</button>
+        </div>
+    </header>
+
+    <section class="scout-progress" id="scoutProgress">
+        <div class="source-chips" id="sourceChips"></div>
+        <div class="progress-line" id="progressLine" role="status" aria-live="polite">Ready.</div>
+        <div class="scout-banner" id="scoutBanner" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="scout-toolbar" id="scoutToolbar" hidden>
+        <input type="search" id="searchBox" aria-label="Filter candidates by name, realm or class"
+               placeholder="Filter by name, realm, class…" autocomplete="off">
+        <label class="inline-check" title="Hides candidates whose parse is below your thresholds, and candidates WarcraftLogs has no logs for. Candidates that could not be scored are always shown.">
+            <input type="checkbox" id="hideBelowThresholds">
+            Hide below thresholds &amp; no logs
+        </label>
+        <span class="result-count" id="resultCount" role="status" aria-live="polite"></span>
+        <span class="spacer"></span>
+        <button id="toggleFilters" class="ghost" aria-expanded="false" aria-controls="scoutFilters">
+            ⛃ Filters<span class="filter-count" id="filterCount" hidden></span>
+        </button>
+        <button id="copyNames"  class="ghost" title="Copy Name-Realm for every visible row">📋 Copy names</button>
+        <button id="exportCsv"  class="ghost">⬇ CSV</button>
+    </section>
+
+    <!-- Structured filters. Persisted, so they survive a reload and the next
+         run; the count on the button above and the Clear control below exist so
+         a short list is never mistaken for a bad harvest. -->
+    <section class="scout-filters" id="scoutFilters" hidden>
+        <div class="filter-grid">
+            <fieldset class="filter-group">
+                <legend>Role</legend>
+                <div class="filter-chips" id="filterRoles"></div>
+            </fieldset>
+
+            <fieldset class="filter-group">
+                <legend>Region</legend>
+                <div class="filter-chips" id="filterRegions"></div>
+            </fieldset>
+
+            <fieldset class="filter-group filter-group--wide">
+                <legend>Class</legend>
+                <div class="filter-chips" id="filterClasses"></div>
+            </fieldset>
+
+            <fieldset class="filter-group">
+                <legend>Seen on</legend>
+                <div class="filter-chips" id="filterSources"></div>
+                <label class="inline-check">
+                    <input type="checkbox" id="filterMultiSource">
+                    On more than one site
+                </label>
+            </fieldset>
+
+            <fieldset class="filter-group">
+                <legend>Minimums</legend>
+                <div class="filter-numbers">
+                    <label>Item level
+                        <input type="number" id="filterMinIlvl" min="0" step="1" placeholder="any">
+                    </label>
+                    <label>M+ score
+                        <input type="number" id="filterMinMplus" min="0" step="10" placeholder="any">
+                    </label>
+                    <label>Mythic kills
+                        <input type="number" id="filterMinMythic" min="0" step="1" placeholder="any">
+                    </label>
+                </div>
+                <p class="filter-note">A candidate is kept when the site never reported that stat.</p>
+            </fieldset>
+        </div>
+
+        <div class="filter-actions">
+            <button id="clearFilters" class="ghost">Clear filters</button>
+            <span class="filter-summary" id="filterSummary" role="status" aria-live="polite"></span>
+        </div>
+    </section>
+
+    <section class="scout-results">
+        <table id="resultsTable" aria-label="Scouted candidates" hidden>
+            <thead>
+                <tr>
+                    <th data-sort="name" tabindex="0" role="columnheader" aria-sort="none">Character</th>
+                    <th data-sort="realm" tabindex="0" role="columnheader" aria-sort="none">Realm</th>
+                    <th data-sort="region" tabindex="0" role="columnheader" aria-sort="none">Region</th>
+                    <th data-sort="playerClass" tabindex="0" role="columnheader" aria-sort="none">Class</th>
+                    <th data-sort="role" tabindex="0" role="columnheader" aria-sort="none">Role</th>
+                    <th data-sort="ilvl" class="num" tabindex="0" role="columnheader" aria-sort="none">ilvl</th>
+                    <th data-sort="mplusScore" class="num" tabindex="0" role="columnheader" aria-sort="none">M+</th>
+                    <th data-sort="mythicKills" class="num" tabindex="0" role="columnheader" aria-sort="none">Mythic</th>
+                    <th data-sort="wclMedian" class="num" tabindex="0" role="columnheader" aria-sort="none">WCL parse</th>
+                    <th data-sort="sources" tabindex="0" role="columnheader" aria-sort="none">Seen on</th>
+                    <th>Links</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState" hidden></div>
+    </section>
+
+    <footer class="scout-footer">
+        <span class="footer-note">RaidScout is free and open source.</span>
+        <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">☕ Support development</a>
+        <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">▶ YouTube</a>
+    </footer>
+
+    <!-- common.js is a classic script: it defines requestWclScore, buildWclSettings,
+         failsWclThresholds and the badge renderer as globals that scout.js reuses,
+         so the Scout page scores candidates through exactly the same path the
+         content scripts do. links.js supplies the support URLs. -->
+    <script src="../links.js"></script>
+    <script src="../content/common.js"></script>
+    <script type="module" src="scout.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Canonicalises the author name shown by git log / shortlog / GitHub's
+# contributor list. Commits were authored under three variants of the same
+# address ("unknown", "EpicChambers Chambers", "Michael Chambers"); mapping by
+# email collapses them without rewriting a single commit, so existing clones
+# stay valid.
+Michael Chambers <michael.chambers1992@gmail.com> <michael.chambers1992@gmail.com>

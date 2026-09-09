@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **RaidScout** is a Chrome extension designed to streamline World of Warcraft guild recruitment. It extends functionality across multiple recruitment-related websites: WarcraftLogs, WoWProgress, Raider.IO, and Guilds of WoW.
 
 **Author:** Michael Chambers  
-**Current Version:** 1.0  
+**Current Version:** 1.4.0  
 **Type:** Chrome Extension (Manifest V3)
 
 ## Tech Stack
@@ -33,9 +33,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - Responds to (sync listener): `parseThresholdFailed`, `clearBadge`, `wclPageReady`
    - Responds to (async listener, returns `true` to keep the channel open): `openTab`, `fetchWclScore`, `wclHasCredentials`, `testWclCredentials`, `clearWclScoreCache`, `storeWclSecret`, `getApiStatus`, `getClosedTabCount`, `getLastScoutSkip`
 
-1a. **Scout decision module** (`src/scout.js`) — ES module imported by the service worker **and by the unit tests directly**
+1a. **Pre-flight decision module** (`src/preflight.js`) — ES module imported by the service worker **and by the unit tests directly**. Named for the flow, not the page: the Scout *aggregator* is `src/scout/`, an unrelated feature
    - `roleForSpec(spec)` — maps a WarcraftLogs spec name to `healer` / `tank` / `dps` (spec names are unambiguous across classes for role purposes)
-   - `thresholdsForRole` / `failsWclThresholds` — **duplicates of the same functions in `content/common.js`**, which cannot import modules. Keep the two in sync; `tests/scout.test.js` covers this copy
+   - `thresholdsForRole` / `failsWclThresholds` — **duplicates of the same functions in `content/common.js`**, which cannot import modules. Keep the two in sync; `tests/preflight.test.js` covers this copy
    - `buildScoutThresholds(options)` — storage snapshot → role-aware thresholds (same shape as `buildWclSettings` minus concurrency)
    - `scoutVerdict(score, settings, role)` → `{ verdict: 'open' | 'reject' | 'unknown', reason }`. `unknown` is the fail-open case (no credentials, API error, rate limit, Cloudflare)
    - `characterFromWclUrl` / `buildWclCharacterUrl` — WCL character URL ↔ `{region, realm, name}`
@@ -62,7 +62,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
      - `normalizeClassName(name)`, `WOW_CLASS_NAMES`, `sendMessageToBackground(action, data)`
      - `assertSelector(selector, context, label)` — logs a console warning if a critical selector finds nothing, so site-markup breakage is surfaced rather than silently failing
      - `requestWclScore(character)` — asks the background for a `{best, median, notFound?, error?, rateLimitMs?}` score. `character` must include `role` so the API uses the right metric
-     - `failsWclThresholds(score, {minBest, minMedian, hideUnknown})` — pure decision function; never hides on transient errors
+     - `failsWclThresholds(score, settings, role)` — pure decision function. Hides low parses and no-logs characters; never hides on transient errors or unscored candidates (see quirk 29)
      - `runWithConcurrency(items, worker, limit)` — concurrency-limited async pool
      - `badgeStateForScore(score)` — maps a score result to a badge state; single source for the ladder all four sites used to repeat
      - `effectiveRole(score, fallbackRole)` — prefers the API-resolved role over whatever the page markup suggested
@@ -84,7 +84,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - "⚙ Full Settings" button calls `chrome.runtime.openOptionsPage()`
    - Does **not** include class filter (too complex for popup — that's in Full Settings only)
 
-4. **Full Settings Page** (`src/options/`)
+4. **Scout Aggregator** (`src/scout/`) — cross-site recruitment aggregator
+   - Opened from the popup's "🔎 Scout all sites" button (`chrome.tabs.create` on `src/scout/scout.html`); auto-runs a harvest on load
+   - **`scout-core.js`** — pure ES module (no `chrome`/`document`), imported directly by Vitest: realm slugging, candidate normalisation, cross-source merge, sorting, CSV/whisper-list export, concurrency pool
+   - **`sources.js`** — adapter registry. Two harvest modes: `fetch` (request the listing + `DOMParser`; WoWProgress only) and `tab` (open the listing in a background tab, let the site's own content script filter it, harvest the visible rows, close the tab; Raider.IO, GoW, WCL recruitment). Promoting a source from `tab` to `fetch` later touches only its registry entry. WoWProgress uses **both**: it fetches first and falls back to a background tab when Cloudflare challenges the request (quirk 32)
+   - **`scout.js`** — orchestration + UI. Loads `common.js` as a classic script first so it reuses `requestWclScore`, `buildWclSettings`, `failsWclThresholds` and `makeBadge` rather than reimplementing scoring
+   - Runs the browser-rendered sources at concurrency 2 (three or four simultaneous SPA loads starve each other and cause spurious render timeouts)
+
+5. **Full Settings Page** (`src/options/`)
    - Opened via right-click → Options or the popup's Full Settings button
    - Tab navigation (WarcraftLogs / WoWProgress / Raider.IO / Guilds of WoW)
    - Per-site enable toggle with disabled state: `syncSectionEnabledState()` in `options.js` adds `.section-disabled` to the site's `.category-content` and sets `disabled` on its controls when the site is OFF, so they grey out (CSS) and drop out of the tab order (the `disabled` attribute — `pointer-events: none` alone still lets keyboard focus reach them). The enable toggle sits in `.section-header`, which is excluded, so it stays clickable. Disabled inputs keep their values, so Save still writes them
@@ -167,7 +174,6 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `wclMinMedianHealer` | number | `0` | **Shared** min median HPS parse % for healers (proactive scoring; 0 = no minimum) |
 | `wclMinBestTank` | number | `0` | **Shared** min best DPS parse % for tanks — falls back to `bestParseThreshold` when 0 |
 | `wclMinMedianTank` | number | `0` | **Shared** min median DPS parse % for tanks — falls back to `parseThreshold` when 0 |
-| `wclHideUnknown` | boolean | `false` | **Shared** also hide characters WCL has no parse data for (proactive scoring) |
 | `scoutPreflight` | boolean | `true` | Score a candidate via the API before opening their WCL tab; skip the tab entirely for rejects. Needs credentials — falls back to open-then-close without them |
 | `scoutOpenInBackground` | boolean | `false` | Open scouted WCL tabs with `active: false` so they don't steal focus |
 | `wclSearchParseThreshold` | number | `0` | Min parse % for recruitment search results (0 = no minimum) |
@@ -177,6 +183,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `wclSelectedClasses` | string[] | `[]` | Filter recruitment search by class — empty shows all |
 | `wclClientId` | string | `""` | WarcraftLogs v2 API client ID (for proactive scoring) — stored in sync |
 | `wclCacheTtlHours` | number | `6` | Score cache TTL in hours — stored in sync |
+| `wclSortByParse` | boolean | `false` | **Shared** — rank candidates by parse (highest first) on every site with proactive filtering on. Replaced the per-site `wpWclSort`/`rioWclSort`/`gowWclSort` in 1.4.0; `wclSortEnabled()` in `common.js` still reads those three when the shared key is absent, so existing installs keep their choice |
 | `wclClientSecret` | string | `""` | WarcraftLogs v2 API client secret — stored in **`chrome.storage.local`** only, never synced |
 | `wclDebug` | boolean | `false` | Log WCL queries/scores to service-worker console — stored in `local` |
 
@@ -192,7 +199,6 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `guildFilter` | string | `"any"` | Guild status: `"any"` / `"in"` / `"out"` |
 | `selectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `wpWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the WoWProgress player table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
-| `wpWclSort` | boolean | `false` | Sort visible players by WCL parse (highest first) instead of only hiding those below threshold |
 
 > **Migration note:** The old `region` (string) key is still read as a fallback when `selectedRegions` is absent.
 
@@ -208,7 +214,6 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `rioSelectedRoles` | string[] | `[]` | Filter search rows by main role (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `rioSelectedClasses` | string[] | `[]` | Filter search rows by class — empty shows all (Full Settings only; not in popup) |
 | `rioWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the Raider.IO search table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
-| `rioWclSort` | boolean | `false` | Sort visible search rows by WCL parse (highest first) instead of only hiding those below threshold |
 
 ### Guilds of WoW
 
@@ -221,7 +226,23 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `gowSelectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `gowSelectedRoles` | string[] | `[]` | Allowed roles (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `gowWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the recruits list (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
-| `gowWclSort` | boolean | `false` | Sort visible recruit cards by WCL parse (highest first) instead of only hiding those below threshold |
+
+### Scout
+
+| Key | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `scoutSources` | string[] | all four | Which sources a Scout run harvests |
+| `scoutMaxCandidates` | number | `150` | Cap on unique candidates scored per run (each is one WCL API call) |
+| `scoutPagesPerSource` | number | `1` | WoWProgress listing pages to pull (`fetch` adapter only) |
+| `scoutWclEnabled` | boolean | `true` | Fetch WarcraftLogs parses for harvested candidates |
+| `scoutHideBelowThresholds` | boolean | `true` | Apply the shared parse thresholds to Scout results, and hide no-logs candidates (see quirk 29) |
+| `scoutUrlWowprogress` | string | `""` | Listing URL override — blank uses `DEFAULT_SOURCE_URLS` |
+| `scoutUrlRaiderio` | string | `""` | Listing URL override |
+| `scoutUrlGuildsofwow` | string | `""` | Listing URL override |
+| `scoutUrlWarcraftlogs` | string | `""` | Listing URL override |
+| `scoutFilters` | object | all empty | Remembered Scout table filters: `{roles, classes, regions, sources, minIlvl, minMplus, minMythic, multiSource}`. Empty lists and zero minimums mean "no opinion" — see quirk 36 |
+| `scoutSortKey` | string | `"wclMedian"` | Remembered Scout sort column; ignored unless it matches a `th[data-sort]` |
+| `scoutSortDir` | string | `"desc"` | Remembered Scout sort direction (`"asc"` / `"desc"`) |
 
 ### WoW class name format
 
@@ -265,15 +286,33 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 
 17. **Sender validation:** The background validates `sender.tab.url` hostname against `TRUSTED_HOSTS` before acting on any message. `openTab` additionally validates the URL against `ALLOWED_TAB_PREFIXES` (WCL character URLs only) to prevent URL injection.
 
-18. **Unit tests:** `tests/common.test.js` (Vitest) inlines copies of the content-script functions it covers (`normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, `normalizeCharacter`, `extractCharacterFromUrl`) because content scripts aren't modules — keep the copies in sync when you touch the originals. `tests/scout.test.js` imports `src/scout.js` directly. Run with `npm test`.
+18. **Unit tests:** `tests/common.test.js` (Vitest) re-declares the content-script functions it covers (`normalizeClassName`, `failsWclThresholds`, `roleToMetric`, `characterKey`, `normalizeCharacter`, `extractCharacterFromUrl`) inline, because content scripts have no export surface — keep the copies in sync when you touch the originals. `tests/preflight.test.js` imports `src/preflight.js` (pre-flight decisions) directly; `tests/scout-core.test.js` imports `src/scout/scout-core.js` (the aggregator) directly, since both are real ES modules. `tests/sources.test.js` covers the WoWProgress HTML parser against jsdom fixtures. Run with `npm test`. CI runs the same command in a `test` job that `build` depends on, so a failing suite blocks the packaged artifact and any release cut from it.
 
-19. **Sort by WCL parse:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
+19. **Sort by WCL parse** (one shared `wclSortByParse`, see the settings table)**:** `sortByWclScore()` in `common.js` re-orders a site's visible rows/cards by `dataset.wclMedian` (falling back to `dataset.wclBest`) via repeated `appendChild`, which is also how each site's scoring loop moves elements — no separate drag/drop or virtual-list logic. It only runs once per scoring batch (after `runWithConcurrency` resolves), not on every MutationObserver re-fire, so appending elements during the sort doesn't trigger an infinite reorder loop: the next observer-triggered pass finds no unscored elements left and returns early before reaching the sort step.
 
 20. **Unreliable page role markup falls back to the API, not to `'dps'`:** `getRecruitmentRole()` (WCL recruitment search) and `getPlayerRole()` (WoWProgress) were both written against markup that couldn't be verified. They now return `null` when they can't tell, and the caller sends `role: 'auto'` so the API resolves the role from the spec the character actually ranked as. Raider.IO and GoW have dependable role markup and still send the role they read, which keeps their queries to a single metric.
 
-21. **Pre-flight scouting fails open on purpose:** `scoutVerdict` only ever returns `reject` on a real score below threshold (or `notFound` with `wclHideUnknown` on). No credentials, an API error, a rate limit and a Cloudflare challenge all yield `unknown`, which opens the tab exactly as the pre-1.4 flow did. A broken lookup must never silently hide a candidate.
+21. **Pre-flight scouting fails open on purpose:** `scoutVerdict` only ever returns `reject` on a real score below threshold. No credentials, an API error, a rate limit and a Cloudflare challenge all yield `unknown`, which opens the tab exactly as the pre-1.4 flow did. A broken lookup must never silently hide a candidate. Note the deliberate asymmetry with quirk 29: a no-logs character is hidden by the list filters but still *gets their tab opened*, because pre-flight decides whether you may look at a profile you navigated to on purpose, not whether to shorten a page you can still read.
 
 22. **Cloudflare backoff is cleared by a page load, not by time:** the 5-minute `wclCloudflareUntil` cooldown is a ceiling. What actually clears a challenge is the user loading warcraftlogs.com in a real tab, so `warcraftlogs.js` sends `wclPageReady` on any non-challenge WCL page and the background drops the backoff immediately.
+
+23. **Scout fails VISIBLE, everything else fails OPEN:** every content-script filter shows a candidate on error (`failsWclThresholds` returns false for transient errors). Scout inverts this for *harvest* failures — a source that returns nothing turns its chip red and raises a banner naming the site, reason and URL. A silently-shortened aggregate list is worse than a visible error because the officer has no page to compare it against. Scoring failures still fail open: an unscored candidate is never hidden.
+
+24. **`isTrustedSender` had to be widened for Scout:** the Scout page has no `sender.tab`, so the original host-based check rejected it. `background.js` now splits the check — `isTrustedTabSender` (host allowlist, used for the tab-bound `parseThresholdFailed`/`openTab`/`clearBadge` actions) and `isExtensionPageSender` (`sender.id === chrome.runtime.id` + extension-origin URL, no tab). Only the async listener accepts the latter, so an extension page can request scores but can never trigger a tab-bound action.
+
+25. **Realm slugging is what makes de-duplication work:** the four sites spell realms three ways (`Tarren Mill`, `tarren-mill`, `Tarren-Mill`) and apostrophes vary (`Kil'jaeden` / `Kil’jaeden`). `slugRealm()` collapses all of them; without it the same player appears once per site and gets scored once per site.
+
+26. **Merge rules:** numeric stats (ilvl, mythic kills, M+ score) take the **higher** value across sources — each site snapshots the character at a different time and these only go up. Class and role take the **more authoritative** source per `SOURCE_META[].priority` (WoWProgress > Raider.IO > WarcraftLogs > GoW, since GoW identity is reconstructed from a Blizzard render URL). Adapters return `role: null` when unknown rather than defaulting to `'dps'`, so a guessed DPS can't beat a real healer during merge and score them against an unreachable threshold — including the WCL recruitment harvester, which maps its `'auto'` scoring sentinel back to `null` rather than storing it as a role. Priority is compared against the source that actually supplied the surviving value, tracked per-field in `candidate.origins`, **not** `sources[0]`: once a candidate has been merged the two differ, and using the first source lets a low-authority value keep winning (WoWProgress `null` → GoW `tank` → Raider.IO `healer` would keep the tank).
+
+27. **Scout listing URLs are user-overridable by design.** Raider.IO and Guilds of WoW render their listings client-side; their JSON endpoints were never confirmed, so the defaults in `DEFAULT_SOURCE_URLS` are best-effort. Any of the four can be repointed in Settings → Scout without an extension update.
+
+28. **Background tabs opened by Scout are always cleaned up** — `harvestViaTab` removes the tab in a `finally` block, so a timeout or a thrown adapter error can't strand a tab in the officer's window.
+
+29. **"No logs" fails every threshold in every list filter.** `failsWclThresholds()` in `common.js` returns `true` for a definitive no-logs result — `notFound`, or a successful lookup where both metrics are null — regardless of any setting. A character with no parses cannot be judged against a parse minimum, so they are below all of them. This is unconditional by design: it replaced the `wclHideUnknown` toggle (removed in 1.4.0), because most existing installs had an explicit `false` saved and a default flip would never have reached them. The line the rule draws is between information about the *player* (`notFound` → actionable) and information about the *request* (`error`, or no score at all → says nothing about them): anything errored or unscored is always kept, so a missing API key, a disabled scoring toggle or a mid-run rate limit can never empty a page. Scout adds only a `!candidate.wcl` guard, because it renders rows before scoring runs, and uses `hasNoLogs()` from `scout-core.js` purely to report the two hide reasons separately above the table. The one exception is pre-flight scouting (quirk 21), which still opens a no-logs character's tab: a list filter shortens a page you can go on reading, whereas pre-flight decides whether you see the profile you deliberately navigated to at all, and an empty profile is itself an answer. `src/preflight.js` therefore mirrors this `failsWclThresholds` exactly but short-circuits on `hasNoWclLogs()` before it.
+
+30. **Design tokens live in `src/shared.css`.** The palette was ~90 loose hex literals across three stylesheets, with the 13 WoW class colours written out verbatim in both `options.css` and `scout.css`. Colours are now CSS custom properties on `:root`; each surface still writes its own selectors (`.class-label.warrior` on the options page, `.class-warrior` in the Scout table) but reads one value. Loaded via a `<link>` before each page's own stylesheet.
+
+31. **The options page toggles a class, not an inline `display`.** `showCategory()` sets `.is-active` rather than `style.display = 'block'`, because the wide-viewport layout promotes the active category to a two-column grid through a media query and an inline `display` would override it. The container was also pinned at `width: 400px`, which is why a 51-setting page scrolled forever and the tab labels ellipsised.
 
 ## File Structure
 
@@ -288,8 +327,16 @@ RaidScout/
 │   └── logo-128.png
 └── src/
     ├── background.js          # Service worker (ES module) — pre-flight scouting, tab management, badge, message routing
-    ├── scout.js               # Pure scout decision logic (spec→role, thresholds, verdict, URL parsing) — imported by background + tests
+    ├── preflight.js           # Pre-flight decision logic (spec→role, thresholds, verdict, URL parsing) — imported by background + tests
     ├── wcl-api.js             # WarcraftLogs v2 API client — OAuth, GraphQL scoring, role auto-resolution, Cloudflare backoff, caching
+    ├── shared.css             # Design tokens (palette, WoW class + role colours) — loaded by popup, options and Scout
+    ├── links.js               # Support/YouTube URLs, single source of truth
+    ├── scout/                 # The Scout *aggregator page* — unrelated to preflight.js above
+    │   ├── scout.html         # Scout aggregator page (opened from the popup)
+    │   ├── scout.css
+    │   ├── scout-core.js      # Pure ES module: normalise, merge/dedupe, sort, export
+    │   ├── sources.js         # Source adapters (fetch + background-tab harvest)
+    │   └── scout.js           # Orchestration + table UI
     ├── popup/
     │   ├── popup.html         # Quick-access popup (extension button click)
     │   ├── popup.css
@@ -305,3 +352,15 @@ RaidScout/
         ├── raiderio.js        # WarcraftLogs redirect, search sorting, ad hiding
         └── guildsofwow.js     # Recruit card filtering (ilvl/mythic/M+/class/role)
 ```
+
+32. **WoWProgress is behind Cloudflare, so its fetch harvest falls back to a tab.** A challenge is not a bad listing URL or changed markup, which is what the harvester used to report — `isCloudflareChallenge()` in `sources.js` identifies one from `cf-mitigated`, a 403/503 carrying `cf-ray`, or the interstitial's body markers (headers are not readable in every context, so the body check stands alone). On a challenge, `harvestWowProgressWithFallback` retries through `harvestViaTab('wowprogress', …)`: the tab loads in the user's real browsing context, so a clearance they already hold applies and a JS challenge resolves itself, and `wowprogress.js`'s harvester (registered since 1.4.0 but until now never reached) reads the rows. This automates the manual step it replaces — opening wowprogress.com to clear Cloudflare before a scout run. The fetch path also sends `credentials: 'include'` so an existing `cf_clearance` cookie is reused rather than every harvest arriving unverified; whether SameSite lets that cookie through from an extension page is not guaranteed, which is why the fallback and not the cookie is what makes the case recoverable. Both paths run through `applyWowProgressFilters()`, so the fallback still honours the officer's filters when the WoWProgress integration is switched off and no content-script pass ran. An interactive (click-to-solve) challenge still defeats both, and Scout says so rather than returning a short list. Note a JSON endpoint would not help: Cloudflare acts at the zone edge, before the application, so any path on the same host is challenged identically.
+
+33. **Scout writes the API-resolved role back onto the candidate.** An `'auto'` lookup returns the role WarcraftLogs ranked the character as, and `effectiveRole()` already judges thresholds by it — but the role column used to keep showing the listing's claim (or nothing), so a row could read "healer" while being scored as DPS. `scoreCandidates()` now assigns `score.role` to `candidate.role`, and only ever from a role the API really resolved — it never fabricates `'dps'`. The site's original claim is kept in `candidate.listedRole` when the two disagree and surfaced as a tooltip on the role pill: "advertised as a healer, ranks as dps" is a recruitment signal, not a glitch. Safe because merging is complete before scoring starts, so `origins` (quirk 26) is no longer consulted.
+
+34. **The Scout table head sticks to a measured header, not a magic number.** `thead th` hangs off `top: var(--header-h)`, published by `trackHeaderHeight()` in `scout.js` from a `ResizeObserver` on `.scout-header`. It replaced a hardcoded `top: 88px` — which is in fact the header's height at every width where it is sticky, so this fixed no visible bug; it removes a constant in `scout.css` that silently had to track a box in another file, and it is right when that box changes (a wrapped header measures 104px, which the old value would have overlapped by 16px). Below 900px both the header and the table head go `position: static`: eleven columns overflow at that width, the page scrolls sideways, and a sticky box does not — so it would tear away from the table beneath it. An `overflow-x` wrapper is the other way to solve that and is worse here: the wrapper becomes the scrollport and breaks the sticky head outright.
+
+35. **Scout's sortable headers are real controls.** They are `<th data-sort>` with `tabindex="0"`, Enter/Space handlers and an `aria-sort` attribute kept current by `render()` — the ▲/▼ is CSS `content`, which a screen reader never sees. Only `th[data-sort]` gets the pointer cursor and hover colour; the Links column previously advertised a sort it does not have. Repeated harvest warnings are also collapsed: sources that render but match nobody are gathered into one sentence naming them all rather than one identical sentence each, and their chip goes amber (`is-empty`) rather than the green of a source that actually found candidates.
+
+36. **Scout's structured filters are remembered; its search box is not.** `matchesFilters()` in `scout-core.js` narrows the table by role, class, region, source, "seen on more than one site", and minimum item level / M+ score / mythic kills — all pure and unit-tested, because they decide what an officer does and does not see. Every field is opt-in (empty list, zero minimum), so the stored default hides nobody, and `normalizeFilters()` absorbs anything an older version wrote: storage outlives the code that wrote it, and a render must not throw because a list arrived as a string. **A minimum never rejects a stat the site did not report** — WoWProgress rows carry no M+ score at all, so treating absent as zero would silently drop every candidate from the sites that omit a stat, the same trap the site-side filters avoid. The filters and the sort column persist to `chrome.storage.sync`; the free-text search deliberately does not, because it answers "where is Thrall" rather than "who is worth talking to", and a query restored weeks later would read as a harvest that lost most of its rows. Because a remembered filter can shorten a list long after it was set, the count sits on the Filters button, a summary and a Clear control sit in the panel, and `restoreFilters()` opens the panel unprompted when anything is active. Chips are real checkboxes inside labels — keyboard handling, focus and screen-reader announcement come free, and only the box is restyled — with a colour swatch so a checked chip is not identified by its blue tint alone.
+
+37. **The per-site filters were not extended, deliberately.** WoWProgress (region, item-level range, class, guild status), Raider.IO (item level, region, role, class), and Guilds of WoW (item level, mythic kills, M+ score, class, role) already filter on everything their content scripts can read reliably. Raider.IO's row reader extracts only role, class and item level; adding an M+ minimum there would mean guessing at markup that was never verified, which is the mistake quirk 20 exists to record. Scout is where filtering was genuinely thin — it had a free-text box and nothing else — and it can filter on the merged candidate, which already carries the stats each site did publish.

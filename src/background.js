@@ -2,7 +2,7 @@ import {
     getCharacterScore, clearScoreCache, hasCredentials, testCredentials,
     storeSecret, getApiStatus, clearCloudflareBackoff,
 } from './wcl-api.js';
-import { buildScoutThresholds, scoutVerdict, characterFromWclUrl, WCL_ORIGIN as SCOUT_WCL_ORIGIN } from './scout.js';
+import { buildScoutThresholds, scoutVerdict, characterFromWclUrl, WCL_ORIGIN as SCOUT_WCL_ORIGIN } from './preflight.js';
 
 // ─── Badge / skipped-candidate count (persisted across service-worker restarts) ─
 // Counts candidates the scout flow rejected — pre-flight skips (no tab ever
@@ -92,7 +92,9 @@ const TRUSTED_HOSTS = [
     'www.guildsofwow.com',
 ];
 
-function isTrustedSender(sender) {
+// Content scripts: trusted only when running on one of the recruitment sites.
+// Tab-bound actions (closing tabs, opening tabs) accept nothing else.
+function isTrustedTabSender(sender) {
     if (!sender?.tab?.url) return false;
     try {
         const host = new URL(sender.tab.url).hostname;
@@ -100,6 +102,20 @@ function isTrustedSender(sender) {
     } catch {
         return false;
     }
+}
+
+// The Scout page (chrome-extension://<id>/src/scout/scout.html) has no
+// sender.tab, so the host check above rejects it outright. It is our own page
+// and needs the same scoring path the content scripts use, so it is trusted via
+// its extension origin instead — the id check keeps this closed to other
+// extensions, and it grants no tab-bound action.
+function isExtensionPageSender(sender) {
+    if (!sender || sender.id !== chrome.runtime.id || sender.tab) return false;
+    return typeof sender.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
+}
+
+function isTrustedSender(sender) {
+    return isTrustedTabSender(sender) || isExtensionPageSender(sender);
 }
 
 // ─── Scout pre-flight ──────────────────────────────────────────────────────────
@@ -119,7 +135,6 @@ const SCOUT_SETTING_KEYS = [
     'parseThreshold', 'bestParseThreshold',
     'wclMinBestHealer', 'wclMinMedianHealer',
     'wclMinBestTank', 'wclMinMedianTank',
-    'wclHideUnknown',
 ];
 
 async function readScoutSettings() {
@@ -202,7 +217,7 @@ chrome.webNavigation.onCompleted.addListener(function(details) {
 // ─── Sync message listener (fire-and-forget) ───────────────────────────────────
 
 chrome.runtime.onMessage.addListener(function(message, sender) {
-    if (!isTrustedSender(sender)) return;
+    if (!isTrustedTabSender(sender)) return;
 
     if (message.action === 'parseThresholdFailed') {
         chrome.tabs.remove(sender.tab.id);
@@ -236,7 +251,12 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     // whether it actually opens. The response lets the content script tell the
     // user the candidate was skipped instead of silently doing nothing.
     if (message.action === 'openTab') {
-        if (!trusted || !isAllowedTabUrl(message.url)) {
+        // Tab-bound action: it reads sender.tab.id and can close the source tab,
+        // so it takes the host-allowlist check specifically, not the widened
+        // `trusted` that also admits extension pages. An extension page reaching
+        // here would have thrown on sender.tab.id and left the caller's message
+        // channel hanging.
+        if (!isTrustedTabSender(sender) || !isAllowedTabUrl(message.url)) {
             sendResponse({ opened: false, verdict: 'unknown', reason: 'BLOCKED' });
             return true;
         }

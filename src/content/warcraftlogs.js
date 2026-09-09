@@ -319,3 +319,30 @@ if (isWarcraftLogsPage()) {
         }
     });
 }
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// Only meaningful on /recruitment/ — on a character page the ready selector
+// never matches and the harvester reports back that nothing rendered.
+
+registerHarvester('warcraftlogs', '.recruitment-search-result', function () {
+    return Array.from(document.querySelectorAll('.recruitment-search-result'))
+        .filter(card => card.style.display !== 'none' && card.dataset.wclHidden !== 'true')
+        .map(card => {
+            const character = getRecruitmentCharacter(card);
+            if (!character) return null;
+            const href = card.querySelector('a[href*="/character/"]')?.getAttribute('href');
+            return {
+                ...character,
+                // 'auto' is a directive to the scoring API, not a role. Scout
+                // stores what it harvests, so leaking it here would render an
+                // "auto" role pill, sort as a string, and — because WCL outranks
+                // Guilds of WoW in SOURCE_META — beat a real role read from a
+                // GoW card during merge. null is the "unknown" the merge expects.
+                role:        character.role === 'auto' ? null : character.role,
+                playerClass: getRecruitmentClass(card),
+                mythicKills: getRecruitmentMythicKills(card),
+                link:        href ? new URL(href, 'https://www.warcraftlogs.com').toString() : null,
+            };
+        })
+        .filter(Boolean);
+});

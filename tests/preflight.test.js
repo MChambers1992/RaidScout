@@ -1,6 +1,6 @@
-// tests/scout.test.js
-// Unit tests for the scout decision logic. Unlike common.test.js (which inlines
-// its copies because content scripts aren't modules), this imports src/scout.js
+// tests/preflight.test.js
+// Unit tests for the pre-flight decision logic. Unlike common.test.js (which inlines
+// its copies because content scripts aren't modules), this imports src/preflight.js
 // directly — it is a plain ES module with no browser globals.
 
 import { describe, it, expect } from 'vitest';
@@ -12,7 +12,7 @@ import {
     scoutVerdict,
     characterFromWclUrl,
     buildWclCharacterUrl,
-} from '../src/scout.js';
+} from '../src/preflight.js';
 
 // ─── roleForSpec ──────────────────────────────────────────────────────────────
 
@@ -49,7 +49,6 @@ const settings = {
     minBest: 60, minMedian: 50,
     minBestHealer: 80, minMedianHealer: 70,
     minBestTank: 0, minMedianTank: 0,
-    hideUnknown: false,
 };
 
 describe('thresholdsForRole', () => {
@@ -85,10 +84,9 @@ describe('failsWclThresholds', () => {
         expect(failsWclThresholds({ best: null, median: null, error: 'CLOUDFLARE_BLOCKED:300' }, settings, 'dps')).toBe(false);
         expect(failsWclThresholds({ best: null, median: null, error: 'NO_CREDENTIALS' }, settings, 'dps')).toBe(false);
     });
-    it('honours hideUnknown for characters with no logs', () => {
-        const score = { best: null, median: null, notFound: true };
-        expect(failsWclThresholds(score, settings, 'dps')).toBe(false);
-        expect(failsWclThresholds(score, { ...settings, hideUnknown: true }, 'dps')).toBe(true);
+    it('fails a character with no logs, with no setting to opt out of it', () => {
+        expect(failsWclThresholds({ best: null, median: null, notFound: true }, settings, 'dps')).toBe(true);
+        expect(failsWclThresholds({ best: null, median: null }, settings, 'dps')).toBe(true);
     });
 });
 
@@ -100,12 +98,10 @@ describe('buildScoutThresholds', () => {
             bestParseThreshold: 60, parseThreshold: 50,
             wclMinBestHealer: 80, wclMinMedianHealer: 70,
             wclMinBestTank: 30, wclMinMedianTank: 25,
-            wclHideUnknown: true,
         })).toEqual({
             minBest: 60, minMedian: 50,
             minBestHealer: 80, minMedianHealer: 70,
             minBestTank: 30, minMedianTank: 25,
-            hideUnknown: true,
         });
     });
     it('defaults every threshold to 0 on an empty snapshot', () => {
@@ -113,7 +109,6 @@ describe('buildScoutThresholds', () => {
             minBest: 0, minMedian: 0,
             minBestHealer: 0, minMedianHealer: 0,
             minBestTank: 0, minMedianTank: 0,
-            hideUnknown: false,
         });
     });
     it('tolerates being called with no arguments', () => {
@@ -145,11 +140,14 @@ describe('scoutVerdict', () => {
     it('is unknown when there is no score at all', () => {
         expect(scoutVerdict(null, settings, 'dps').verdict).toBe('unknown');
     });
-    it('opens characters with no logs unless hideUnknown is set', () => {
-        const score = { best: null, median: null, notFound: true };
-        expect(scoutVerdict(score, settings, 'dps')).toEqual({ verdict: 'open', reason: 'NO_LOGS' });
-        expect(scoutVerdict(score, { ...settings, hideUnknown: true }, 'dps'))
-            .toEqual({ verdict: 'reject', reason: 'NO_LOGS' });
+    // Deliberately diverges from the list filters, which hide a no-logs
+    // character: pre-flight decides whether you get to see a profile you
+    // navigated to on purpose, and an empty profile is itself an answer.
+    it('always opens a character with no logs, even though the list filters hide them', () => {
+        expect(scoutVerdict({ best: null, median: null, notFound: true }, settings, 'dps'))
+            .toEqual({ verdict: 'open', reason: 'NO_LOGS' });
+        expect(scoutVerdict({ best: null, median: null }, settings, 'dps'))
+            .toEqual({ verdict: 'open', reason: 'NO_LOGS' });
     });
     it('opens when every threshold is disabled', () => {
         expect(scoutVerdict({ best: 1, median: 1 }, buildScoutThresholds({}), 'dps').verdict).toBe('open');
