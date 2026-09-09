@@ -320,7 +320,16 @@ WoWProgress uses this exact format in its DOM classlist. Guilds of WoW uses `img
 RaidScout/
 ├── manifest.json              # Extension metadata, permissions, content script routes
 ├── CLAUDE.md                  # This file
-├── README.md                  # User-facing documentation
+├── tools/
+│   └── screenshots.mjs        # Regenerates docs/screenshots (see quirk 38)
+├── README.md                  # User-facing landing page — links out to docs/
+├── CHANGELOG.md
+├── docs/                      # Long-form user documentation
+│   ├── scout.md               # The Scout aggregator in depth
+│   ├── warcraftlogs-api.md    # API credential setup, per-role thresholds, badges
+│   ├── settings.md            # Every setting, by options-page tab
+│   ├── troubleshooting.md
+│   └── screenshots/           # README/doc images (see note below)
 ├── img/
 │   ├── logo-16.png
 │   ├── logo-48.png
@@ -364,3 +373,5 @@ RaidScout/
 36. **Scout's structured filters are remembered; its search box is not.** `matchesFilters()` in `scout-core.js` narrows the table by role, class, region, source, "seen on more than one site", and minimum item level / M+ score / mythic kills — all pure and unit-tested, because they decide what an officer does and does not see. Every field is opt-in (empty list, zero minimum), so the stored default hides nobody, and `normalizeFilters()` absorbs anything an older version wrote: storage outlives the code that wrote it, and a render must not throw because a list arrived as a string. **A minimum never rejects a stat the site did not report** — WoWProgress rows carry no M+ score at all, so treating absent as zero would silently drop every candidate from the sites that omit a stat, the same trap the site-side filters avoid. The filters and the sort column persist to `chrome.storage.sync`; the free-text search deliberately does not, because it answers "where is Thrall" rather than "who is worth talking to", and a query restored weeks later would read as a harvest that lost most of its rows. Because a remembered filter can shorten a list long after it was set, the count sits on the Filters button, a summary and a Clear control sit in the panel, and `restoreFilters()` opens the panel unprompted when anything is active. Chips are real checkboxes inside labels — keyboard handling, focus and screen-reader announcement come free, and only the box is restyled — with a colour swatch so a checked chip is not identified by its blue tint alone.
 
 37. **The per-site filters were not extended, deliberately.** WoWProgress (region, item-level range, class, guild status), Raider.IO (item level, region, role, class), and Guilds of WoW (item level, mythic kills, M+ score, class, role) already filter on everything their content scripts can read reliably. Raider.IO's row reader extracts only role, class and item level; adding an M+ minimum there would mean guessing at markup that was never verified, which is the mistake quirk 20 exists to record. Scout is where filtering was genuinely thin — it had a free-text box and nothing else — and it can filter on the merged candidate, which already carries the stats each site did publish.
+
+38. **The documentation screenshots are generated, not captured.** `tools/screenshots.mjs` renders `popup.html` and `options.html` in headless Chromium with `chrome.*` stubbed — the pages are plain HTML, so no packed extension or Chrome profile is involved — and writes `docs/screenshots/`. The stub's storage snapshot is a fully-configured install, so the shots show real values rather than empty fields; change it there, not by editing an image. The options shots are cropped to a section because `.save-area` is `position: sticky` and lands across the middle of a full-page capture. **The badge legend (`parse-badges.png`) is built by calling the real `makeBadge()` from `content/common.js`**, so the documented badge states cannot drift from the code — a new state or a changed colour shows up on the next run. Playwright is deliberately *not* in `package.json`: the project has no build step and `npm install` should stay light, so regeneration installs it with `--no-save` (the file header has the commands). The three `scout-*.png` are captured from a live run and are not reproduced by the script. Output is byte-stable across runs, so a rerun that produces a diff means a page actually changed.
