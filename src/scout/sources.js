@@ -12,11 +12,11 @@
 //             human, then ask it for the visible rows via registerHarvester()
 //             (see src/content/common.js) and close the tab.
 //
-// The 'tab' mode exists because Raider.IO, Guilds of WoW and the WarcraftLogs
-// recruitment search all render their listings client-side — their HTML arrives
-// empty, so there is nothing for DOMParser to read. Promoting any of them to
-// 'fetch' later (once its JSON endpoint is known) means changing only the
-// `mode` and `run` of that one entry; nothing downstream of the adapter cares.
+// The 'tab' mode exists because Raider.IO and Guilds of WoW both render their
+// listings client-side — their HTML arrives empty, so there is nothing for
+// DOMParser to read. Promoting either to 'fetch' later (once its JSON endpoint is
+// known) means changing only the `mode` and `run` of that one entry; nothing
+// downstream of the adapter cares.
 //
 // Every listing URL is user-editable in Settings → Scout. Sites move their
 // listing pages; an officer should be able to paste the URL they actually use
@@ -29,9 +29,13 @@ const TAB_LOAD_TIMEOUT_MS = 25_000;
 
 export const DEFAULT_SOURCE_URLS = {
     wowprogress:  'https://www.wowprogress.com/gearscore/?lfg=1&sortby=ts&raids_week=2&lang=en',
-    raiderio:     'https://raider.io/search?recruitment.guild_raids.profile.published_at%5B0%5D%5Bgte%5D=1&sort%5Brecruitment.guild_raids.profile.published_at%5D=desc',
+    // `type=character` is not optional: without it Raider.IO's advanced search
+    // renders its table with an `.rt-noData` body and no rows at all, which
+    // reached Scout as "no results rendered within 15s" and read like a markup
+    // change or a sign-in wall. The recruitment filter and sort are what make it
+    // a recruitment listing rather than a general character search.
+    raiderio:     'https://raider.io/search?type=character&recruitment.guild_raids.profile.published_at%5B0%5D%5Bgte%5D=1&sort%5Brecruitment.guild_raids.profile.published_at%5D=desc',
     guildsofwow:  'https://guildsofwow.com/recruits',
-    warcraftlogs: 'https://www.warcraftlogs.com/recruitment/',
 };
 
 // Site enable flags — a source whose site is switched off still harvests, but
@@ -40,7 +44,6 @@ export const SITE_ENABLED_KEYS = {
     wowprogress:  'wowprogressEnabled',
     raiderio:     'raiderioEnabled',
     guildsofwow:  'guildsofwowEnabled',
-    warcraftlogs: 'warcraftlogsEnabled',
 };
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -75,6 +78,37 @@ class CloudflareChallenge extends Error {
 
 // ─── Tab harvesting ────────────────────────────────────────────────────────────
 
+// Chrome refuses tabs.create/tabs.remove outright while the tab strip is busy —
+// the user is mid-drag, or an animation from a tab this run just opened or
+// closed has not settled — and the rejection reads "Tabs cannot be edited right
+// now (user may be dragging a tab)". Scout is the one caller that opens and
+// closes several tabs back to back, so it hits this far more often than the rest
+// of the extension, and a source that never got its tab reports itself as a
+// harvest failure with an error about tab dragging, which tells the officer
+// nothing about recruitment.
+//
+// It is genuinely transient, so retry it and only it: any other tabs error is a
+// real failure and is rethrown untouched.
+const TAB_BUSY_RE = /cannot be edited right now|user may be dragging/i;
+
+export async function withTabRetry(operation, { attempts = 6, baseDelayMs = 400 } = {}) {
+    let lastError = null;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        try {
+            return await operation();
+        } catch (err) {
+            if (!TAB_BUSY_RE.test(err?.message || '')) throw err;
+            lastError = err;
+            // Linear rather than exponential: a drag ends when the user lets go,
+            // which is a human-scale wait, and backing off to 12s would outlast
+            // the harvest timeout for no benefit.
+            await delay(baseDelayMs * (attempt + 1));
+        }
+    }
+    throw lastError || new Error('Tab could not be opened — the tab strip stayed busy');
+}
+
+
 function waitForTabComplete(tabId, timeoutMs = TAB_LOAD_TIMEOUT_MS) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => { cleanup(); reject(new Error('Timed out loading the page')); }, timeoutMs);
@@ -100,10 +134,24 @@ function waitForTabComplete(tabId, timeoutMs = TAB_LOAD_TIMEOUT_MS) {
 
 // Content scripts register their harvester at document_start but the listing
 // itself renders later, and some sites (WoWProgress, Raider.IO) self-redirect to
-// add query params, which tears down the first content script. Retry rather
-// than treating the first "no receiving end" as failure.
+// add query params, which tears down the first content script and discards the
+// message in flight. Retry rather than treating the first "no receiving end" as
+// failure.
+//
+// The retry budget is a wall-clock deadline, not a fixed attempt count. Five
+// attempts 700ms apart gave up after 3.5s, which Raider.IO reliably outlasts: it
+// rewrites its own query string to force the sort order, and the reload plus the
+// SPA's first render takes longer than that — so a page that was going to work
+// perfectly well was reported as "its content script never answered", and the
+// suggested fix (reload the extension) had nothing to do with the cause.
+const HARVEST_RETRY_WINDOW_MS = 12_000;
+
 async function requestHarvest(tabId, sourceId, timeoutMs) {
-    for (let attempt = 0; attempt < 5; attempt++) {
+    const deadline = Date.now() + HARVEST_RETRY_WINDOW_MS;
+    let attempts = 0;
+
+    while (true) {
+        attempts++;
         const response = await new Promise(resolve => {
             chrome.tabs.sendMessage(
                 tabId,
@@ -112,18 +160,22 @@ async function requestHarvest(tabId, sourceId, timeoutMs) {
             );
         });
         if (response) return response;
-        await delay(700);
+        if (Date.now() >= deadline) break;
+        await delay(600);
     }
+
     return {
         ok: false, source: sourceId, candidates: [],
-        error: 'The page loaded but its content script never answered. Reload the extension and try again.',
+        error: `The page never answered after ${attempts} attempts over ` +
+               `${Math.round(HARVEST_RETRY_WINDOW_MS / 1000)}s. It may still have been loading or ` +
+               `redirecting; if it happens every run, reload the extension at chrome://extensions.`,
     };
 }
 
 async function harvestViaTab(sourceId, url, { timeoutMs = 15_000 } = {}) {
     let tabId = null;
     try {
-        const tab = await chrome.tabs.create({ url, active: false });
+        const tab = await withTabRetry(() => chrome.tabs.create({ url, active: false }));
         tabId = tab.id;
         await waitForTabComplete(tabId);
         const response = await requestHarvest(tabId, sourceId, timeoutMs);
@@ -133,7 +185,7 @@ async function harvestViaTab(sourceId, url, { timeoutMs = 15_000 } = {}) {
     } finally {
         // Always clean up, including on timeout — a stranded background tab is
         // the one failure mode an officer would actually notice and resent.
-        if (tabId !== null) chrome.tabs.remove(tabId).catch(() => {});
+        if (tabId !== null) withTabRetry(() => chrome.tabs.remove(tabId)).catch(() => {});
     }
 }
 
@@ -325,6 +377,31 @@ function appendPageParam(url, page) {
     return parsed.toString();
 }
 
+// ─── Raider.IO listing URL ─────────────────────────────────────────────────────
+
+// Raider.IO's advanced search needs `type=character` to return anything: without
+// it the table renders with an empty `.rt-noData` body, which reaches Scout as
+// "nothing rendered" and reads like a markup change or a sign-in wall. The
+// default URL now carries it, but an officer who saved the old one in Settings →
+// Scout would keep getting an empty harvest with no way to know why — and the
+// listing-URL override exists precisely so they do not have to wait for an
+// extension update. So repair it in passing rather than failing on it.
+//
+// Only the missing parameter is added; anything else the officer put in the URL
+// is theirs and is left alone. An unparseable URL is handed back untouched for
+// the harvester to fail on with its own message.
+export function ensureRaiderioSearchParams(url) {
+    try {
+        const parsed = new URL(url);
+        if (!parsed.pathname.startsWith('/search')) return url;
+        if (parsed.searchParams.has('type')) return url;
+        parsed.searchParams.set('type', 'character');
+        return parsed.toString();
+    } catch {
+        return url;
+    }
+}
+
 // ─── Adapter registry ──────────────────────────────────────────────────────────
 
 export const SOURCE_ADAPTERS = [
@@ -343,9 +420,9 @@ export const SOURCE_ADAPTERS = [
             },
         }),
     },
-    { id: 'raiderio',     mode: 'tab', run: url => harvestViaTab('raiderio', url) },
+    { id: 'raiderio',     mode: 'tab', run: url => harvestViaTab('raiderio', ensureRaiderioSearchParams(url)) },
     { id: 'guildsofwow',  mode: 'tab', run: url => harvestViaTab('guildsofwow', url) },
-    { id: 'warcraftlogs', mode: 'tab', run: url => harvestViaTab('warcraftlogs', url, { timeoutMs: 18_000 }) },
+    // WarcraftLogs is not a source — see RETIRED_SOURCE_IDS in scout-core.js.
 ];
 
 export function adapterFor(sourceId) {

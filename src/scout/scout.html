@@ -15,6 +15,15 @@
         </div>
         <div class="scout-actions">
             <button id="runScout" class="primary">🔎 Run scout</button>
+            <!-- Notices are collapsed behind this button rather than stacked
+                 above the table: a run with four things to say used to push the
+                 results off the screen, and the one notice that mattered looked
+                 the same as three routine ones. Hidden until there is something
+                 to show, so an uneventful run has no dead control. -->
+            <button id="toggleNotices" class="ghost" aria-expanded="false"
+                    aria-controls="scoutBanner" hidden>
+                <span id="noticeIcon">⚠</span> Notices<span class="notice-count" id="noticeCount">0</span>
+            </button>
             <button id="openSettings" class="ghost">⚙ Settings</button>
         </div>
     </header>
@@ -22,6 +31,9 @@
     <section class="scout-progress" id="scoutProgress">
         <div class="source-chips" id="sourceChips"></div>
         <div class="progress-line" id="progressLine" role="status" aria-live="polite">Ready.</div>
+        <!-- Opened from the Notices button in the header. aria-live is kept so a
+             screen reader still hears a new notice arrive even while collapsed;
+             the count on the button is the visual equivalent. -->
         <div class="scout-banner" id="scoutBanner" role="status" aria-live="polite" hidden></div>
     </section>
 
@@ -62,7 +74,7 @@
             </fieldset>
 
             <fieldset class="filter-group">
-                <legend>Seen on</legend>
+                <legend>Advertising on</legend>
                 <div class="filter-chips" id="filterSources"></div>
                 <label class="inline-check">
                     <input type="checkbox" id="filterMultiSource">
@@ -106,7 +118,7 @@
                     <th data-sort="mplusScore" class="num" tabindex="0" role="columnheader" aria-sort="none">M+</th>
                     <th data-sort="mythicKills" class="num" tabindex="0" role="columnheader" aria-sort="none">Mythic</th>
                     <th data-sort="wclMedian" class="num" tabindex="0" role="columnheader" aria-sort="none">WCL parse</th>
-                    <th data-sort="sources" tabindex="0" role="columnheader" aria-sort="none">Seen on</th>
+                    <th data-sort="sources" tabindex="0" role="columnheader" aria-sort="none" title="Which recruitment sites this player is advertising on">Advertising on</th>
                     <th>Links</th>
                 </tr>
             </thead>

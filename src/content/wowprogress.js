@@ -25,7 +25,10 @@ function getPlayerRole(playerRow) {
 }
 
 function filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter) {
-    const rows = assertSelector('.rating', document, 'WoWProgress rating table')
+    // Same reasoning as the poll in handlePageNavigation: on a Cloudflare
+    // interstitial there is no table, and reporting that as changed markup is
+    // wrong. handlePageNavigation is what notices a genuinely missing table.
+    const rows = (!isCloudflareChallengePage() && assertSelector('.rating', document, 'WoWProgress rating table'))
         ? document.querySelectorAll('.rating tr')
         : [];
 
@@ -178,23 +181,54 @@ function loadSettingsAndFilter() {
     });
 }
 
+// Returns false when there is nothing to observe yet. Deliberately silent about
+// it: this runs immediately at startup and again from the poll below, so a miss
+// is usually "not yet", not "the markup changed". The poll owns the complaining.
 function observeTableChanges() {
-    const tableContainer = assertSelector('.ratingContainer', document, 'WoWProgress ratingContainer');
-    if (!tableContainer) return;
+    const tableContainer = document.querySelector('.ratingContainer');
+    if (!tableContainer) return false;
 
     const observer = new MutationObserver(mutations => {
         if (mutations.some(m => m.type === 'childList')) loadSettingsAndFilter();
     });
     observer.observe(tableContainer, { childList: true, subtree: true });
     loadSettingsAndFilter();
+    return true;
 }
 
+// How long the container may be missing before it is worth reporting. WoWProgress
+// is server-rendered, so the table is normally there at document_idle; this is
+// slack for a slow load, not an expected wait.
+const CONTAINER_GRACE_POLLS = 5;   // × 2s
+
 function handlePageNavigation() {
+    let missedPolls = 0;
+    let reported = false;
+
     setInterval(() => {
+        // Cloudflare serves its challenge at this very URL, so this script runs
+        // against the interstitial with no listing anywhere on it. That is not
+        // markup drift, and saying so sent the officer looking for a broken
+        // selector when the page simply had not loaded yet. Sit it out: passing
+        // the check reloads the page and re-runs this script.
+        if (isCloudflareChallengePage()) { missedPolls = 0; return; }
+
         const table = document.querySelector('.ratingContainer table');
-        if (table && !table.dataset.filtered) {
-            table.dataset.filtered = 'true';
-            observeTableChanges();
+        if (table) {
+            missedPolls = 0;
+            reported = false;
+            if (!table.dataset.filtered) {
+                table.dataset.filtered = 'true';
+                observeTableChanges();
+            }
+            return;
+        }
+
+        // Genuinely absent on a real page, for long enough that it is not a slow
+        // load — this is the case assertSelector exists to catch.
+        if (++missedPolls >= CONTAINER_GRACE_POLLS && !reported) {
+            reported = true;
+            assertSelector('.ratingContainer', document, 'WoWProgress ratingContainer');
         }
     }, 2000);
 }
@@ -230,6 +264,9 @@ chrome.storage.sync.get('wowprogressEnabled', function(options) {
     if (options.wowprogressEnabled !== false) {
         redirectRealmPageIfNeeded();
         if (isTargetPage()) {
+            // observeTableChanges may find nothing on this first call — a
+            // Cloudflare challenge, or a table that has not rendered. It says so
+            // by returning false and handlePageNavigation picks it up from there.
             observeTableChanges();
             handlePageNavigation();
         }

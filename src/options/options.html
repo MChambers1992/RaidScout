@@ -426,12 +426,14 @@
                 <div class="region-checks">
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="wowprogress"> WoWProgress</label>
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="raiderio"> Raider.IO</label>
-                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="warcraftlogs"> WarcraftLogs recruitment</label>
                     <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="guildsofwow"> Guilds of WoW</label>
                 </div>
-                <p class="hint">WoWProgress is read directly over the network. The other three render their listings in the
+                <p class="hint">WoWProgress is read directly over the network. The other two render their listings in the
                 browser, so Scout opens each one in a background tab for a few seconds, reads the filtered results and closes
                 it again — you never have to look at them.</p>
+                <p class="hint">WarcraftLogs is not a source. Its recruitment page sits behind Cloudflare, and its v2 API
+                has no recruitment data to ask for instead — the schema covers characters, guilds, reports and rankings only.
+                It stays what it is best at: the parse data every candidate here is ranked by.</p>
             </div>
 
             <p class="subsection-label">Limits</p>
@@ -460,6 +462,17 @@
                 credentials saved, Scout still lists everyone — it just can't rank them by parse.</p>
             </div>
             <div class="option toggle-inline">
+                <label for="scoutEnrichRaiderio">Cross-reference stats with Raider.IO</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scoutEnrichRaiderio">
+                    <span class="toggle-slider"></span>
+                </label>
+                <p class="hint">Looks every candidate up on Raider.IO's public character API to fill in M+ score,
+                mythic progress and item level. Each listing publishes a different subset — a WoWProgress row carries
+                an item level and nothing else — so without this those columns read “—” because of where the recruit
+                advertised, not because of how they play. Needs no API key.</p>
+            </div>
+            <div class="option toggle-inline">
                 <label for="scoutHideBelowThresholds">Hide candidates below thresholds</label>
                 <label class="toggle-switch">
                     <input type="checkbox" id="scoutHideBelowThresholds">
@@ -486,11 +499,7 @@
                 </div>
                 <div class="option">
                     <label for="scoutUrlRaiderio">Raider.IO</label>
-                    <input type="text" id="scoutUrlRaiderio" placeholder="https://raider.io/search?…recruitment.guild_raids…" autocomplete="off">
-                </div>
-                <div class="option">
-                    <label for="scoutUrlWarcraftlogs">WarcraftLogs recruitment</label>
-                    <input type="text" id="scoutUrlWarcraftlogs" placeholder="https://www.warcraftlogs.com/recruitment/" autocomplete="off">
+                    <input type="text" id="scoutUrlRaiderio" placeholder="https://raider.io/search?type=character&amp;…recruitment.guild_raids…" autocomplete="off">
                 </div>
                 <div class="option">
                     <label for="scoutUrlGuildsofwow">Guilds of WoW</label>

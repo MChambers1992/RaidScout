@@ -6,8 +6,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { parseWowProgressDocument, DEFAULT_SOURCE_URLS, adapterFor, isCloudflareChallenge } from '../src/scout/sources.js';
-import { normalizeCandidate, mergeCandidates } from '../src/scout/scout-core.js';
+import { parseWowProgressDocument, DEFAULT_SOURCE_URLS, adapterFor, isCloudflareChallenge, withTabRetry,
+         ensureRaiderioSearchParams, SOURCE_ADAPTERS } from '../src/scout/sources.js';
+import { normalizeCandidate, mergeCandidates, SOURCE_IDS, RETIRED_SOURCE_IDS } from '../src/scout/scout-core.js';
 
 // Mirrors the markup wowprogress.js targets: a .rating table whose rows carry
 // the class on .character, item level in td.center, and a /character/ link that
@@ -93,17 +94,31 @@ describe('parseWowProgressDocument', () => {
 
 describe('adapter registry', () => {
     it('exposes one adapter per source with a default URL', () => {
-        for (const id of ['wowprogress', 'raiderio', 'guildsofwow', 'warcraftlogs']) {
+        for (const id of SOURCE_IDS) {
             expect(adapterFor(id)).toBeTruthy();
             expect(DEFAULT_SOURCE_URLS[id]).toMatch(/^https:\/\//);
         }
+    });
+
+    it('has an adapter for every id Scout will ask about, and no others', () => {
+        // scout.js harvests SOURCE_IDS and calls adapterFor() on each; an id
+        // without an adapter reports itself to the officer as a failed harvest.
+        expect(SOURCE_ADAPTERS.map(a => a.id).sort()).toEqual([...SOURCE_IDS].sort());
     });
 
     it('marks only WoWProgress as directly fetchable', () => {
         expect(adapterFor('wowprogress').mode).toBe('fetch');
         expect(adapterFor('raiderio').mode).toBe('tab');
         expect(adapterFor('guildsofwow').mode).toBe('tab');
-        expect(adapterFor('warcraftlogs').mode).toBe('tab');
+    });
+
+    it('no longer harvests WarcraftLogs', () => {
+        // Its recruitment page is behind Cloudflare and its v2 API publishes no
+        // recruitment data at all, so there is nothing to harvest either way.
+        // WarcraftLogs still supplies every parse the table is ranked by.
+        expect(adapterFor('warcraftlogs')).toBeNull();
+        expect(DEFAULT_SOURCE_URLS.warcraftlogs).toBeUndefined();
+        expect(RETIRED_SOURCE_IDS).toContain('warcraftlogs');
     });
 
     it('returns null for an unknown source', () => {
@@ -350,5 +365,74 @@ describe('WoWProgress Cloudflare fallback', () => {
         expect(result.ok).toBe(false);
         expect(result.error).toMatch(/Cloudflare/i);
         expect(result.error).toMatch(/nothing rendered/);
+    });
+});
+
+
+describe('withTabRetry', () => {
+    // Chrome refuses tabs.create/remove outright while the tab strip is busy, and
+    // Scout is the only caller that opens and closes several tabs in a row. Left
+    // unhandled it surfaced as a harvest failure — "WarcraftLogs returned
+    // nothing: Tabs cannot be edited right now" — which tells an officer nothing
+    // about recruitment and points at no fix.
+    const busy = () => new Error('Tabs cannot be edited right now (user may be dragging a tab)');
+
+    it('retries the transient tab-strip refusal and returns the eventual result', async () => {
+        let calls = 0;
+        const result = await withTabRetry(async () => {
+            if (++calls < 3) throw busy();
+            return { id: 7 };
+        }, { baseDelayMs: 1 });
+
+        expect(result).toEqual({ id: 7 });
+        expect(calls).toBe(3);
+    });
+
+    it('rethrows any other tabs error immediately', async () => {
+        let calls = 0;
+        await expect(withTabRetry(async () => {
+            calls++;
+            throw new Error('No tab with id 42');
+        }, { baseDelayMs: 1 })).rejects.toThrow('No tab with id 42');
+
+        expect(calls).toBe(1);
+    });
+
+    it('gives up after the attempt budget rather than looping forever', async () => {
+        let calls = 0;
+        await expect(withTabRetry(async () => { calls++; throw busy(); },
+                                  { attempts: 3, baseDelayMs: 1 })).rejects.toThrow(/cannot be edited/);
+        expect(calls).toBe(3);
+    });
+});
+
+
+describe('ensureRaiderioSearchParams', () => {
+    // Without type=character Raider.IO's advanced search renders its table with
+    // an empty `.rt-noData` body and no rows, which reached Scout as "nothing
+    // rendered within 15s" — indistinguishable from a markup change.
+    it('adds the parameter the search needs to return anything', () => {
+        const fixed = ensureRaiderioSearchParams('https://raider.io/search?sort%5Bx%5D=desc');
+        expect(new URL(fixed).searchParams.get('type')).toBe('character');
+    });
+
+    it('is what the shipped default already carries', () => {
+        expect(new URL(DEFAULT_SOURCE_URLS.raiderio).searchParams.get('type')).toBe('character');
+    });
+
+    it('leaves an explicit type alone — the officer chose it', () => {
+        const url = 'https://raider.io/search?type=guild&x=1';
+        expect(ensureRaiderioSearchParams(url)).toBe(url);
+    });
+
+    it('preserves every other parameter untouched', () => {
+        const fixed = new URL(ensureRaiderioSearchParams(DEFAULT_SOURCE_URLS.raiderio.replace('type=character&', '')));
+        expect(fixed.searchParams.get('sort[recruitment.guild_raids.profile.published_at]')).toBe('desc');
+        expect(fixed.searchParams.get('recruitment.guild_raids.profile.published_at[0][gte]')).toBe('1');
+    });
+
+    it('does not touch a non-search URL or an unparseable one', () => {
+        expect(ensureRaiderioSearchParams('https://raider.io/recruitment')).toBe('https://raider.io/recruitment');
+        expect(ensureRaiderioSearchParams('not a url')).toBe('not a url');
     });
 });

@@ -76,11 +76,12 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 
 | Setting | Default | What it does |
 |---|---|---|
-| Sources | all four | Which recruitment sites a Scout run harvests |
+| Sources | all three | Which recruitment sites a Scout run harvests |
 | Max candidates per run | 150 | Cap on unique candidates scored — each one is a WarcraftLogs API call |
 | WoWProgress pages per run | 1 | How many pages of the WoWProgress listing to pull |
 | Fetch WarcraftLogs parses | On | Score candidates via the API. Off = list only, no parses |
 | Hide candidates below thresholds | On | Apply your parse thresholds to the results, and hide candidates with no logs. Candidates that couldn't be scored stay visible (also toggleable on the Scout page) |
+| Cross-reference stats with Raider.IO | On | Look every candidate up on Raider.IO's public character API to fill in M+ score, mythic progress and item level. Each listing publishes a different subset, so without this those columns are blank because of where the recruit advertised rather than how they play. Needs no API key |
 | Listing URLs | blank | Override the default listing URL per source. Blank = use the default |
 
 ---

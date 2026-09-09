@@ -7,7 +7,7 @@
 <p align="center">
   A Chrome extension that streamlines World of Warcraft guild recruitment.<br>
   Filter candidates on WoWProgress, Raider.IO and Guilds of WoW by item level,
-  class, role and WarcraftLogs parse — or pull all four into one ranked list.
+  class, role and WarcraftLogs parse — or pull every site into one ranked list.
 </p>
 
 <p align="center">

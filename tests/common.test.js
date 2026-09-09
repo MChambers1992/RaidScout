@@ -20,6 +20,7 @@ const commonSource = readFileSync(new URL('../src/content/common.js', import.met
 const EXPOSED = [
     'normalizeClassName', 'hasNoWclLogs', 'failsWclThresholds', 'thresholdsForRole',
     'wclSortEnabled', 'effectiveRole', 'badgeStateForScore', 'buildWclSettings',
+    'roleForSpec', 'isCloudflareChallengePage',
 ];
 
 const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
@@ -28,6 +29,7 @@ dom.window.eval(`${commonSource}\n;window.__api = { ${EXPOSED.join(', ')} };`);
 const {
     normalizeClassName, hasNoWclLogs, failsWclThresholds, thresholdsForRole,
     wclSortEnabled, effectiveRole, badgeStateForScore, buildWclSettings,
+    roleForSpec, isCloudflareChallengePage,
 } = dom.window.__api;
 
 // ─── Still mirrored, deliberately ─────────────────────────────────────────────
@@ -340,5 +342,107 @@ describe('wclSortEnabled', () => {
 
     it('defaults to off for a fresh install with nothing saved', () => {
         expect(wclSortEnabled({})).toBe(false);
+    });
+});
+
+
+// ─── roleForSpec ──────────────────────────────────────────────────────────────
+// The real function from common.js, evaluated above. There are three copies of
+// this map (common.js, preflight.js, and the resolution in wcl-api.js) because
+// none of those three files can import from the others; tests/preflight.test.js
+// pins its own. Raider.IO's role column is gone, so this map is now the only
+// thing standing between a healer and being judged on DPS parses.
+
+describe('roleForSpec', () => {
+    it('reads the healer specs', () => {
+        for (const spec of ['Restoration', 'Holy', 'Discipline', 'Mistweaver', 'Preservation']) {
+            expect(roleForSpec(spec)).toBe('healer');
+        }
+    });
+
+    it('reads the tank specs', () => {
+        for (const spec of ['Protection', 'Guardian', 'Blood', 'Brewmaster', 'Vengeance']) {
+            expect(roleForSpec(spec)).toBe('tank');
+        }
+    });
+
+    it('treats every other spec as DPS, including ones added since', () => {
+        // Devourer and Augmentation are both live on Raider.IO's listing today
+        // and neither heals nor tanks, so falling through to dps is right.
+        for (const spec of ['Arms', 'Havoc', 'Devourer', 'Augmentation', 'Devastation', 'Frost']) {
+            expect(roleForSpec(spec)).toBe('dps');
+        }
+    });
+
+    it('covers every spec Raider.IO currently publishes on its recruitment listing', () => {
+        // Captured from a live harvest: 30 distinct specs across 100 rows. Any
+        // of them returning null would mean a row scored against the wrong metric.
+        const live = ['Arcane', 'Arms', 'Assassination', 'Augmentation', 'Balance', 'Beast Mastery',
+            'Blood', 'Brewmaster', 'Demonology', 'Destruction', 'Devastation', 'Devourer', 'Elemental',
+            'Enhancement', 'Frost', 'Fury', 'Guardian', 'Havoc', 'Holy', 'Marksmanship', 'Mistweaver',
+            'Protection', 'Restoration', 'Retribution', 'Shadow', 'Subtlety', 'Survival', 'Unholy',
+            'Vengeance', 'Windwalker'];
+        expect(live.filter(s => !['dps', 'tank', 'healer'].includes(roleForSpec(s)))).toEqual([]);
+    });
+
+    it('is null for an unknown spec rather than a guessed dps', () => {
+        // The caller sends 'auto' on null and lets WarcraftLogs resolve it.
+        expect(roleForSpec(null)).toBeNull();
+        expect(roleForSpec('')).toBeNull();
+    });
+
+    it('is case- and whitespace-insensitive, matching what a title attribute carries', () => {
+        expect(roleForSpec('  restoration ')).toBe('healer');
+    });
+});
+
+
+// ─── isCloudflareChallengePage ────────────────────────────────────────────────
+// Cloudflare serves its challenge at the requested page's own URL, so a content
+// script matched on that URL runs against the interstitial instead of the site.
+// Without this check every selector on the page is missing and the extension
+// reports "site markup may have changed" — sending the user after a broken
+// selector when the page simply had not loaded yet.
+//
+// The real function from common.js is evaluated in jsdom above, but it reads the
+// live `document`, so each case gets its own DOM rather than the shared one.
+
+describe('isCloudflareChallengePage', () => {
+    // Runs the real function against a throwaway document.
+    function inPage(html, title = '') {
+        const page = new JSDOM(`<!doctype html><head><title>${title}</title></head><body>${html}</body>`,
+                               { runScripts: 'outside-only' });
+        page.window.eval(`${commonSource}
+;window.__r = isCloudflareChallengePage();`);
+        return page.window.__r;
+    }
+
+    it('recognises the title both blocked sites actually serve', () => {
+        // Captured from live requests to wowprogress.com and warcraftlogs.com,
+        // which both answer 403 with exactly this title.
+        expect(inPage('', 'Just a moment...')).toBe(true);
+        expect(inPage('', 'Attention Required! | Cloudflare')).toBe(true);
+    });
+
+    it('recognises the challenge markers regardless of title', () => {
+        expect(inPage('<div id="challenge-running"></div>')).toBe(true);
+        expect(inPage('<div id="cf-challenge-running"></div>')).toBe(true);
+        expect(inPage('<h1 id="challenge-error-title">Error</h1>')).toBe(true);
+        expect(inPage('<script src="https://x/cdn-cgi/challenge-platform/h/b/orchestrate"></script>')).toBe(true);
+    });
+
+    it('does not fire on the real listing page', () => {
+        // The case that matters most: a false positive here would silently stop
+        // filtering on a page that is working perfectly well.
+        expect(inPage('<div class="ratingContainer"><table class="rating"></table></div>',
+                      'WoWProgress: Gear Score Rating')).toBe(false);
+    });
+
+    it('does not fire on a page that merely mentions the words', () => {
+        expect(inPage('<p>Just a moment while we load your logs</p>', 'Guild recruitment')).toBe(false);
+    });
+
+    it('tolerates a page with no title at all', () => {
+        expect(inPage('<div></div>')).toBe(false);
     });
 });

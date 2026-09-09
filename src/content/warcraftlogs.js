@@ -34,18 +34,11 @@ function extractCharacterFromUrl(url) {
     }
 }
 
-// Cloudflare interstitial ("Just a moment…", managed challenge, or a block
-// page). The real character page replaces it after the check passes, which
-// re-runs this content script, so there is nothing to poll for meanwhile —
-// and closing the tab mid-challenge is exactly what we want to avoid.
-function isCloudflareChallengePage() {
-    if (document.getElementById('challenge-running') ||
-        document.getElementById('cf-challenge-running') ||
-        document.getElementById('challenge-error-title')) return true;
-    if (document.querySelector('script[src*="challenge-platform"]')) return true;
-    const title = (document.title || '').toLowerCase();
-    return title.startsWith('just a moment') || title.includes('attention required');
-}
+// isCloudflareChallengePage() lives in common.js — WoWProgress is behind the same
+// interstitial and needs the same check. The real character page replaces the
+// challenge after it passes, which re-runs this content script, so there is
+// nothing to poll for meanwhile — and closing the tab mid-challenge is exactly
+// what we want to avoid.
 
 let reactiveCheckTimer = null;
 let reactiveAttempts   = 0;
@@ -321,28 +314,20 @@ if (isWarcraftLogsPage()) {
 }
 
 // ─── Scout harvest ─────────────────────────────────────────────────────────────
-// Only meaningful on /recruitment/ — on a character page the ready selector
-// never matches and the harvester reports back that nothing rendered.
-
-registerHarvester('warcraftlogs', '.recruitment-search-result', function () {
-    return Array.from(document.querySelectorAll('.recruitment-search-result'))
-        .filter(card => card.style.display !== 'none' && card.dataset.wclHidden !== 'true')
-        .map(card => {
-            const character = getRecruitmentCharacter(card);
-            if (!character) return null;
-            const href = card.querySelector('a[href*="/character/"]')?.getAttribute('href');
-            return {
-                ...character,
-                // 'auto' is a directive to the scoring API, not a role. Scout
-                // stores what it harvests, so leaking it here would render an
-                // "auto" role pill, sort as a string, and — because WCL outranks
-                // Guilds of WoW in SOURCE_META — beat a real role read from a
-                // GoW card during merge. null is the "unknown" the merge expects.
-                role:        character.role === 'auto' ? null : character.role,
-                playerClass: getRecruitmentClass(card),
-                mythicKills: getRecruitmentMythicKills(card),
-                link:        href ? new URL(href, 'https://www.warcraftlogs.com').toString() : null,
-            };
-        })
-        .filter(Boolean);
-});
+// There isn't one. Scout used to open /recruitment/ in a background tab and read
+// the rows through registerHarvester(), but WarcraftLogs sits behind an
+// aggressive Cloudflare configuration, so the source that most needed a tab was
+// the one most likely to be served a challenge instead of a listing — the exact
+// cost pre-flight scouting was built to stop paying.
+//
+// Their v2 API cannot stand in for it either: the Client API's root Query is
+// characterData, gameData, guildData, progressRaceData, rateLimitData,
+// reportData, userData, worldData and two report-component fields, and nothing in
+// the published schema describes a recruitment post (the one "Recruit" in it is a
+// guild rank). The recruitment Discord integration is an outbound webhook, not
+// something a client can query.
+//
+// So WarcraftLogs contributes what only it can — the parses every candidate is
+// ranked by — and Scout harvests names from the three sites that publish them.
+// The recruitment-page filtering earlier in this file is unaffected: that is for
+// browsing /recruitment/ yourself, which is still a perfectly good thing to do.

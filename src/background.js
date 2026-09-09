@@ -104,19 +104,35 @@ function isTrustedTabSender(sender) {
     }
 }
 
-// The Scout page (chrome-extension://<id>/src/scout/scout.html) has no
-// sender.tab, so the host check above rejects it outright. It is our own page
-// and needs the same scoring path the content scripts use, so it is trusted via
-// its extension origin instead — the id check keeps this closed to other
-// extensions, and it grants no tab-bound action.
+// Our own extension pages — the Scout page above all — need the same scoring
+// path the content scripts use, and the host check above rejects them because
+// their hostname is the extension id rather than a recruitment site.
+//
+// The trust boundary here is the URL: only this extension's own pages have a
+// chrome-extension://<our id>/ URL, and the browser sets sender.url, not the
+// page. The sender.id check keeps it closed to other extensions.
+//
+// This deliberately does NOT require sender.tab to be absent. It used to, on the
+// assumption that an extension page has no tab — but Chrome populates
+// sender.tab for anything sent from a tab, and the Scout page is opened with
+// chrome.tabs.create, so it always had one. The guard rejected every scoring
+// request Scout ever made: they came back UNTRUSTED_SENDER and every candidate
+// rendered a "⚠ WCL err" badge. Separation from the tab-bound actions is not
+// lost, because it never rested on this: the sync listener that closes and
+// opens tabs checks isTrustedTabSender alone.
 function isExtensionPageSender(sender) {
-    if (!sender || sender.id !== chrome.runtime.id || sender.tab) return false;
-    return typeof sender.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
+    if (!sender || sender.id !== chrome.runtime.id) return false;
+    if (typeof sender.url !== 'string') return false;
+    return sender.url.startsWith(chrome.runtime.getURL(''));
 }
 
 function isTrustedSender(sender) {
     return isTrustedTabSender(sender) || isExtensionPageSender(sender);
 }
+
+// Exported for tests/background-senders.test.js. The listeners below are the
+// only production callers; nothing imports background.js.
+export { isTrustedTabSender, isExtensionPageSender, isTrustedSender, TRUSTED_HOSTS };
 
 // ─── Scout pre-flight ──────────────────────────────────────────────────────────
 // The scout flow used to be: open the candidate's WarcraftLogs tab, let the

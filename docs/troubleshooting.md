@@ -27,7 +27,10 @@
 
 **Parse badges show "⚠ WCL err"**
 - A transient lookup failure — the character stays visible, because filtering always fails open
-- If it persists across refreshes, check the service worker console: `chrome://extensions/` → RaidScout → **Service worker** → **inspect**. Look for `[RaidScout WCL]` lines (turn on debug logging in Full Settings for more detail)
+- **Hover the badge**: its tooltip carries the actual error, which is what tells you which of the causes below you have
+- On the **Scout** page you don't need to hover — a run that fails to score names the cause behind the **Notices** button, with the fix that applies
+- Common causes: a wrong or revoked Client ID/Secret (use **Test connection** in Full Settings), WarcraftLogs being slow or down, or their API rejecting the query outright — the last one reads `WCL GraphQL error: …` and needs an extension update, not a settings change
+- For the full picture, check the service worker console: `chrome://extensions/` → RaidScout → **Service worker** → **inspect**. Look for `[RaidScout WCL]` lines (turn on debug logging in Full Settings for more detail)
 
 **"☁ Cloudflare check" in the popup, or `☁ CF check` badges on rows**
 - WarcraftLogs is challenging RaidScout's API requests. This is not a credentials problem
@@ -53,9 +56,14 @@
 ## Scout
 
 **A Scout source returned nothing**
-- The banner names the site, the reason and the URL it used. Open that URL yourself: if the listing looks fine in your browser but Scout saw nothing, the site changed its markup
+- The **Notices** button in the header carries the count; open it for the site, the reason and the URL it used. Open that URL yourself: if the listing looks fine in your browser but Scout saw nothing, the site changed its markup
 - A "No results rendered within Ns" error on Raider.IO, WarcraftLogs or Guilds of WoW usually means the page wanted a sign-in, or the listing URL is wrong — override it in Settings → Scout → Listing URLs
+- Raider.IO's search needs `type=character` in the URL, or it renders an empty table rather than an error. RaidScout adds it automatically, including to a listing URL you saved yourself — but if you open the search manually and see no rows, that parameter is why
 - WoWProgress is fetched directly, so it fails differently: an HTTP status or "No results table (.rating)" means the URL is wrong or the markup changed. If WoWProgress is behind a Cloudflare challenge, Scout automatically retries it through a background tab, which reuses the clearance your browser already holds. An interactive click-to-solve challenge defeats both — open wowprogress.com, clear it, and run Scout again
+
+**Every candidate shows "⚠ WCL err"**
+- Nobody is hidden by this — scoring fails open — and the **Notices** button in the Scout header names the cause and the fix. See [Badges and the API](#badges-and-the-api) above
+- If it says the credentials were rejected, use **Test connection** in Full Settings → WarcraftLogs; if it mentions Cloudflare, open warcraftlogs.com in a tab and complete the check
 
 **Scout is hiding people who look fine on the site**
 - Candidates with no WarcraftLogs parses are hidden by **Hide below thresholds & no logs**. The counter above the table shows how many; untick it to see them
@@ -64,7 +72,7 @@
 **Scout found fewer candidates than the sites show**
 - Each source is filtered by its own tab's settings before Scout ever sees it — a strict item-level or class filter on one site applies to that site's Scout results too
 - De-duplication merges cross-posted players, so 60 + 45 + 20 listing rows is usually well under 125 unique people
-- Check the candidate cap in Settings → Scout if the banner mentions it
+- Check the candidate cap in Settings → Scout if the Notices panel mentions it
 
 **Scout is slow**
 - The three browser-rendered sources each need a few seconds of real page load. WoWProgress, fetched directly, returns almost instantly

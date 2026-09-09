@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RaidScout",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Streamline your World of Warcraft guild recruitment process with this extension. Extends functionality on websites such as WarcraftLogs, WoWProgress, and more.",
   "author": "Michael Chambers",
   "icons": {
@@ -73,5 +73,5 @@
       ]
     }
   ],
-  "version_name": "1.4.0 — Scout aggregator, pre-flight scouting, role auto-resolution"
+  "version_name": "1.5.0 — Raider.IO cross-reference, class icons, counted notices"
 }

@@ -3,7 +3,7 @@
 [← Back to README](../README.md)
 
 Scout answers one question: *who is looking for a guild right now that meets my
-criteria?* — without opening four sites and reading four different layouts.
+criteria?* — without opening three sites and reading three different layouts.
 
 Click **🔎 Scout all sites** in the popup.
 
@@ -14,20 +14,89 @@ Click **🔎 Scout all sites** in the popup.
 ## What a run does
 
 1. **Harvests** every source you've enabled. WoWProgress is read directly over
-   the network. Raider.IO, WarcraftLogs recruitment and Guilds of WoW render
-   their listings in the browser, so Scout opens each in a background tab for a
-   few seconds, lets RaidScout's own content script filter it exactly as it
-   would for you, reads the surviving rows and closes the tab.
+   the network. Raider.IO and Guilds of WoW render their listings in the
+   browser, so Scout opens each in a background tab for a few seconds, lets
+   RaidScout's own content script filter it exactly as it would for you, reads
+   the surviving rows and closes the tab.
 2. **Filters** each site by that site's own settings — the item level, class,
    role and region filters you already configured in its tab.
 3. **De-duplicates** across sites. The same player advertising on WoWProgress
-   *and* Raider.IO *and* GoW becomes one row marked `×3` — and being on three
-   sites at once is itself a signal they're actively looking.
+   *and* Raider.IO *and* GoW becomes one row, and the **Advertising on** column
+   names all three — being on three sites at once is itself a signal they're
+   actively looking.
 4. **Scores** each unique player once through the WarcraftLogs API, with the
    same role-aware thresholds, 6-hour cache and rate-limit backoff as
-   [proactive filtering](warcraftlogs-api.md).
-5. **Ranks** everyone in a sortable table you can search, filter, copy as an
+   [proactive filtering](warcraftlogs-api.md). This runs first because it is
+   what decides who you look at, and it is the faster of the two lookups.
+5. **Cross-references** the candidates that survived against Raider.IO's
+   public character API, to fill in M+ score, mythic progress and item level
+   (see below). Only the survivors, because looking someone up after the
+   thresholds rejected them spends a request on a row you won't see.
+6. **Ranks** everyone in a sortable table you can search, filter, copy as an
    in-game whisper list, or export to CSV.
+
+---
+
+## Every candidate gets the same columns
+
+The three sites publish wildly different stats. A WoWProgress row has an item
+level and nothing else — no M+ score, no raid progress. Raider.IO's search table
+adds a role. Only Guilds of WoW prints all three. So a blank M+ cell used to
+mean *"the site they happened to post on doesn't print that"*, which tells you
+nothing about the player.
+
+**Cross-reference stats with Raider.IO** (Settings → Scout, on by default) looks
+every candidate up on Raider.IO's public character API and fills in the gaps:
+M+ score, current-tier mythic kills, item level, class and spec. It needs no API
+key and no sign-in.
+
+Two rules keep it from doing harm:
+
+- **It only fills gaps and refreshes numbers.** A stat takes whichever reading
+  is higher, since gear and progress only go up. A role a site *stated* is never
+  overwritten — that came from the recruit's own advert, whereas Raider.IO
+  reports whichever spec they last logged out in.
+- **A failed lookup changes nothing and says nothing.** Raider.IO has never
+  heard of plenty of legitimate fresh alts, so a miss simply leaves the row as
+  the listing described it rather than raising a warning you can't act on.
+
+Class and role also come free where they can be deduced: hunters, mages, rogues
+and warlocks have no tank or healer specialisation, so knowing the class settles
+the role outright — no markup guessing, no API call.
+
+Mythic progress is shown as a fraction — **6/8**, not 6 — because a kill count
+means nothing without the tier's boss count, and that count changes every
+raid. Candidates whose kills came from a listing that prints no total show
+the bare number.
+
+Turn it off if you'd rather the run finish faster, or if you only care about
+parses.
+
+---
+
+## Why WarcraftLogs isn't a source
+
+Scout harvests names from WoWProgress, Raider.IO and Guilds of WoW. It used to
+read the WarcraftLogs recruitment page too, by opening it in a background tab —
+and that was the least reliable part of a run, because WarcraftLogs sits behind
+an aggressive Cloudflare configuration. The source that most needed a browser tab
+was the one most likely to be handed a security check instead of a listing.
+
+The obvious fix — asking the WarcraftLogs API for the listing, the way RaidScout
+already asks it for parses — isn't available. Their v2 API covers characters,
+guilds, reports, rankings and game data; there is nothing in it that describes a
+recruitment post. The recruitment page's Discord integration is an outbound
+webhook (WarcraftLogs *posting* new adverts to a channel), not something an
+application can query.
+
+So WarcraftLogs does the thing only it can do: **every candidate in the table is
+still ranked by WarcraftLogs parses**, fetched through your API credentials
+exactly as before. Nothing about scoring, thresholds or badges changed.
+
+If you like reading `warcraftlogs.com/recruitment` yourself, that page still gets
+RaidScout's filters and inline parse badges — see
+[WarcraftLogs API](warcraftlogs-api.md). It just isn't somewhere Scout goes on
+your behalf any more.
 
 ---
 
@@ -78,7 +147,7 @@ misconfiguration. The counter above the table breaks the two apart —
 
 Every other filter in RaidScout fails *open* — on an error it shows the
 candidate rather than hiding them. Scout deliberately fails *visible* instead:
-if a site returns nothing, its chip turns red and a banner says exactly which
+if a site returns nothing, its chip turns red and a notice says exactly which
 site, why, and against which URL. A shortened list you trust is worse than a
 visible error.
 

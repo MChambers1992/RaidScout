@@ -9,6 +9,9 @@ import {
     passesWowProgressFilters, sortCandidates, matchesQuery, profileLinks,
     toCsv, toWhisperList, runWithConcurrency, hasNoLogs, isScored, classLabel,
     matchesFilters, normalizeFilters, activeFilterCount, hasActiveFilters, DEFAULT_FILTERS,
+    normalizeClassKey, roleFromClass, classIconUrl, DPS_ONLY_CLASSES,
+    describeScoreError, summarizeScoreErrors, SOURCE_IDS, RETIRED_SOURCE_IDS, SOURCE_META,
+    formatMythicProgress,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -571,5 +574,210 @@ describe('activeFilterCount', () => {
     it('counts each selected value and each minimum in use', () => {
         expect(activeFilterCount({ roles: ['tank', 'healer'], minIlvl: 630, multiSource: true })).toBe(4);
         expect(hasActiveFilters({ minMythic: 1 })).toBe(true);
+    });
+});
+
+
+describe('normalizeClassKey', () => {
+    it('maps the display names the sites and APIs use back to storage keys', () => {
+        expect(normalizeClassKey('Death Knight')).toBe('deathknight');
+        expect(normalizeClassKey('Demon Hunter')).toBe('demon_hunter');
+        expect(normalizeClassKey('Shaman')).toBe('shaman');
+        expect(normalizeClassKey('demon_hunter')).toBe('demon_hunter');
+    });
+
+    it('rejects anything that is not a class rather than inventing a key', () => {
+        expect(normalizeClassKey('Tinker')).toBeNull();
+        expect(normalizeClassKey('')).toBeNull();
+        expect(normalizeClassKey(null)).toBeNull();
+    });
+});
+
+describe('roleFromClass', () => {
+    it('settles the role for the four classes with no tank or healer spec', () => {
+        for (const cls of DPS_ONLY_CLASSES) expect(roleFromClass(cls)).toBe('dps');
+        expect(DPS_ONLY_CLASSES.sort()).toEqual(['hunter', 'mage', 'rogue', 'warlock']);
+    });
+
+    it('stays unknown for every class that has a non-DPS spec', () => {
+        // Guessing 'dps' here would score a healer against a DPS threshold they
+        // can never meet, which is the trap the whole role pipeline avoids.
+        for (const cls of ['warrior', 'paladin', 'priest', 'shaman', 'monk',
+                           'druid', 'deathknight', 'demon_hunter', 'evoker']) {
+            expect(roleFromClass(cls)).toBeNull();
+        }
+        expect(roleFromClass(null)).toBeNull();
+    });
+});
+
+describe('normalizeCandidate role inference', () => {
+    it('assigns dps to a listing that gave a DPS-only class but no role', () => {
+        const c = normalizeCandidate(raw({ role: null, playerClass: 'warlock' }), 'wowprogress');
+        expect(c.role).toBe('dps');
+        expect(c.origins.role).toBe('wowprogress');
+    });
+
+    it('leaves the role unknown when the class could be anything', () => {
+        expect(normalizeCandidate(raw({ role: null, playerClass: 'druid' }), 'wowprogress').role).toBeNull();
+    });
+
+    it('does not override a role the listing actually stated', () => {
+        // Only relevant if a site ever mislabels one, but the stated role is the
+        // recruit's own advert and the inference agrees with it anyway.
+        expect(normalizeCandidate(raw({ role: 'dps', playerClass: 'mage' }), 'raiderio').role).toBe('dps');
+    });
+
+    it('lets an inferred role win a merge, because it cannot be wrong', () => {
+        const wp  = normalizeCandidate(raw({ role: null, playerClass: 'rogue' }), 'wowprogress');
+        const gow = normalizeCandidate(raw({ role: 'tank', playerClass: 'rogue' }), 'guildsofwow');
+        expect(mergeCandidate(wp, gow).role).toBe('dps');
+    });
+});
+
+describe('classIconUrl', () => {
+    it('points at the bundled icon named for the storage key', () => {
+        expect(classIconUrl('demon_hunter')).toBe('../../img/class/demon_hunter.jpg');
+        expect(classIconUrl('deathknight')).toBe('../../img/class/deathknight.jpg');
+    });
+
+    it('is null for an unknown class, so no broken image is rendered', () => {
+        expect(classIconUrl('tinker')).toBeNull();
+        expect(classIconUrl(null)).toBeNull();
+    });
+});
+
+
+describe('describeScoreError', () => {
+    it('names the fix for each failure an officer can actually act on', () => {
+        expect(describeScoreError('NO_CREDENTIALS').hint).toMatch(/Client ID and Secret/);
+        expect(describeScoreError('CLOUDFLARE_BLOCKED:300').hint).toMatch(/warcraftlogs\.com in a normal tab/);
+        expect(describeScoreError('RATE_LIMITED:60').headline).toMatch(/rate limit/i);
+        expect(describeScoreError('NO_RESPONSE').hint).toMatch(/service-worker console/);
+    });
+
+    it('separates bad credentials from a broken token endpoint', () => {
+        // Same message prefix, completely different fix — re-entering a Client
+        // Secret does nothing about a 500 from the OAuth endpoint.
+        expect(describeScoreError('WCL token request failed (401): x').hint).toMatch(/wrong or has been revoked/);
+        expect(describeScoreError('WCL token request failed (500): x').hint).toMatch(/OAuth endpoint/);
+    });
+
+    it('flags a GraphQL rejection as needing an extension fix, not a setting change', () => {
+        const described = describeScoreError('WCL GraphQL error: Cannot query field "zoneRankings"');
+        expect(described.hint).toMatch(/API schema changed/);
+        // The raw message is kept verbatim: it is the only thing that identifies
+        // which part of the query the API stopped accepting.
+        expect(described.headline).toContain('Cannot query field "zoneRankings"');
+    });
+
+    it('passes an unrecognised message through rather than inventing advice', () => {
+        expect(describeScoreError('something new')).toEqual({ headline: 'something new', hint: null });
+        expect(describeScoreError(undefined).headline).toBe('UNKNOWN_ERROR');
+    });
+});
+
+describe('summarizeScoreErrors', () => {
+    const scored = wcl => ({ name: 'x', wcl });
+
+    it('collapses identical failures into one entry with a count', () => {
+        const summary = summarizeScoreErrors([
+            scored({ error: 'NO_CREDENTIALS' }),
+            scored({ error: 'NO_CREDENTIALS' }),
+            scored({ error: 'FETCH_TIMEOUT' }),
+        ]);
+        expect(summary.length).toBe(2);
+        expect(summary[0]).toMatchObject({ message: 'NO_CREDENTIALS', count: 2 });
+        expect(summary[1]).toMatchObject({ message: 'FETCH_TIMEOUT', count: 1 });
+    });
+
+    it('ignores candidates that scored fine or were never scored', () => {
+        expect(summarizeScoreErrors([
+            scored({ best: 90, median: 80 }),
+            scored(null),
+            { name: 'no wcl key at all' },
+        ])).toEqual([]);
+    });
+});
+
+
+describe('retired sources', () => {
+    it('drops a retired source from a stored filter instead of keeping it', () => {
+        // Storage outlives the code that wrote it. A filter naming only
+        // WarcraftLogs would otherwise match no candidate at all, and an empty
+        // table reads as a harvest that found nobody rather than a stale filter.
+        expect(normalizeFilters({ sources: ['warcraftlogs'] }).sources).toEqual([]);
+        expect(normalizeFilters({ sources: ['raiderio', 'warcraftlogs'] }).sources).toEqual(['raiderio']);
+    });
+
+    it('does not count a retired source towards the active-filter badge', () => {
+        expect(activeFilterCount({ ...DEFAULT_FILTERS, sources: ['warcraftlogs'] })).toBe(0);
+    });
+
+    it('keeps the three harvestable sources, each with display metadata', () => {
+        expect(SOURCE_IDS).toEqual(['wowprogress', 'raiderio', 'guildsofwow']);
+        for (const id of SOURCE_IDS) {
+            expect(SOURCE_META[id].label).toBeTruthy();
+            expect(SOURCE_META[id].colour).toMatch(/^#/);
+        }
+    });
+
+    it('gives every source a distinct merge priority', () => {
+        // preferByPriority breaks class/role ties on these; two sources sharing a
+        // rank would make the winner depend on harvest order.
+        const priorities = SOURCE_IDS.map(id => SOURCE_META[id].priority);
+        expect(new Set(priorities).size).toBe(priorities.length);
+    });
+
+    it('lists WarcraftLogs as retired rather than forgetting it', () => {
+        expect(RETIRED_SOURCE_IDS).toEqual(['warcraftlogs']);
+        expect(SOURCE_IDS).not.toContain('warcraftlogs');
+    });
+});
+
+
+describe('formatMythicProgress', () => {
+    it('shows the tier denominator, because a bare kill count says nothing', () => {
+        // 6/8 is most of a tier; 6/12 is a third of one. The number alone cannot
+        // be compared to anything, and the denominator changes every raid.
+        expect(formatMythicProgress({ mythicKills: 6, mythicTotal: 8 })).toBe('6/8');
+        expect(formatMythicProgress({ mythicKills: 0, mythicTotal: 8 })).toBe('0/8');
+    });
+
+    it('falls back to the bare count when only a listing supplied the kills', () => {
+        // Guilds of WoW prints a kill count with no boss total, and the Raider.IO
+        // cross-reference may not have run or may not know the character.
+        expect(formatMythicProgress({ mythicKills: 4, mythicTotal: null })).toBe('4');
+        expect(formatMythicProgress({ mythicKills: 4 })).toBe('4');
+    });
+
+    it('is null when the kills are unknown, so the cell can show a dash', () => {
+        expect(formatMythicProgress({ mythicKills: null, mythicTotal: 8 })).toBeNull();
+        expect(formatMythicProgress({})).toBeNull();
+        expect(formatMythicProgress(null)).toBeNull();
+    });
+
+    it('never renders a fraction over a zero total', () => {
+        // A total of 0 is not a denominator anyone can read.
+        expect(formatMythicProgress({ mythicKills: 3, mythicTotal: 0 })).toBe('3');
+    });
+});
+
+describe('mythicTotal through the merge', () => {
+    const src = (over, source) => normalizeCandidate(raw(over), source);
+
+    it('fills the boss count from whichever source knew it', () => {
+        const merged = mergeCandidate(src({ mythicKills: 3 }, 'wowprogress'),
+                                      src({ mythicKills: 5, mythicTotal: 8 }, 'guildsofwow'));
+        expect(merged.mythicKills).toBe(5);
+        expect(merged.mythicTotal).toBe(8);
+    });
+
+    it('does not take the higher of two boss counts', () => {
+        // The denominator describes the raid, not the player, so there is no
+        // freshest reading to prefer — and a max could invent a fraction larger
+        // than the raid itself.
+        const merged = mergeCandidate(src({ mythicKills: 3, mythicTotal: 8 }, 'wowprogress'),
+                                      src({ mythicKills: 3, mythicTotal: 12 }, 'guildsofwow'));
+        expect(merged.mythicTotal).toBe(8);
     });
 });

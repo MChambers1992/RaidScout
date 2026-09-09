@@ -75,12 +75,12 @@ const SCHEMA = [
     { key: 'scoutPagesPerSource',        type: 'int',    default: 1,     domId: 'scoutPagesPerSource' },
     { key: 'scoutWclEnabled',            type: 'bool',   default: true,  domId: 'scoutWclEnabled' },
     { key: 'scoutHideBelowThresholds',   type: 'bool',   default: true,  domId: 'scoutHideBelowThresholds' },
+    { key: 'scoutEnrichRaiderio',        type: 'bool',   default: true,  domId: 'scoutEnrichRaiderio' },
     { key: 'scoutUrlWowprogress',        type: 'string', default: '',    domId: 'scoutUrlWowprogress' },
     { key: 'scoutUrlRaiderio',           type: 'string', default: '',    domId: 'scoutUrlRaiderio' },
     { key: 'scoutUrlGuildsofwow',        type: 'string', default: '',    domId: 'scoutUrlGuildsofwow' },
-    { key: 'scoutUrlWarcraftlogs',       type: 'string', default: '',    domId: 'scoutUrlWarcraftlogs' },
     { key: 'scoutSources',               type: 'checkboxGroup',
-      default: ['wowprogress', 'raiderio', 'warcraftlogs', 'guildsofwow'], selector: '.scoutSourceFilter' },
+      default: ['wowprogress', 'raiderio', 'guildsofwow'], selector: '.scoutSourceFilter' },
 ];
 
 // Superseded keys that are still read so their value can be carried into the

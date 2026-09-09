@@ -39,6 +39,11 @@ function enforceSortingAndPublishedColumn() {
     const href   = window.location.href;
     const params = new URLSearchParams(window.location.search);
     const toAppend = [];
+    // Raider.IO's advanced search returns nothing at all without type=character —
+    // the table renders with an empty `.rt-noData` body rather than an error — so
+    // this is as load-bearing as the recruitment filter itself.
+    if (!params.has('type'))
+        toAppend.push('type=character');
     if (!params.has('recruitment.guild_raids.profile.published_at[0][gte]'))
         toAppend.push('recruitment.guild_raids.profile.published_at%5B0%5D%5Bgte%5D=1');
     if (!params.has('sort[recruitment.guild_raids.profile.published_at]'))
@@ -126,6 +131,25 @@ function ensureRioBadgeStyles() {
 
 // ─── Row data extraction ───────────────────────────────────────────────────────
 
+// The class cell carries two avatars: the class, then the spec — e.g.
+// title="Shaman" followed by title="Restoration", backed by a
+// `spec_<class>_<spec>` class on the sprite. Both are present on every row.
+function getRowSpec(classCell) {
+    if (!classCell) return null;
+    const avatars = classCell.querySelectorAll('.slds-avatar[title]');
+    // [0] is the class, [1] is the spec. Read the title rather than the sprite
+    // class because the title is the spec's display name, which is what
+    // roleForSpec() matches on.
+    if (avatars.length > 1 && avatars[1].title) return avatars[1].title;
+
+    // Fallback for a row that renders the sprite without a title: the class name
+    // is on the sprite as `spec_death-knight_blood`, whose last segment is the
+    // spec with hyphens for spaces ("beast-mastery").
+    const sprite = classCell.querySelector('[class*="spec_"]');
+    const match  = String(sprite?.className || '').match(/spec_[a-z-]+_([a-z-]+)/);
+    return match ? match[1].replace(/-/g, ' ') : null;
+}
+
 function getRowData(row) {
     const cells = row.querySelectorAll('.rt-td');
     if (cells.length < 6) return null;
@@ -134,12 +158,17 @@ function getRowData(row) {
     const region      = realmText.match(/^\(([A-Z]+)\)/)?.[1] ?? null;
     const ilvlText    = cells[4]?.querySelector('.slds-text-align--center')?.textContent.trim() ?? '';
     const ilvl        = parseFloat(ilvlText);
-    const roleCell    = cells[5];
-    let role = null;
-    if (roleCell?.querySelector('.tank-lfg-rio'))   role = 'tank';
-    else if (roleCell?.querySelector('.healer-lfg-rio')) role = 'healer';
-    else if (roleCell?.querySelector('.dps-lfg-rio'))    role = 'dps';
-    return { playerClass, region, ilvl: isNaN(ilvl) ? null : ilvl, role };
+
+    // Raider.IO removed its role column — the last cell is now "Published", and
+    // the .tank-lfg-rio / .healer-lfg-rio / .dps-lfg-rio markers this used to
+    // read no longer exist anywhere on the page, so every row parsed as an
+    // unknown role. The spec icon replaced it and is on every row, and a spec
+    // names its role outright, so this is a better reading than the one it
+    // replaces rather than a workaround for it.
+    const spec = getRowSpec(cells[1]);
+    const role = roleForSpec(spec);
+
+    return { playerClass, region, ilvl: isNaN(ilvl) ? null : ilvl, role, spec };
 }
 
 function getRowCharacter(group) {
@@ -317,6 +346,7 @@ registerHarvester('raiderio', '.rt-tr-group', function () {
             return {
                 ...character,
                 role:        data?.role ?? null,
+                spec:        data?.spec ?? null,
                 playerClass: data?.playerClass ?? null,
                 ilvl:        data?.ilvl ?? null,
                 link:        href ? new URL(href, 'https://raider.io').toString() : null,

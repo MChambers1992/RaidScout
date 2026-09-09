@@ -14,11 +14,31 @@
 export const SOURCE_META = {
     wowprogress:  { label: 'WoWProgress',   colour: '#4a90d9', priority: 1 },
     raiderio:     { label: 'Raider.IO',     colour: '#00b35a', priority: 2 },
-    warcraftlogs: { label: 'WarcraftLogs',  colour: '#e8670d', priority: 3 },
-    guildsofwow:  { label: 'Guilds of WoW', colour: '#9B59B6', priority: 4 },
+    guildsofwow:  { label: 'Guilds of WoW', colour: '#9B59B6', priority: 3 },
 };
 
 export const SOURCE_IDS = Object.keys(SOURCE_META);
+
+// WarcraftLogs was harvested as a fourth source by opening its /recruitment/
+// page in a background tab. It is no longer a source, for a reason that cannot
+// be engineered around: WarcraftLogs sits behind an aggressive Cloudflare
+// configuration, so the one source that most needed a tab was also the one most
+// likely to be handed a challenge instead of a listing — which is the very cost
+// pre-flight scouting exists to avoid paying.
+//
+// The obvious fix, asking their v2 API for the listing instead, is not available:
+// the Client API's root Query exposes characterData, gameData, guildData,
+// progressRaceData, rateLimitData, reportData, userData, worldData and two report
+// component fields, and nothing across the whole published schema describes a
+// recruitment post. (The recruitment feature's Discord integration is an outbound
+// webhook — WarcraftLogs pushing new posts to a channel — not something a client
+// can query.) So WarcraftLogs stays what it is best at and is still the most
+// valuable thing here: the parse data every candidate is ranked by.
+//
+// Kept as an id so settings written by an older version — a stored scoutSources
+// list, a saved source filter — are recognised and dropped rather than silently
+// narrowing a filter to a source that can never match.
+export const RETIRED_SOURCE_IDS = ['warcraftlogs'];
 
 // ─── Identity ──────────────────────────────────────────────────────────────────
 
@@ -52,6 +72,11 @@ export function makeCandidateKey({ region, realm, name }) {
 // Storage uses lowercase underscore keys ('demon_hunter', 'deathknight').
 // Naively replacing underscores gets 'demon hunter' right but leaves
 // 'deathknight' as one word, so the two irregular names are spelled out.
+const CLASS_KEYS = [
+    'warrior', 'paladin', 'hunter', 'rogue', 'priest', 'shaman', 'mage',
+    'warlock', 'monk', 'druid', 'deathknight', 'demon_hunter', 'evoker',
+];
+
 const CLASS_LABELS = {
     deathknight:  'Death Knight',
     demon_hunter: 'Demon Hunter',
@@ -61,6 +86,44 @@ export function classLabel(playerClass) {
     if (!playerClass) return null;
     if (CLASS_LABELS[playerClass]) return CLASS_LABELS[playerClass];
     return playerClass.charAt(0).toUpperCase() + playerClass.slice(1);
+}
+
+// The inverse: a display name from a site or an API ("Death Knight") back to the
+// storage key. Mirrors normalizeClassName() in content/common.js, which cannot be
+// imported here (classic script, no exports) — the two irregular names are the
+// only reason either function exists.
+export function normalizeClassKey(name) {
+    if (!name) return null;
+    const lower = String(name).toLowerCase().replace(/[\s_-]+/g, '');
+    if (lower === 'deathknight')  return 'deathknight';
+    if (lower === 'demonhunter')  return 'demon_hunter';
+    return CLASS_KEYS.includes(lower) ? lower : null;
+}
+
+// Blizzard's official class icons, bundled under img/class/ so the table renders
+// the same offline and makes no third-party request to draw a row. File names are
+// the storage class keys, so this is a path join rather than a lookup table.
+// Returns null for an unknown class — a row with no class shows no icon rather
+// than a broken image.
+export function classIconUrl(playerClass) {
+    return CLASS_KEYS.includes(playerClass) ? `../../img/class/${playerClass}.jpg` : null;
+}
+
+// ─── Role inference ────────────────────────────────────────────────────────────
+
+// Four classes have no tank or healer specialisation at all, so knowing the class
+// settles the role outright — no markup reading, no API call, no guess. Every
+// other class has at least one non-DPS spec, so its role stays unknown until a
+// site says otherwise or WarcraftLogs resolves it from the spec they ranked as.
+//
+// This matters beyond the role column: a candidate with a known role is scored
+// with a single-metric query instead of the heavier 'auto' lookup that fetches
+// both DPS and HPS rankings, and it can never be mis-scored by a listing that
+// advertised the wrong role.
+export const DPS_ONLY_CLASSES = ['hunter', 'mage', 'rogue', 'warlock'];
+
+export function roleFromClass(playerClass) {
+    return DPS_ONLY_CLASSES.includes(playerClass) ? 'dps' : null;
 }
 
 // ─── Normalisation ─────────────────────────────────────────────────────────────
@@ -80,6 +143,13 @@ export function normalizeCandidate(raw, source) {
     const region = String(raw.region || '').trim().toLowerCase();
     if (!name || !realm || !region) return null;
 
+    // A class with no tank or healer spec settles its own role, so fill it in
+    // where the listing did not. This is not the "default to dps" the comment
+    // below warns about — a mage cannot be anything else — so it is safe to let
+    // it win a merge, and it is recorded with the source that supplied the class.
+    const playerClass = raw.playerClass || null;
+    const role        = raw.role || roleFromClass(playerClass);
+
     return {
         key:         makeCandidateKey({ region, realm, name }),
         name,
@@ -88,18 +158,22 @@ export function normalizeCandidate(raw, source) {
         // role is intentionally left null when unknown rather than defaulted to
         // 'dps' here: a null loses to a real role during merge, a fake 'dps'
         // would win and score a healer against a DPS threshold.
-        role:        raw.role || null,
-        playerClass: raw.playerClass || null,
+        role,
+        playerClass,
         ilvl:        num(raw.ilvl),
         mythicKills: num(raw.mythicKills),
+        // Bosses in the current tier. Only the Raider.IO cross-reference knows
+        // it — the listings print a bare kill count — so it is usually filled in
+        // later rather than harvested.
+        mythicTotal: num(raw.mythicTotal),
         mplusScore:  num(raw.mplusScore),
         note:        raw.note ? String(raw.note).trim().slice(0, 300) : null,
         sources:     [source],
         // Which source supplied role/playerClass. Only meaningful once a
         // candidate has been merged, when `sources[0]` no longer identifies it.
         origins:     {
-            role:        raw.role        ? source : null,
-            playerClass: raw.playerClass ? source : null,
+            role:        role        ? source : null,
+            playerClass: playerClass ? source : null,
         },
         links:       raw.link ? { [source]: raw.link } : {},
         wcl:         null,
@@ -157,6 +231,9 @@ export function mergeCandidate(existing, incoming) {
         origins:     { role: role.source, playerClass: playerClass.source },
         ilvl:        preferHigher(existing.ilvl, incoming.ilvl),
         mythicKills: preferHigher(existing.mythicKills, incoming.mythicKills),
+        // Not preferHigher: the boss count describes the raid, not the player,
+        // so there is no "freshest reading" to pick — first known value wins.
+        mythicTotal: existing.mythicTotal ?? incoming.mythicTotal ?? null,
         mplusScore:  preferHigher(existing.mplusScore, incoming.mplusScore),
         note:        existing.note || incoming.note,
         sources:     existing.sources.includes(incomingSource)
@@ -178,6 +255,17 @@ export function mergeCandidates(candidates) {
     return Array.from(byKey.values());
 }
 
+// Mythic progress as an officer reads it. A bare "6" says nothing without the
+// tier's boss count — 6/8 is most of a tier, 6/12 is a third of one, and the
+// denominator changes with every raid. Falls back to the bare number when only a
+// listing supplied the kills and nothing supplied the total.
+export function formatMythicProgress(candidate) {
+    const killed = candidate?.mythicKills;
+    if (killed === null || killed === undefined) return null;
+    const total = candidate.mythicTotal;
+    return total ? `${killed}/${total}` : String(killed);
+}
+
 // ─── Score classification ──────────────────────────────────────────────────────
 
 // True when WarcraftLogs gave a definitive answer that this character has no
@@ -196,6 +284,79 @@ export function hasNoLogs(score) {
 // apart from "we never asked").
 export function isScored(score) {
     return !!score && !score.error;
+}
+
+// ─── Score error reporting ─────────────────────────────────────────────────────
+
+// Turns a raw scoring error into something an officer can act on.
+//
+// Scoring failures fail *open* — an unscored candidate is never hidden — which is
+// right, but it meant a lookup failing for every single candidate produced a
+// table of identical "⚠ WCL err" badges and no explanation anywhere except each
+// badge's hover tooltip. That is precisely the silent-wrong-result Scout's
+// fail-visible rule exists to prevent (quirk 23), just applied to scoring instead
+// of harvesting.
+//
+// Returns { headline, hint } — hint is null when the raw message is already the
+// most specific thing we can say.
+export function describeScoreError(message) {
+    const raw = String(message || 'UNKNOWN_ERROR');
+
+    if (raw === 'NO_CREDENTIALS') return {
+        headline: 'No WarcraftLogs API credentials',
+        hint: 'Add a Client ID and Secret in Settings → WarcraftLogs.',
+    };
+    if (raw === 'NO_RESPONSE') return {
+        headline: 'The background service worker did not answer',
+        hint: 'Chrome may have shut it down mid-run. Re-run the scout; if it keeps happening, ' +
+              'reload the extension at chrome://extensions and check its service-worker console.',
+    };
+    if (raw === 'FETCH_TIMEOUT') return {
+        headline: 'WarcraftLogs did not respond in time',
+        hint: 'Usually a slow connection or a WarcraftLogs outage. Re-run to retry — nothing was cached.',
+    };
+    if (raw.startsWith('RATE_LIMITED')) return {
+        headline: 'WarcraftLogs rate limit',
+        hint: 'Wait for the cooldown and re-run; cached scores make the re-run cheap.',
+    };
+    if (raw.startsWith('CLOUDFLARE_BLOCKED')) return {
+        headline: 'Cloudflare is challenging API requests',
+        hint: 'Open warcraftlogs.com in a normal tab and complete the check, then re-run.',
+    };
+    if (raw.startsWith('WCL token request failed')) return {
+        headline: raw,
+        // A 401 here is the credentials themselves; anything else is the token
+        // endpoint, which is a different problem with a different fix.
+        hint: raw.includes('(401)') || raw.includes('(403)')
+            ? 'The Client ID or Secret is wrong or has been revoked. Re-enter them in ' +
+              'Settings → WarcraftLogs and use Test connection.'
+            : 'The WarcraftLogs OAuth endpoint rejected the request. Try Test connection in ' +
+              'Settings → WarcraftLogs to see the full response.',
+    };
+    if (raw.startsWith('WCL GraphQL error')) return {
+        headline: raw,
+        hint: 'WarcraftLogs accepted the request but rejected the query, which usually means their ' +
+              'API schema changed. This needs an extension fix — please report the message above.',
+    };
+    if (raw.startsWith('WCL query failed')) return {
+        headline: raw,
+        hint: 'WarcraftLogs returned an HTTP error for the query itself.',
+    };
+    return { headline: raw, hint: null };
+}
+
+// Groups the scored candidates by failure so one banner line can stand in for
+// every row that failed the same way, rather than one line per candidate.
+export function summarizeScoreErrors(candidates) {
+    const counts = new Map();
+    for (const candidate of candidates) {
+        const error = candidate?.wcl?.error;
+        if (!error) continue;
+        counts.set(error, (counts.get(error) || 0) + 1);
+    }
+    return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([message, count]) => ({ message, count, ...describeScoreError(message) }));
 }
 
 // ─── Filtering ─────────────────────────────────────────────────────────────────
@@ -313,7 +474,10 @@ export function normalizeFilters(raw) {
         roles:       list(input.roles).map(r => r.toLowerCase()),
         classes:     list(input.classes),
         regions:     list(input.regions).map(r => r.toLowerCase()),
-        sources:     list(input.sources),
+        // A source that no longer exists is dropped, not kept: a stored filter
+        // naming only WarcraftLogs would otherwise match nothing at all and read
+        // as a harvest that found nobody.
+        sources:     list(input.sources).filter(id => SOURCE_IDS.includes(id)),
         minIlvl:     num(input.minIlvl),
         minMplus:    num(input.minMplus),
         minMythic:   num(input.minMythic),
@@ -388,6 +552,7 @@ const CSV_COLUMNS = [
     ['role',        c => c.role],
     ['ilvl',        c => c.ilvl],
     ['mythic_kills', c => c.mythicKills],
+    ['mythic_total', c => c.mythicTotal],
     ['mplus_score', c => c.mplusScore],
     ['wcl_best',    c => c.wcl?.best],
     ['wcl_median',  c => c.wcl?.median],

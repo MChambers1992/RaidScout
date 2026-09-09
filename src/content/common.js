@@ -14,6 +14,34 @@ function normalizeClassName(name) {
     return lower.replace(/ /g, '_');
 }
 
+// ─── Spec → role ───────────────────────────────────────────────────────────────
+// Sites publish the spec far more reliably than the role: Raider.IO dropped its
+// role column entirely in favour of a spec icon on every row. Spec names are
+// unambiguous across classes for role purposes — both Restoration specs heal,
+// both Protection specs tank — so the spec alone settles the role.
+//
+// Third copy of this map, and deliberately so: src/preflight.js has one because
+// the service worker cannot import a content script, and src/wcl-api.js resolves
+// the ranked spec the same way. Content scripts are classic scripts with no
+// export surface, so this cannot be shared either. Keep the three in step;
+// tests/common.test.js pins this copy's behaviour.
+
+const HEALER_SPECS = new Set([
+    'restoration', 'holy', 'discipline', 'mistweaver', 'preservation',
+]);
+
+const TANK_SPECS = new Set([
+    'protection', 'guardian', 'blood', 'brewmaster', 'vengeance',
+]);
+
+function roleForSpec(spec) {
+    if (!spec) return null;
+    const s = String(spec).trim().toLowerCase();
+    if (HEALER_SPECS.has(s)) return 'healer';
+    if (TANK_SPECS.has(s))   return 'tank';
+    return 'dps';
+}
+
 function sendMessageToBackground(action, data = {}, callback) {
     if (typeof callback === 'function') {
         chrome.runtime.sendMessage({ action, ...data }, response => {
@@ -24,6 +52,25 @@ function sendMessageToBackground(action, data = {}, callback) {
         return;
     }
     chrome.runtime.sendMessage({ action, ...data });
+}
+
+// ─── Cloudflare interstitial ───────────────────────────────────────────────────
+// Cloudflare serves its challenge at the requested page's own URL, so a content
+// script matched on that URL runs against the interstitial rather than the site.
+// Every check that follows then fails for a reason that has nothing to do with
+// the site: selectors are missing, tables are empty, rows never render.
+//
+// Both WoWProgress and WarcraftLogs sit behind it, so this is shared rather than
+// copied. Detection is by the markers Cloudflare's own challenge page carries;
+// the title check catches the plain "Just a moment…" variant, which is what both
+// sites actually serve.
+function isCloudflareChallengePage() {
+    if (document.getElementById('challenge-running') ||
+        document.getElementById('cf-challenge-running') ||
+        document.getElementById('challenge-error-title')) return true;
+    if (document.querySelector('script[src*="challenge-platform"]')) return true;
+    const title = (document.title || '').toLowerCase();
+    return title.startsWith('just a moment') || title.includes('attention required');
 }
 
 // ─── Selector self-check ───────────────────────────────────────────────────────

@@ -12,10 +12,12 @@
 
 import {
     SOURCE_META, SOURCE_IDS, normalizeCandidate, mergeCandidates, hasNoLogs, classLabel,
-    sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency,
-    matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS,
+    sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency, classIconUrl,
+    formatMythicProgress,
+    matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS, summarizeScoreErrors,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS } from './sources.js';
+import { fetchProfileFields, applyEnrichment, ENRICH_ORIGIN } from './enrich.js';
 
 // ─── Defaults ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +27,7 @@ const SCOUT_DEFAULTS = {
     scoutPagesPerSource:      1,
     scoutWclEnabled:          true,
     scoutHideBelowThresholds: true,
+    scoutEnrichRaiderio:      true,
     scoutFilters:             DEFAULT_FILTERS,
     scoutSortKey:             'wclMedian',
     scoutSortDir:             'desc',
@@ -40,7 +43,6 @@ const SOURCE_URL_KEYS = {
     wowprogress:  'scoutUrlWowprogress',
     raiderio:     'scoutUrlRaiderio',
     guildsofwow:  'scoutUrlGuildsofwow',
-    warcraftlogs: 'scoutUrlWarcraftlogs',
 };
 
 // Two at a time: the tab-mode adapters each open a background tab, and three or
@@ -60,7 +62,7 @@ const state = {
     filters:    { ...DEFAULT_FILTERS },
     running:    false,
     rowIndex:   new Map(),
-    warnings:   [],
+    notices:    [],
 };
 
 // ─── Elements ──────────────────────────────────────────────────────────────────
@@ -71,6 +73,9 @@ const el = {
     chips:        document.getElementById('sourceChips'),
     progress:     document.getElementById('progressLine'),
     banner:       document.getElementById('scoutBanner'),
+    toggleNotices: document.getElementById('toggleNotices'),
+    noticeCount:  document.getElementById('noticeCount'),
+    noticeIcon:   document.getElementById('noticeIcon'),
     toolbar:      document.getElementById('scoutToolbar'),
     search:       document.getElementById('searchBox'),
     hideBelow:    document.getElementById('hideBelowThresholds'),
@@ -143,25 +148,64 @@ function setChip(sourceId, stateName, text) {
 
 function setProgress(text) { el.progress.textContent = text; }
 
-function renderWarnings() {
-    if (state.warnings.length === 0) { el.banner.hidden = true; return; }
-    el.banner.hidden = false;
-    el.banner.innerHTML = '';
-    const intro = document.createElement('div');
-    intro.textContent = state.warnings.length === 1 ? 'One thing to know:' : 'A few things to know:';
-    const list = document.createElement('ul');
-    for (const warning of state.warnings) {
-        const li = document.createElement('li');
-        li.innerHTML = warning;
-        list.appendChild(li);
-    }
-    el.banner.append(intro, list);
+// ─── Notices ───────────────────────────────────────────────────────────────────
+// Notices live behind a counted button in the header rather than in a banner
+// above the table. A run with four things to say — a Cloudflare fallback, a
+// source that matched nobody, a candidate cap — used to push the results off the
+// screen, and the one notice that actually mattered was styled identically to
+// three routine ones.
+//
+// Two levels, because they are not the same kind of news: a 'warn' is something
+// that happened and is worth knowing, an 'error' is a part of the run that did
+// not work. The count covers both; the button turns red and the icon changes if
+// any error is present, so severity is visible without opening the panel.
+
+function noticesOpen() {
+    return !el.banner.hidden;
 }
 
-function warn(message) {
-    if (!state.warnings.includes(message)) state.warnings.push(message);
-    renderWarnings();
+function setNoticesOpen(open) {
+    el.banner.hidden = !open;
+    el.toggleNotices.setAttribute('aria-expanded', String(open));
 }
+
+function renderNotices() {
+    const count  = state.notices.length;
+    const errors = state.notices.filter(n => n.level === 'error').length;
+
+    // No control at all on an uneventful run — a permanently greyed-out button
+    // is just furniture.
+    el.toggleNotices.hidden = count === 0;
+    if (count === 0) { setNoticesOpen(false); el.banner.innerHTML = ''; return; }
+
+    el.toggleNotices.classList.toggle('has-errors', errors > 0);
+    el.noticeIcon.textContent  = errors > 0 ? '⚠' : 'ℹ';
+    el.noticeCount.textContent = String(count);
+    el.toggleNotices.title = errors > 0
+        ? `${errors} of ${count} ${count === 1 ? 'notice' : 'notices'} ${errors === 1 ? 'is' : 'are'} a failure — click to read`
+        : `${count} ${count === 1 ? 'notice' : 'notices'} — click to read`;
+
+    el.banner.innerHTML = '';
+    const list = document.createElement('ul');
+    for (const notice of state.notices) {
+        const li = document.createElement('li');
+        li.className = `notice notice--${notice.level}`;
+        li.innerHTML = notice.message;
+        list.appendChild(li);
+    }
+    el.banner.appendChild(list);
+}
+
+function addNotice(message, level) {
+    // De-duplicated on the rendered text: several sources failing the same way
+    // produce the same sentence, and repeating it is not more informative.
+    if (state.notices.some(n => n.message === message)) return;
+    state.notices.push({ message, level });
+    renderNotices();
+}
+
+function warn(message) { addNotice(message, 'warn'); }
+function fail(message) { addNotice(message, 'error'); }
 
 // ─── Harvest ───────────────────────────────────────────────────────────────────
 
@@ -186,12 +230,12 @@ async function harvestSource(sourceId, settings) {
 async function runScout() {
     if (state.running) return;
     state.running = true;
-    state.warnings = [];
     state.candidates = [];
+    state.notices = [];
     state.rowIndex.clear();
     el.run.disabled = true;
     el.run.textContent = '⏳ Scouting…';
-    el.banner.hidden = true;
+    renderNotices();
     el.table.hidden = true;
     el.toolbar.hidden = true;
     el.empty.hidden = true;
@@ -236,7 +280,7 @@ async function runScout() {
 
         if (!result.ok) {
             setChip(sourceId, 'is-failed', 'failed');
-            warn(`<strong>${SOURCE_META[sourceId].label}</strong> returned nothing: ${escapeHtml(result.error || 'unknown error')} ` +
+            fail(`<strong>${SOURCE_META[sourceId].label}</strong> returned nothing: ${escapeHtml(result.error || 'unknown error')} ` +
                  `<br><code>${escapeHtml(result.url || '')}</code>`);
             return;
         }
@@ -295,7 +339,14 @@ async function runScout() {
     el.toolbar.hidden = false;
     el.table.hidden = false;
 
+    // Score before cross-referencing, deliberately. The parse thresholds are what
+    // actually decide who an officer looks at, and WarcraftLogs answers fastest —
+    // it is an official API with a token, per-character caching and a
+    // concurrency limit tuned to it. Hydrating first meant every candidate the
+    // thresholds were about to discard was looked up on Raider.IO anyway, so the
+    // slower of the two passes ran over the larger of the two sets.
     if (settings.scoutWclEnabled !== false) await scoreCandidates(merged);
+    if (settings.scoutEnrichRaiderio !== false) await enrichCandidates(candidatesWorthHydrating(merged));
 
     render();
     finishRun();
@@ -312,12 +363,87 @@ function finishRun(emptyMessage) {
     }
 }
 
+// ─── Cross-referencing ─────────────────────────────────────────────────────────
+
+// Every listing publishes a different subset of stats — a WoWProgress row has an
+// item level and nothing else, so its candidates showed "—" for M+ and mythic
+// progress no matter how good the player was. Fill those gaps from Raider.IO's
+// public character API, which knows all three for every character regardless of
+// where they advertised.
+//
+// Deliberately additive and silent: a lookup that fails leaves the candidate
+// exactly as the listings described them, and is not warned about. Raider.IO has
+// never heard of plenty of legitimate fresh alts, and four hundred "could not
+// find character" lines would bury the harvest warnings that actually matter.
+// Raider.IO has no bulk character endpoint — its API is one profile per request
+// — so "batching" here means running more of them at once. Twelve is chosen to
+// keep a full run in the low tens of seconds while staying well short of
+// anything that looks like abuse; responses are cacheable for five minutes and
+// the endpoint publishes no rate-limit headers, so this is a politeness ceiling
+// rather than a measured one. A 429 backs the whole pass off (see below) instead
+// of retrying into it.
+const ENRICH_CONCURRENCY = 12;
+
+// Only candidates still standing after scoring are worth a Raider.IO lookup.
+// Hydrating a candidate the parse thresholds already rejected spends a request
+// on a row the officer will not see — on a typical run that is most of them.
+//
+// When "hide below thresholds" is off nothing is filtered, so this returns
+// everyone and the pass is exactly as it was. Rows revealed later by unticking
+// that box are hydrated then (see the toolbar handler), so no row ever stays
+// permanently blank because it was hidden at the moment scoring finished.
+function candidatesWorthHydrating(candidates) {
+    if (!el.hideBelow.checked) return candidates;
+    return candidates.filter(c => !c.enriched && !isBelowThreshold(c));
+}
+
+async function enrichCandidates(candidates) {
+    if (candidates.length === 0) return;
+
+    let done = 0;
+    let filled = 0;
+    setProgress(`Cross-referencing 0/${candidates.length} with Raider.IO…`);
+
+    await runWithConcurrency(candidates, async (candidate) => {
+        const fields = await fetchProfileFields(candidate);
+        done++;
+
+        if (fields) {
+            const before = candidate.mplusScore;
+            // Mutated in place rather than replaced: state.candidates and
+            // rowIndex both hold this object by reference, and swapping it would
+            // leave the rendered row pointing at a stale copy.
+            Object.assign(candidate, applyEnrichment(candidate, fields));
+            if (before === null && candidate.mplusScore !== null) filled++;
+            updateRow(candidate);
+        }
+        setProgress(`Cross-referencing ${done}/${candidates.length} with Raider.IO…`);
+    }, ENRICH_CONCURRENCY);
+
+    render();
+    setProgress(`${candidates.length} candidates · ${filled} gained an M+ score from Raider.IO`);
+}
+
 // ─── Scoring ───────────────────────────────────────────────────────────────────
+
+// Which role to query with. A role a site *stated* is the recruit's own advert
+// and a role deduced from a DPS-only class cannot be wrong, so both are queried
+// directly — one metric instead of two. A role that came from the Raider.IO
+// cross-reference is neither: it is whichever spec the character last logged out
+// in, which is good enough to print in a column but not to score against. Trust
+// it and a raider who happens to be sitting in their off-spec gets queried on the
+// wrong metric, comes back empty, and is hidden under the no-logs rule — so those
+// go to 'auto' and let WarcraftLogs resolve the role from the spec they actually
+// ranked as.
+function scoringRole(candidate) {
+    if (!candidate.role) return 'auto';
+    return candidate.origins?.role === ENRICH_ORIGIN ? 'auto' : candidate.role;
+}
 
 async function scoreCandidates(candidates) {
     const credentials = await sendToBackground({ action: 'wclHasCredentials' });
     if (!credentials?.has) {
-        warn('No WarcraftLogs API credentials saved, so parses were not fetched. ' +
+        fail('No WarcraftLogs API credentials saved, so parses were not fetched. ' +
              'Add a Client ID and Secret in Settings → WarcraftLogs to rank candidates by parse.');
         return;
     }
@@ -339,7 +465,7 @@ async function scoreCandidates(candidates) {
             // as — the same contract all four content scripts use. Defaulting
             // to 'dps' here would query DPS rankings for a healer, come back
             // empty, and then hide them under the no-logs rule.
-            role:   candidate.role || 'auto',
+            role:   scoringRole(candidate),
         });
 
         candidate.wcl = score;
@@ -362,7 +488,7 @@ async function scoreCandidates(candidates) {
             // Stop the whole pass: every further call would be refused anyway,
             // and the officer keeps the rows already scored.
             rateLimited = true;
-            warn(`WarcraftLogs rate limit hit after ${scored} of ${candidates.length} candidates. ` +
+            fail(`WarcraftLogs rate limit hit after ${scored} of ${candidates.length} candidates. ` +
                  `Scores already fetched are shown; re-run in about ${Math.ceil(score.rateLimitMs / 1000)}s ` +
                  `for the rest (cached scores make the re-run cheap).`);
         }
@@ -371,8 +497,32 @@ async function scoreCandidates(candidates) {
         setProgress(`Scoring ${scored}/${candidates.length}…`);
     }, state.wclSettings.concurrency || 4);
 
+    reportScoreErrors(candidates);
+
     const withScores = candidates.filter(c => c.wcl && (c.wcl.best !== null || c.wcl.median !== null)).length;
     setProgress(`${candidates.length} candidates · ${withScores} with WarcraftLogs parses`);
+}
+
+// A scoring failure hides nobody — that is the fail-open rule working — but it
+// used to explain itself nowhere except each badge's hover tooltip. A lookup
+// failing for *every* candidate then produced a full table of identical "⚠ WCL
+// err" badges and a banner that said nothing, which is the silent-wrong-result
+// Scout's fail-visible rule exists to prevent (quirk 23). One line per distinct
+// failure, not per candidate: when they all fail they almost always fail
+// identically, and 150 copies of one sentence is not a better error report.
+function reportScoreErrors(candidates) {
+    const failures = summarizeScoreErrors(candidates);
+    if (failures.length === 0) return;
+
+    // The rate limit already raised its own, more specific warning mid-pass.
+    for (const { count, headline, hint } of failures.filter(f => !f.message.startsWith('RATE_LIMITED'))) {
+        const scope = count === candidates.length
+            ? 'No candidate could be scored'
+            : `${count} of ${candidates.length} candidates could not be scored`;
+        fail(`<strong>${scope}</strong> — ${escapeHtml(headline)}.` +
+             (hint ? ` ${escapeHtml(hint)}` : '') +
+             ` They are still listed: an unscored candidate is never hidden.`);
+    }
 }
 
 // ─── Render ────────────────────────────────────────────────────────────────────
@@ -428,27 +578,66 @@ function roleCellHtml(candidate) {
          + `title="${escapeHtml(title)}">${escapeHtml(candidate.role)}</span>`;
 }
 
+// The class cell carries Blizzard's class icon ahead of the name. The icon is
+// decorative here — the name is right beside it — so it is alt="" rather than
+// repeating the word to a screen reader.
+function classCellHtml(candidate) {
+    if (!candidate.playerClass) return '<span class="muted">—</span>';
+    const icon = classIconUrl(candidate.playerClass);
+    const label = classLabel(candidate.playerClass);
+    return `<span class="class-cell class-${escapeHtml(candidate.playerClass)}">`
+         + (icon ? `<img class="class-icon" src="${escapeHtml(icon)}" alt="" width="18" height="18">` : '')
+         + `<span>${escapeHtml(label)}</span></span>`;
+}
+
+// Short site names rather than bare colour dots. The dots were unreadable: four
+// unlabelled 8px circles asked the officer to learn a colour key, and the column
+// heading "Seen on" did not say what the cell was showing. Cross-posting is the
+// strongest signal in the table — someone advertising on three sites is actively
+// looking — so it needs to be legible at a glance, not on hover.
+const SOURCE_SHORT = {
+    wowprogress: 'WP', raiderio: 'RIO', guildsofwow: 'GoW',
+};
+
+function sourcesCellHtml(candidate) {
+    return `<span class="source-tags">` + candidate.sources.map(id =>
+        `<span class="source-tag" style="--source-colour:${SOURCE_META[id]?.colour || '#555'}" `
+        + `title="Advertising on ${escapeHtml(SOURCE_META[id]?.label || id)}">`
+        + `${escapeHtml(SOURCE_SHORT[id] || id)}</span>`).join('') + `</span>`;
+}
+
+function numCell(value) {
+    return value === null || value === undefined ? '<span class="muted">—</span>' : escapeHtml(value);
+}
+
+// "6/8", not "6". The denominator is what makes a kill count mean anything, and
+// it changes every tier — the muted total keeps the kills the thing you scan.
+function mythicCell(candidate) {
+    const text = formatMythicProgress(candidate);
+    if (text === null) return '<span class="muted">—</span>';
+    const [killed, total] = text.split('/');
+    return total
+        ? `${escapeHtml(killed)}<span class="muted">/${escapeHtml(total)}</span>`
+        : escapeHtml(killed);
+}
+
 function buildRow(candidate) {
     const tr = document.createElement('tr');
     if (isBelowThreshold(candidate)) tr.classList.add('below-threshold');
 
     const links = profileLinks(candidate);
-    const multi = candidate.sources.length > 1
-        ? `<span class="multi-source" title="Posted on ${candidate.sources.length} sites">×${candidate.sources.length}</span>`
-        : '';
 
     tr.innerHTML = `
-        <td><span class="char-name class-${escapeHtml(candidate.playerClass || '')}">${escapeHtml(candidate.name)}</span>${multi}</td>
+        <td class="name-cell"><span class="char-name class-${escapeHtml(candidate.playerClass || '')}">${escapeHtml(candidate.name)}</span></td>
         <td>${escapeHtml(candidate.realm)}</td>
         <td>${escapeHtml(candidate.region.toUpperCase())}</td>
-        <td>${candidate.playerClass ? escapeHtml(classLabel(candidate.playerClass)) : '<span class="muted">—</span>'}</td>
+        <td class="class-col">${classCellHtml(candidate)}</td>
         <td class="role-cell">${roleCellHtml(candidate)}</td>
-        <td class="num">${candidate.ilvl ?? '<span class="muted">—</span>'}</td>
-        <td class="num">${candidate.mplusScore ?? '<span class="muted">—</span>'}</td>
-        <td class="num">${candidate.mythicKills ?? '<span class="muted">—</span>'}</td>
+        <td class="num ilvl-cell">${numCell(candidate.ilvl)}</td>
+        <td class="num mplus-cell">${numCell(candidate.mplusScore)}</td>
+        <td class="num mythic-cell">${mythicCell(candidate)}</td>
         <td class="num wcl-cell"></td>
-        <td><span class="source-dots">${candidate.sources.map(s =>
-            `<span class="source-dot" style="--source-colour:${SOURCE_META[s]?.colour || '#555'}" title="${escapeHtml(SOURCE_META[s]?.label || s)}"></span>`).join('')}</span></td>
+        <td class="sources-cell">${sourcesCellHtml(candidate)}</td>
         <td class="row-links">
             <a href="${escapeHtml(links.warcraftlogs)}" target="_blank" rel="noreferrer">WCL</a>
             <a href="${escapeHtml(links.raiderio)}" target="_blank" rel="noreferrer">RIO</a>
@@ -511,9 +700,16 @@ function updateRow(candidate) {
     const cell = tr.querySelector('.wcl-cell');
     cell.innerHTML = '';
     cell.appendChild(wclBadgeFor(candidate));
-    // Scoring may have resolved the role, so refresh that cell too rather than
-    // leaving it stale until the run finishes and render() rebuilds the table.
-    tr.querySelector('.role-cell').innerHTML = roleCellHtml(candidate);
+    // Scoring resolves the role, and the Raider.IO cross-reference fills in the
+    // class and the three stat columns, so every cell either pass can change is
+    // refreshed here rather than left stale until the run ends and render()
+    // rebuilds the table.
+    tr.querySelector('.role-cell').innerHTML   = roleCellHtml(candidate);
+    tr.querySelector('.class-col').innerHTML   = classCellHtml(candidate);
+    tr.querySelector('.ilvl-cell').innerHTML   = numCell(candidate.ilvl);
+    tr.querySelector('.mplus-cell').innerHTML  = numCell(candidate.mplusScore);
+    tr.querySelector('.mythic-cell').innerHTML = mythicCell(candidate);
+    tr.querySelector('.char-name').className   = `char-name class-${candidate.playerClass || ''}`;
     tr.classList.toggle('below-threshold', isBelowThreshold(candidate));
 }
 
@@ -654,9 +850,22 @@ el.search.addEventListener('input', () => { state.query = el.search.value; rende
 el.hideBelow.addEventListener('change', () => {
     chrome.storage.sync.set({ scoutHideBelowThresholds: el.hideBelow.checked });
     render();
+
+    // Revealing the rejected candidates reveals rows the Raider.IO pass skipped,
+    // because hydrating a candidate the thresholds had already discarded is a
+    // request spent on a row nobody was going to see. Catch them up now, so
+    // unticking the box shows complete rows rather than a column of dashes that
+    // only appear when you look at the people you filtered out.
+    if (!el.hideBelow.checked && !state.running &&
+        state.settings.scoutEnrichRaiderio !== false) {
+        const pending = state.candidates.filter(c => !c.enriched);
+        if (pending.length) enrichCandidates(pending);
+    }
 });
 
 el.toggleFilters.addEventListener('click', () => setFiltersOpen(el.filters.hidden));
+
+el.toggleNotices.addEventListener('click', () => setNoticesOpen(!noticesOpen()));
 
 // One delegated listener rather than one per control: the chips are rebuilt
 // from data, so binding them individually would mean rebinding on every build.

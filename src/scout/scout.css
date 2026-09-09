@@ -45,6 +45,13 @@ button.primary:hover:not(:disabled) { background-color: #0056b3; }
 button.ghost { background-color: #3a3a3a; color: #ccc; border-color: #4a4a4a; }
 button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 
+/* Any rule that sets `display` outranks the user-agent's `[hidden]{display:none}`,
+   so an element toggled with el.hidden stays on screen. That is how the Filters
+   badge came to show a blue "0" for no active filters — `.filter-count` sets
+   `display: inline-block`. Fixed once here rather than per selector, since every
+   panel and counter on this page is toggled the same way. */
+[hidden] { display: none !important; }
+
 /* ── Progress ───────────────────────────────────────────────────────────── */
 
 .scout-progress { padding: 16px 0; }
@@ -76,19 +83,52 @@ button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 
 .progress-line { font-size: 13px; color: #aaa; min-height: 18px; }
 
+/* The notices panel, opened from the counted button in the header. Neutral
+   ground rather than the old all-amber block: severity now belongs to each
+   notice, so painting the whole panel one colour would make a routine note look
+   like a failure and a failure look routine. */
 .scout-banner {
     margin-top: 12px;
-    padding: 10px 12px;
+    padding: 10px 12px 10px 4px;
     border-radius: 4px;
     font-size: 13px;
     line-height: 1.5;
-    background: #2d1a00;
-    border: 1px solid #7a4a00;
-    color: #f0b060;
+    background: #1c1c1c;
+    border: 1px solid #3a3a3a;
+    color: #ccc;
 }
-.scout-banner ul { margin: 6px 0 0; padding-left: 18px; }
-.scout-banner li { margin: 3px 0; }
+.scout-banner ul { margin: 0; padding-left: 18px; list-style: none; }
 .scout-banner code { color: #ddd; font-size: 12px; }
+
+.notice {
+    margin: 4px 0;
+    padding: 4px 0 4px 10px;
+    border-left: 3px solid var(--notice-colour, #555);
+}
+.notice strong { color: #eee; }
+.notice--warn  { --notice-colour: #f0b060; color: #d8bc96; }
+.notice--error { --notice-colour: #d9534f; color: #e8a9a6; }
+
+/* ── Notices button ─────────────────────────────────────────────────────── */
+
+#toggleNotices.has-errors {
+    border-color: #a03a36;
+    color: #e8a9a6;
+}
+
+.notice-count {
+    display: inline-block;
+    margin-left: 6px;
+    min-width: 16px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: #6a5020;
+    color: #f5d9a8;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+}
+#toggleNotices.has-errors .notice-count { background: #8c2f2b; color: #ffdedc; }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
 
@@ -280,7 +320,19 @@ tbody tr.below-threshold td:first-child { box-shadow: inset 2px 0 0 #6a4a2a; }
 tbody tr.below-threshold:hover { opacity: 0.85; }
 
 .char-name { font-weight: 600; color: var(--class-color, #e8e8e8); }
-.multi-source { color: #f0b060; font-size: 11px; margin-left: 5px; }
+
+/* Blizzard's class icon ahead of the class name. Rounded and slightly dimmed so
+   thirteen of them down a column read as a texture rather than thirteen competing
+   focal points; full opacity on row hover when the officer is reading that row. */
+.class-cell { display: inline-flex; align-items: center; gap: 7px; color: var(--class-color, #e8e8e8); }
+.class-icon {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    flex: none;
+    opacity: 0.88;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+tbody tr:hover .class-icon { opacity: 1; }
 
 .class-warrior      { --class-color: var(--wow-warrior); }
 .class-paladin      { --class-color: var(--wow-paladin); }
@@ -309,12 +361,20 @@ tbody tr.below-threshold:hover { opacity: 0.85; }
 .role-healer { --role-color: var(--role-healer); }
 .role-dps    { --role-color: var(--role-dps); }
 
-.source-dots { display: inline-flex; gap: 4px; }
-.source-dot {
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    background: var(--source-colour, #555);
-    display: inline-block;
+/* Named tags rather than colour dots: the dots required learning a key, and the
+   number of sites a candidate is advertising on is one of the more useful things
+   in the table. */
+.source-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.source-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 2px 5px;
+    border-radius: 4px;
+    color: var(--source-colour, #999);
+    background: color-mix(in srgb, var(--source-colour, #555) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--source-colour, #555) 45%, transparent);
+    white-space: nowrap;
 }
 
 /* Three short links that were wrapping onto three lines on a narrow window,
