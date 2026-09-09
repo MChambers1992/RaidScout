@@ -1,31 +1,40 @@
 // tests/common.test.js
-// Unit tests for pure logic extracted from common.js and wcl-api.js.
-// These run in Node (via Vitest) with no browser globals needed.
+// The shared content-script helpers, exercised as the code that actually ships.
+//
+// common.js is a classic script injected before every site script, so it has no
+// export surface. It is evaluated into a jsdom window here (the approach
+// tests/links.test.js uses) rather than re-declared: the copies these tests used
+// to run against had already drifted — failsWclThresholds was still the
+// pre-1.4 two-argument form the source no longer has, so the role-aware
+// behaviour the extension really ships was never the thing under test.
+//
+// Its top-level declarations are function declarations, so they land on the
+// window; a trailing assignment hands the set out in one go.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { JSDOM } from 'jsdom';
 
-// ─── Inline the pure functions under test ────────────────────────────────────
-// (No build step — we just re-declare the functions here rather than import
-//  browser-globals-dependent files. When a build step is added in future,
-//  extract these to a shared utils module and import directly.)
+const commonSource = readFileSync(new URL('../src/content/common.js', import.meta.url), 'utf8');
 
-function normalizeClassName(name) {
-    if (!name) return null;
-    const lower = name.toLowerCase().replace(/ /g, '');
-    if (lower === 'deathknight') return 'deathknight';
-    if (lower === 'demonhunter') return 'demon_hunter';
-    return lower.replace(/ /g, '_');
-}
+const EXPOSED = [
+    'normalizeClassName', 'hasNoWclLogs', 'failsWclThresholds', 'thresholdsForRole',
+    'wclSortEnabled', 'effectiveRole', 'badgeStateForScore', 'buildWclSettings',
+];
 
-function failsWclThresholds(score, { minBest, minMedian, hideUnknown }) {
-    if (!score) return !!hideUnknown;
-    if (score.error) return false;
-    const haveData = score.best !== null || score.median !== null;
-    if (!haveData) return !!hideUnknown;
-    if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
-    if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
-    return false;
-}
+const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
+dom.window.eval(`${commonSource}\n;window.__api = { ${EXPOSED.join(', ')} };`);
+
+const {
+    normalizeClassName, hasNoWclLogs, failsWclThresholds, thresholdsForRole,
+    wclSortEnabled, effectiveRole, badgeStateForScore, buildWclSettings,
+} = dom.window.__api;
+
+// ─── Still mirrored, deliberately ─────────────────────────────────────────────
+// These two live in wcl-api.js and are not exported. tests/wcl-api.test.js
+// covers the real ones through their observable effects (which metric the query
+// asks for, and that a cache entry is keyed by role); the copies below only
+// pin the shapes those tests rely on.
 
 function roleToMetric(role) {
     if (role === 'healer') return 'hps';
@@ -34,15 +43,6 @@ function roleToMetric(role) {
 
 function characterKey({ region, realm, name, role }) {
     return `${region}/${realm}/${name}/${role || 'dps'}`.toLowerCase();
-}
-
-function normalizeCharacter({ region, realm, name, role }) {
-    return {
-        region: region.toLowerCase(),
-        realm:  realm.replace(/\s/g, '-').toLowerCase(),
-        name:   decodeURIComponent(name.split('?')[0]),
-        role:   role || 'dps',
-    };
 }
 
 // ─── normalizeClassName ───────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ describe('normalizeClassName', () => {
 // ─── failsWclThresholds ───────────────────────────────────────────────────────
 
 describe('failsWclThresholds', () => {
-    const cfg = { minBest: 60, minMedian: 50, hideUnknown: false };
+    const cfg = { minBest: 60, minMedian: 50 };
 
     it('hides when best and median both below threshold', () => {
         expect(failsWclThresholds({ best: 40, median: 30 }, cfg)).toBe(true);
@@ -94,17 +94,25 @@ describe('failsWclThresholds', () => {
         expect(failsWclThresholds({ best: null, median: null, error: 'FETCH_TIMEOUT' }, cfg)).toBe(false);
         expect(failsWclThresholds({ best: null, median: null, error: 'NO_RESPONSE' }, cfg)).toBe(false);
     });
-    it('respects hideUnknown=false for characters with no logs', () => {
-        expect(failsWclThresholds({ best: null, median: null, notFound: true }, cfg)).toBe(false);
+    it('hides a character WarcraftLogs has no logs for', () => {
+        expect(failsWclThresholds({ best: null, median: null, notFound: true }, cfg)).toBe(true);
     });
-    it('respects hideUnknown=true for characters with no logs', () => {
-        expect(failsWclThresholds({ best: null, median: null, notFound: true }, { ...cfg, hideUnknown: true })).toBe(true);
+    it('hides a successful lookup that came back with both metrics null', () => {
+        expect(failsWclThresholds({ best: null, median: null }, cfg)).toBe(true);
     });
-    it('respects hideUnknown=true for null score object', () => {
-        expect(failsWclThresholds(null, { ...cfg, hideUnknown: true })).toBe(true);
+    it('hides a no-logs character even with no thresholds set', () => {
+        expect(failsWclThresholds({ best: null, median: null, notFound: true },
+            { minBest: 0, minMedian: 0 })).toBe(true);
     });
-    it('keeps on null score when hideUnknown=false', () => {
+    it('keeps a character that was never scored', () => {
+        // Distinct from "no logs": nothing was asked, so nothing is known.
         expect(failsWclThresholds(null, cfg)).toBe(false);
+    });
+    it('keeps a no-data result that carries an error, however it failed', () => {
+        // An error describes the request, not the player. Hiding on these would
+        // empty a whole page when credentials are missing or a rate limit hits.
+        expect(failsWclThresholds({ best: null, median: null, error: 'NO_CREDENTIALS' }, cfg)).toBe(false);
+        expect(failsWclThresholds({ best: null, median: null, notFound: true, error: 'FETCH_TIMEOUT' }, cfg)).toBe(false);
     });
     it('handles one metric present: best ok, median null → keep', () => {
         expect(failsWclThresholds({ best: 80, median: null }, cfg)).toBe(false);
@@ -113,7 +121,7 @@ describe('failsWclThresholds', () => {
         expect(failsWclThresholds({ best: null, median: 30 }, cfg)).toBe(true);
     });
     it('disabled thresholds (0) never hide', () => {
-        expect(failsWclThresholds({ best: 5, median: 5 }, { minBest: 0, minMedian: 0, hideUnknown: false })).toBe(false);
+        expect(failsWclThresholds({ best: 5, median: 5 }, { minBest: 0, minMedian: 0 })).toBe(false);
     });
     it('healer with hps score is evaluated the same way (metric agnostic)', () => {
         // The threshold function doesn't know about metric; it just compares numbers
@@ -156,46 +164,16 @@ describe('characterKey', () => {
     });
 });
 
-// ─── normalizeCharacter (realm slug + name decoding) ─────────────────────────
-
-describe('normalizeCharacter', () => {
-    it('lowercases region and realm', () => {
-        const c = normalizeCharacter({ region: 'EU', realm: 'Kazzak', name: 'Test', role: 'dps' });
-        expect(c.region).toBe('eu');
-        expect(c.realm).toBe('kazzak');
-    });
-    it('converts spaces to hyphens in realm', () => {
-        const c = normalizeCharacter({ region: 'eu', realm: 'Twisting Nether', name: 'x', role: 'dps' });
-        expect(c.realm).toBe('twisting-nether');
-    });
-    it('already-hyphenated realm stays intact', () => {
-        const c = normalizeCharacter({ region: 'us', realm: 'Area-52', name: 'x', role: 'dps' });
-        expect(c.realm).toBe('area-52');
-    });
-    it('strips query string from name', () => {
-        const c = normalizeCharacter({ region: 'eu', realm: 'silvermoon', name: 'Char?spec=1', role: 'dps' });
-        expect(c.name).toBe('Char');
-    });
-    it('decodes percent-encoded characters in name', () => {
-        const c = normalizeCharacter({ region: 'eu', realm: 'silvermoon', name: '%C3%89ly', role: 'dps' });
-        expect(c.name).toBe('Ély');
-    });
-    it('defaults null role to dps', () => {
-        const c = normalizeCharacter({ region: 'eu', realm: 'k', name: 'x', role: null });
-        expect(c.role).toBe('dps');
-    });
-});
-
 // ─── Edge cases: combined / boundary ─────────────────────────────────────────
 
 describe('edge cases', () => {
     it('failsWclThresholds: score with best=0 is treated as data (not null)', () => {
         // A parse of 0 is real data (someone logged a 0 parse), not "no data"
-        const cfg = { minBest: 1, minMedian: 0, hideUnknown: false };
+        const cfg = { minBest: 1, minMedian: 0 };
         expect(failsWclThresholds({ best: 0, median: 50 }, cfg)).toBe(true);
     });
     it('failsWclThresholds: score with best=100 is perfect and kept', () => {
-        const cfg = { minBest: 99, minMedian: 99, hideUnknown: false };
+        const cfg = { minBest: 99, minMedian: 99 };
         expect(failsWclThresholds({ best: 100, median: 100 }, cfg)).toBe(false);
     });
     it('characterKey is case-insensitive across region/realm/name', () => {
@@ -207,33 +185,11 @@ describe('edge cases', () => {
 
 // ─── thresholdsForRole ────────────────────────────────────────────────────────
 
-function thresholdsForRole(role, settings) {
-    if (role === 'healer') {
-        return { minBest: settings.minBestHealer || 0, minMedian: settings.minMedianHealer || 0, hideUnknown: settings.hideUnknown };
-    }
-    if (role === 'tank') {
-        return { minBest: settings.minBestTank || settings.minBest || 0, minMedian: settings.minMedianTank || settings.minMedian || 0, hideUnknown: settings.hideUnknown };
-    }
-    return { minBest: settings.minBest || 0, minMedian: settings.minMedian || 0, hideUnknown: settings.hideUnknown };
-}
-
-function failsWclThresholdsRoleAware(score, settings, role) {
-    const { minBest, minMedian, hideUnknown } = thresholdsForRole(role || 'dps', settings);
-    if (!score) return !!hideUnknown;
-    if (score.error) return false;
-    const haveData = score.best !== null || score.median !== null;
-    if (!haveData) return !!hideUnknown;
-    if (minBest   > 0 && score.best   !== null && score.best   < minBest)   return true;
-    if (minMedian > 0 && score.median !== null && score.median < minMedian) return true;
-    return false;
-}
-
 describe('thresholdsForRole', () => {
     const settings = {
         minBest: 60, minMedian: 50,
         minBestHealer: 70, minMedianHealer: 65,
         minBestTank: 40, minMedianTank: 35,
-        hideUnknown: false,
     };
 
     it('returns DPS thresholds for dps role', () => {
@@ -268,26 +224,25 @@ describe('failsWclThresholds role-aware', () => {
         minBest: 60, minMedian: 50,
         minBestHealer: 70, minMedianHealer: 65,
         minBestTank: 0, minMedianTank: 0,
-        hideUnknown: false,
     };
 
     it('healer with 75/70 HPS passes healer thresholds', () => {
-        expect(failsWclThresholdsRoleAware({ best: 75, median: 70 }, settings, 'healer')).toBe(false);
+        expect(failsWclThresholds({ best: 75, median: 70 }, settings, 'healer')).toBe(false);
     });
     it('healer with 65/60 HPS fails healer thresholds (minBestHealer=70)', () => {
-        expect(failsWclThresholdsRoleAware({ best: 65, median: 60 }, settings, 'healer')).toBe(true);
+        expect(failsWclThresholds({ best: 65, median: 60 }, settings, 'healer')).toBe(true);
     });
     it('healer with 65/60 HPS would PASS dps thresholds — proving role isolation', () => {
-        expect(failsWclThresholdsRoleAware({ best: 65, median: 60 }, settings, 'dps')).toBe(false);
+        expect(failsWclThresholds({ best: 65, median: 60 }, settings, 'dps')).toBe(false);
     });
     it('tank with no tank-specific thresholds falls back to DPS thresholds', () => {
-        expect(failsWclThresholdsRoleAware({ best: 50, median: 40 }, settings, 'tank')).toBe(true);
+        expect(failsWclThresholds({ best: 50, median: 40 }, settings, 'tank')).toBe(true);
     });
     it('dps at exactly DPS thresholds passes', () => {
-        expect(failsWclThresholdsRoleAware({ best: 60, median: 50 }, settings, 'dps')).toBe(false);
+        expect(failsWclThresholds({ best: 60, median: 50 }, settings, 'dps')).toBe(false);
     });
     it('error is always fail-open regardless of role', () => {
-        expect(failsWclThresholdsRoleAware({ best: null, median: null, error: 'TIMEOUT' }, settings, 'healer')).toBe(false);
+        expect(failsWclThresholds({ best: null, median: null, error: 'TIMEOUT' }, settings, 'healer')).toBe(false);
     });
 });
 
@@ -328,5 +283,62 @@ describe('extractCharacterFromUrl', () => {
     });
     it('returns null for malformed URLs', () => {
         expect(extractCharacterFromUrl('not a url')).toBeNull();
+    });
+});
+
+// ─── No-logs rule applied per role ───────────────────────────────────────────
+// The rule must not depend on which threshold pair a role resolves to: someone
+// with no parses is below every threshold, including a role whose minimums are
+// all zero.
+
+describe('no-logs rule is role-independent', () => {
+    const settings = {
+        minBest: 60, minMedian: 50,
+        minBestHealer: 70, minMedianHealer: 65,
+        minBestTank: 0, minMedianTank: 0,
+    };
+
+    for (const role of ['dps', 'healer', 'tank', null]) {
+        it(`hides a no-logs ${role ?? 'unknown-role'} character`, () => {
+            expect(failsWclThresholds(
+                { best: null, median: null, notFound: true }, settings, role)).toBe(true);
+        });
+
+        it(`keeps an errored lookup for a ${role ?? 'unknown-role'} character`, () => {
+            expect(failsWclThresholds(
+                { best: null, median: null, error: 'RATE_LIMITED:60' }, settings, role)).toBe(false);
+        });
+    }
+});
+
+// ─── Shared sort preference + migration ──────────────────────────────────────
+// Sorting by parse used to be three
+// per-site keys; it is now one. Installs that set the old keys must keep the
+// behaviour they chose without touching settings again.
+
+describe('wclSortEnabled', () => {
+    it('uses the shared key when it has been written', () => {
+        expect(wclSortEnabled({ wclSortByParse: true })).toBe(true);
+        expect(wclSortEnabled({ wclSortByParse: false })).toBe(false);
+    });
+
+    it('lets an explicit false win over stale per-site keys', () => {
+        // Someone who turns the new toggle off must not have it resurrected by
+        // an old key still sitting in sync storage.
+        expect(wclSortEnabled({ wclSortByParse: false, wpWclSort: true, rioWclSort: true })).toBe(false);
+    });
+
+    it('migrates from any single old per-site key', () => {
+        expect(wclSortEnabled({ wpWclSort: true })).toBe(true);
+        expect(wclSortEnabled({ rioWclSort: true })).toBe(true);
+        expect(wclSortEnabled({ gowWclSort: true })).toBe(true);
+    });
+
+    it('stays off when every old key was off', () => {
+        expect(wclSortEnabled({ wpWclSort: false, rioWclSort: false, gowWclSort: false })).toBe(false);
+    });
+
+    it('defaults to off for a fresh install with nothing saved', () => {
+        expect(wclSortEnabled({})).toBe(false);
     });
 });

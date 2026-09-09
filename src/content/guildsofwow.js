@@ -114,7 +114,7 @@ function filterCards(minIlvl, minMythicKills, minMythicPlusScore, selectedClasse
 
 // ─── WCL scoring ──────────────────────────────────────────────────────────────
 
-let gowWclThresholds  = { minBest: 0, minMedian: 0, hideUnknown: false };
+let gowWclThresholds  = { minBest: 0, minMedian: 0 };
 let gowHiddenCount    = 0;
 let gowSummaryAnchor  = null;
 
@@ -177,7 +177,7 @@ async function applyWclScoring(wclSettings) {
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const GOW_WCL_KEYS = ['gowWclEnabled', 'gowWclSort', ...SHARED_WCL_KEYS];
+const GOW_WCL_KEYS = ['gowWclEnabled', ...SHARED_WCL_KEYS];
 
 watchSettings(GOW_WCL_KEYS, (changes) => {
     const allCards = Array.from(document.querySelectorAll('#recruits-list .card'));
@@ -191,7 +191,7 @@ watchSettings(GOW_WCL_KEYS, (changes) => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get(
         ['gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedClasses', 'gowSelectedRoles',
-         'gowWclEnabled', 'gowWclSort', ...SHARED_WCL_KEYS],
+         'gowWclEnabled', ...SHARED_WCL_KEYS],
         function(options) {
             filterCards(
                 parseFloat(options.gowMinIlvl)          || 0,
@@ -201,7 +201,7 @@ function loadSettingsAndFilter() {
                 options.gowSelectedRoles   || []
             );
             if (options.gowWclEnabled) {
-                applyWclScoring({ ...buildWclSettings(options), sort: !!options.gowWclSort });
+                applyWclScoring({ ...buildWclSettings(options), sort: wclSortEnabled(options) });
             }
         }
     );
@@ -240,4 +240,29 @@ function watchForContainer() {
 
 chrome.storage.sync.get('guildsofwowEnabled', function(options) {
     if (options.guildsofwowEnabled !== false) watchForContainer();
+});
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// GoW is an SPA with infinite scroll; Scout harvests whatever the first render
+// produced. Recruit cards carry no character link, so identity comes from the
+// Blizzard render URL via getCardCharacter() — the same reconstruction the
+// proactive scoring path uses.
+
+registerHarvester('guildsofwow', '#recruits-list .card', function () {
+    return Array.from(document.querySelectorAll('#recruits-list .card'))
+        .filter(card => card.style.display !== 'none' && card.dataset.wclHidden !== 'true')
+        .map(card => {
+            const character = getCardCharacter(card);
+            if (!character) return null;
+            return {
+                ...character,
+                role:        getCardRole(card),
+                playerClass: getCardClass(card),
+                ilvl:        getCardIlvl(card),
+                mythicKills: getCardMythicKills(card),
+                mplusScore:  getCardMythicPlusScore(card),
+                note:        card.querySelector('.card-notes, .recruit-notes')?.textContent?.trim() || null,
+            };
+        })
+        .filter(Boolean);
 });

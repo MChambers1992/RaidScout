@@ -62,9 +62,15 @@ function getWowProgressCharacter(playerRow) {
     const idx = parts.indexOf('character');
     if (idx === -1 || parts.length < idx + 4) return null;
     const role = getPlayerRole(playerRow);
+    // WoWProgress percent-encodes spaces in realm names ("Tarren%20Mill"), so
+    // the realm must be decoded before slugging — otherwise the WCL API is
+    // queried for "tarren%20mill" and returns notFound for every multi-word realm.
+    let realm = parts[idx + 2];
+    try { realm = decodeURIComponent(realm); } catch { /* keep raw */ }
+
     return {
         region: parts[idx + 1].toLowerCase(),
-        realm:  parts[idx + 2].replace(/\s/g, '-').toLowerCase(),
+        realm:  realm.replace(/\s/g, '-').toLowerCase(),
         name:   decodeURIComponent(parts[idx + 3].split('?')[0]),
         // 'auto' → the API picks the metric from the spec they ranked as, so a
         // healer isn't silently judged on DPS parses they'll never post.
@@ -77,7 +83,7 @@ function getWowProgressCharacter(playerRow) {
 // WCL settings change later in the session. The original standard-filter pass
 // removes rows that fail non-WCL criteria; WCL-scored rows that fail are hidden.
 
-let wclThresholds = { minBest: 0, minMedian: 0, hideUnknown: false };
+let wclThresholds = { minBest: 0, minMedian: 0 };
 let wclSummaryAnchor = null;
 
 async function applyWclScoring(wclSettings) {
@@ -143,7 +149,7 @@ async function applyWclScoring(wclSettings) {
 
 // ─── Live settings re-evaluation ──────────────────────────────────────────────
 
-const WP_WCL_KEYS = ['wpWclEnabled', 'wpWclSort', ...SHARED_WCL_KEYS];
+const WP_WCL_KEYS = ['wpWclEnabled', ...SHARED_WCL_KEYS];
 
 watchSettings(WP_WCL_KEYS, () => {
     // Clear all WCL markers so the next filter pass re-scores everything
@@ -157,7 +163,7 @@ watchSettings(WP_WCL_KEYS, () => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get([
         'selectedRegions', 'region', 'minIlvl', 'maxIlvl', 'selectedClasses', 'guildFilter',
-        'wpWclEnabled', 'wpWclSort', ...SHARED_WCL_KEYS,
+        'wpWclEnabled', ...SHARED_WCL_KEYS,
     ], function(options) {
         const selectedRegions = options.selectedRegions ?? (options.region ? [options.region] : ['EU']);
         const minIlvl         = parseFloat(options.minIlvl) || 0;
@@ -167,7 +173,7 @@ function loadSettingsAndFilter() {
         filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter);
 
         if (options.wpWclEnabled) {
-            applyWclScoring({ ...buildWclSettings(options), sort: !!options.wpWclSort });
+            applyWclScoring({ ...buildWclSettings(options), sort: wclSortEnabled(options) });
         }
     });
 }
@@ -228,4 +234,30 @@ chrome.storage.sync.get('wowprogressEnabled', function(options) {
             handlePageNavigation();
         }
     }
+});
+
+// ─── Scout harvest ─────────────────────────────────────────────────────────────
+// Returns the rows still standing after filterPlayers()/applyWclScoring() have
+// run. Registered unconditionally so Scout works even when the WoWProgress
+// integration toggle is off (Scout warns the officer that filters didn't run).
+
+registerHarvester('wowprogress', '.rating tr', function () {
+    return Array.from(document.querySelectorAll('.rating tr'))
+        .slice(1)
+        .filter(row => row.isConnected && row.style.display !== 'none' && row.dataset.wclHidden !== 'true')
+        .map(row => {
+            const character = getWowProgressCharacter(row);
+            if (!character) return null;
+            const ilvlText = row.querySelector('td.center')?.textContent?.trim() ?? '';
+            const link = row.querySelector('a[href*="/character/"]')?.getAttribute('href');
+            return {
+                ...character,
+                playerClass: getPlayerClass(row),
+                role:        getPlayerRole(row),
+                ilvl:        parseFloat(ilvlText),
+                inGuild:     row.querySelector('.guild') !== null,
+                link:        link ? `https://www.wowprogress.com${link}` : null,
+            };
+        })
+        .filter(Boolean);
 });

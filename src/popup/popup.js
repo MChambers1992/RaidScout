@@ -2,12 +2,12 @@ const SETTINGS_KEYS = [
     'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
     'scoutPreflight', 'scoutOpenInBackground',
     'wowprogressEnabled', 'openWarcraftLogsTab', 'minIlvl', 'maxIlvl', 'selectedRegions', 'guildFilter',
-    'wpWclEnabled', 'wpWclSort',
+    'wpWclEnabled',
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedRegions', 'rioSelectedRoles',
-    'rioWclEnabled', 'rioWclSort',
+    'rioWclEnabled',
     'guildsofwowEnabled', 'gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedRoles',
-    'gowWclEnabled', 'gowWclSort',
+    'gowWclEnabled',
 ];
 
 const SITE_PANEL_MAP = {
@@ -62,7 +62,6 @@ function applySettings(data) {
     document.getElementById('q-guildFilter').value = data.guildFilter ?? 'any';
     document.getElementById('q-openWarcraftLogsTab').checked = data.openWarcraftLogsTab !== false;
     document.getElementById('q-wpWclEnabled').checked = !!data.wpWclEnabled;
-    document.getElementById('q-wpWclSort').checked = !!data.wpWclSort;
 
     const savedRegions = data.selectedRegions ?? ['EU'];
     document.querySelectorAll('.q-regionFilter').forEach(cb => {
@@ -73,7 +72,6 @@ function applySettings(data) {
     document.getElementById('q-openWarcraftLogsFromRaiderIO').checked = data.openWarcraftLogsFromRaiderIO !== false;
     document.getElementById('q-hideRaiderIoAds').checked = data.hideRaiderIoAds !== false;
     document.getElementById('q-rioWclEnabled').checked = !!data.rioWclEnabled;
-    document.getElementById('q-rioWclSort').checked = !!data.rioWclSort;
     document.getElementById('q-rioMinIlvl').value = data.rioMinIlvl || '';
 
     const savedRioRegions = data.rioSelectedRegions ?? [];
@@ -88,7 +86,6 @@ function applySettings(data) {
 
     document.getElementById('q-guildsofwowEnabled').checked = data.guildsofwowEnabled !== false;
     document.getElementById('q-gowWclEnabled').checked = !!data.gowWclEnabled;
-    document.getElementById('q-gowWclSort').checked = !!data.gowWclSort;
     document.getElementById('q-gowMinIlvl').value = data.gowMinIlvl || '';
     document.getElementById('q-gowMinMythicKills').value = data.gowMinMythicKills || '';
     document.getElementById('q-gowMinMythicPlusScore').value = data.gowMinMythicPlusScore || '';
@@ -127,7 +124,6 @@ function saveAll() {
         wowprogressEnabled: document.getElementById('q-wowprogressEnabled').checked,
         openWarcraftLogsTab: document.getElementById('q-openWarcraftLogsTab').checked,
         wpWclEnabled: document.getElementById('q-wpWclEnabled').checked,
-        wpWclSort: document.getElementById('q-wpWclSort').checked,
         minIlvl: parseFloat(document.getElementById('q-minIlvl').value) || 0,
         maxIlvl: parseFloat(document.getElementById('q-maxIlvl').value) || 0,
         selectedRegions,
@@ -140,7 +136,6 @@ function saveAll() {
         rioSelectedRegions,
         rioSelectedRoles,
         rioWclEnabled: document.getElementById('q-rioWclEnabled').checked,
-        rioWclSort: document.getElementById('q-rioWclSort').checked,
 
         guildsofwowEnabled: document.getElementById('q-guildsofwowEnabled').checked,
         gowMinIlvl: parseFloat(document.getElementById('q-gowMinIlvl').value) || 0,
@@ -148,7 +143,6 @@ function saveAll() {
         gowMinMythicPlusScore: parseInt(document.getElementById('q-gowMinMythicPlusScore').value) || 0,
         gowSelectedRoles,
         gowWclEnabled: document.getElementById('q-gowWclEnabled').checked,
-        gowWclSort: document.getElementById('q-gowWclSort').checked,
     }, showSaved);
 }
 
@@ -247,6 +241,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 renderLastSkip(res?.skip);
             });
         }
+    });
+
+    // Open the Scout aggregator page. Reuses an already-open Scout tab rather
+    // than stacking duplicates, since it auto-runs a harvest on load.
+    document.getElementById('openScout').addEventListener('click', function () {
+        const scoutUrl = chrome.runtime.getURL('src/scout/scout.html');
+        chrome.tabs.query({ url: scoutUrl }, function (tabs) {
+            if (tabs && tabs.length > 0) {
+                chrome.tabs.update(tabs[0].id, { active: true });
+                chrome.tabs.reload(tabs[0].id);
+            } else {
+                chrome.tabs.create({ url: scoutUrl });
+            }
+            window.close();
+        });
     });
 
     // Open full settings page

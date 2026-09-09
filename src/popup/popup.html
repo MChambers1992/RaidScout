@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>RaidScout</title>
+    <link rel="stylesheet" href="../shared.css">
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -117,10 +118,6 @@
                     <input type="checkbox" id="q-wpWclEnabled">
                     Proactive WCL parse filter
                 </label>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-wpWclSort">
-                    Sort by WCL parse
-                </label>
             </div>
         </div>
     </div>
@@ -169,10 +166,6 @@
                     <input type="checkbox" id="q-rioWclEnabled">
                     Proactive WCL parse filter
                 </label>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-rioWclSort">
-                    Sort by WCL parse
-                </label>
             </div>
         </div>
     </div>
@@ -218,21 +211,24 @@
                     <input type="checkbox" id="q-gowWclEnabled">
                     Proactive WCL parse filter
                 </label>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-gowWclSort">
-                    Sort by WCL parse
-                </label>
             </div>
         </div>
     </div>
 
     <div class="popup-footer">
+        <button id="openScout">🔎 Scout all sites</button>
         <button id="openSettings">⚙ Full Settings</button>
         <div class="saved-indicator" id="savedIndicator"></div>
         <div id="wclStatusBar" style="font-size:11px;color:#f09020;padding:4px 8px;display:none;"></div>
         <div id="lastSkipBar" style="font-size:11px;color:#888;padding:0 8px 4px;display:none;"></div>
+        <div class="support-row">
+            <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">☕ Support</a>
+            <span class="support-sep">·</span>
+            <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">▶ YouTube</a>
+        </div>
     </div>
 
+    <script src="../links.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

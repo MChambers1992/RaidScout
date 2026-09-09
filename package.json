@@ -13,12 +13,13 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/MChambers1992/RaidScout/issues"
   },
   "homepage": "https://github.com/MChambers1992/RaidScout#readme",
   "devDependencies": {
+    "jsdom": "^30.0.1",
     "vitest": "^4.1.9"
   },
   "type": "module"

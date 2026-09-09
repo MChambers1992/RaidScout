@@ -73,5 +73,5 @@
       ]
     }
   ],
-  "version_name": "1.4.0 — Pre-flight scouting, role auto-resolution, Cloudflare handling"
+  "version_name": "1.4.0 — Scout aggregator, pre-flight scouting, role auto-resolution"
 }
