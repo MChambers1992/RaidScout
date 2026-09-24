@@ -47,7 +47,7 @@
 - If nothing opened, check the popup's badge — the pre-flight check may have skipped them for being below threshold. The popup shows the most recent skip with their parse
 
 **Everyone's tabs are opening even though they're bad parses**
-- Pre-flight needs API credentials. Without them RaidScout opens the tab first and closes it afterwards, which is the older behaviour
+- Parse checks need API credentials — both the pre-flight check and the check on the WarcraftLogs page itself read parses through the API. Without credentials every tab opens and stays open; see [WarcraftLogs API](warcraftlogs-api.md) to add them
 - Confirm **Check parses before opening a tab** is on in Full Settings → WarcraftLogs
 - Check the popup for a rate-limit or Cloudflare countdown — both make scouting fail open on purpose
 

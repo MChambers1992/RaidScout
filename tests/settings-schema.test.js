@@ -91,6 +91,27 @@ describe('load and collect round-trip', () => {
         expect(collected.wclSelectedClasses.sort()).toEqual(['druid', 'mage']);
     });
 
+    it('keeps a saved 0 for the DPS parse thresholds', () => {
+        // 0 means "no minimum" and the inputs allow it (min="0"), but the int
+        // parser treated 0 as missing and Save wrote 50/60 back — a threshold
+        // could never be switched off from this page.
+        const { loadFromData, collectFromDom, document } = loadSchema();
+        loadFromData({ parseThreshold: 0, bestParseThreshold: 0 });
+        expect(document.getElementById('parseThreshold').value).toBe('0');
+        const collected = collectFromDom();
+        expect(collected.parseThreshold).toBe(0);
+        expect(collected.bestParseThreshold).toBe(0);
+    });
+
+    it('still falls back to the default for a blank DPS threshold', () => {
+        const { collectFromDom, document } = loadSchema();
+        document.getElementById('parseThreshold').value = '';
+        document.getElementById('bestParseThreshold').value = '';
+        const collected = collectFromDom();
+        expect(collected.parseThreshold).toBe(50);
+        expect(collected.bestParseThreshold).toBe(60);
+    });
+
     it('reads a checkbox group back as the ticked values only', () => {
         const { loadFromData, collectFromDom } = loadSchema();
         loadFromData({ wclSelectedRegions: ['EU'] });

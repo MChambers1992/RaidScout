@@ -22,7 +22,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Min. Best % (Tank override) | — | **Shared** — overrides the DPS best threshold for tanks only |
 | Min. Median % (Tank override) | — | **Shared** — overrides the DPS median threshold for tanks only |
 | Sort lists by parse | Off | **Shared** — ranks candidates by parse (highest first) on every site with proactive filtering on. Was three per-site toggles before 1.4.0; your existing choice carries over |
-| Check parses before opening a tab | On | Scout via the API first and only open a WarcraftLogs tab for candidates who pass. Needs credentials; falls back to open-then-close without them |
+| Check parses before opening a tab | On | Scout via the API first and only open a WarcraftLogs tab for candidates who pass. Needs credentials. If a lookup fails the tab opens and is re-checked on the WarcraftLogs page; with no credentials at all, nothing is checked and every tab stays open |
 | Open scouted tabs in the background | Off | Open WarcraftLogs tabs without switching to them |
 | Recruitment search parse filter | — | Minimum parse % on the WarcraftLogs recruitment search page |
 | Use role-aware API scoring (search) | Off | Also apply the full proactive scoring flow to recruitment search results, on top of the flat minimum above. Requires credentials |

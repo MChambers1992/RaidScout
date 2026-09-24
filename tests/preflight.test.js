@@ -104,15 +104,27 @@ describe('buildScoutThresholds', () => {
             minBestTank: 30, minMedianTank: 25,
         });
     });
-    it('defaults every threshold to 0 on an empty snapshot', () => {
+    it('uses the documented 60/50 DPS defaults on an empty snapshot', () => {
+        // An absent key means "never saved", and the popup and options page both
+        // display 60/50 for it. Reading it as 0 scored fresh installs against no
+        // threshold at all while the UI claimed otherwise.
         expect(buildScoutThresholds({})).toEqual({
-            minBest: 0, minMedian: 0,
+            minBest: 60, minMedian: 50,
             minBestHealer: 0, minMedianHealer: 0,
             minBestTank: 0, minMedianTank: 0,
         });
     });
+    it('keeps an explicitly saved 0 as "no minimum"', () => {
+        const t = buildScoutThresholds({ bestParseThreshold: 0, parseThreshold: '0' });
+        expect(t.minBest).toBe(0);
+        expect(t.minMedian).toBe(0);
+    });
+    it('falls back to the default for an unparseable value', () => {
+        expect(buildScoutThresholds({ bestParseThreshold: 'abc', parseThreshold: '' }))
+            .toMatchObject({ minBest: 60, minMedian: 50 });
+    });
     it('tolerates being called with no arguments', () => {
-        expect(buildScoutThresholds().minBest).toBe(0);
+        expect(buildScoutThresholds().minBest).toBe(60);
     });
 });
 
@@ -150,7 +162,7 @@ describe('scoutVerdict', () => {
             .toEqual({ verdict: 'open', reason: 'NO_LOGS' });
     });
     it('opens when every threshold is disabled', () => {
-        expect(scoutVerdict({ best: 1, median: 1 }, buildScoutThresholds({}), 'dps').verdict).toBe('open');
+        expect(scoutVerdict({ best: 1, median: 1 }, buildScoutThresholds({ bestParseThreshold: 0, parseThreshold: 0 }), 'dps').verdict).toBe('open');
     });
 });
 

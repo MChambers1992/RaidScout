@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
+import { buildScoutThresholds } from '../src/preflight.js';
 
 const commonSource = readFileSync(new URL('../src/content/common.js', import.meta.url), 'utf8');
 
@@ -444,5 +445,41 @@ describe('isCloudflareChallengePage', () => {
 
     it('tolerates a page with no title at all', () => {
         expect(inPage('<div></div>')).toBe(false);
+    });
+});
+
+// ─── buildWclSettings ─────────────────────────────────────────────────────────
+// The list filters and the pre-flight scout read the same storage keys through
+// two copies of this mapping (common.js cannot import preflight.js). Both must
+// agree on what an absent key means, or a candidate hidden on one page gets a
+// tab opened from another.
+
+describe('buildWclSettings', () => {
+    it('uses the documented 60/50 DPS defaults when the keys were never saved', () => {
+        expect(buildWclSettings({})).toMatchObject({ minBest: 60, minMedian: 50 });
+    });
+
+    it('keeps an explicitly saved 0 as "no minimum"', () => {
+        expect(buildWclSettings({ bestParseThreshold: 0, parseThreshold: 0 }))
+            .toMatchObject({ minBest: 0, minMedian: 0 });
+    });
+
+    it('passes saved values through', () => {
+        expect(buildWclSettings({ bestParseThreshold: '75', parseThreshold: 40, wclMinBestHealer: 30 }))
+            .toMatchObject({ minBest: 75, minMedian: 40, minBestHealer: 30 });
+    });
+
+    it('agrees with preflight.js for every shape of snapshot', () => {
+        const snapshots = [
+            {},
+            { bestParseThreshold: 0, parseThreshold: 0 },
+            { bestParseThreshold: '', parseThreshold: null },
+            { bestParseThreshold: 'x', parseThreshold: '33' },
+            { bestParseThreshold: 90, parseThreshold: 80, wclMinBestTank: 20, wclMinMedianHealer: 45 },
+        ];
+        for (const snap of snapshots) {
+            const { concurrency, ...shared } = buildWclSettings(snap);
+            expect({ ...shared }, JSON.stringify(snap)).toEqual(buildScoutThresholds(snap));
+        }
     });
 });
