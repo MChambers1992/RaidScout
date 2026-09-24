@@ -6,6 +6,11 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **Pre-flight scouting could close the wrong WoWProgress tab** — When a candidate was rejected, the WoWProgress tab they were opened from was closed by tab id once the API answered. That answer is asynchronous (a token exchange plus a GraphQL call), so a user who clicked a name on the gearscore listing and pressed Back, or moved on to the next candidate, before it arrived lost that tab — listing and all. The tab is now re-read at close time and only closed if it still shows the rejected character.
+
 ## [1.5.0] — 2026-09-09
 
 ### Added

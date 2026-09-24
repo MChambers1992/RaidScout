@@ -80,6 +80,48 @@ function closeWowProgressTab(warcraftLogsUrl) {
     });
 }
 
+// True when two WoWProgress URLs are the same character page. Query string and
+// hash are ignored (a sort or anchor is still the same candidate), and region
+// and realm compare case-insensitively; the name is decoded before comparing so
+// `Ch%C3%A9` and `Ché` agree.
+function isSameWowProgressCharacter(a, b) {
+    const key = url => {
+        try {
+            const parts = new URL(url).pathname.split('/').filter(Boolean);
+            const idx = parts.indexOf('character');
+            if (idx === -1 || parts.length < idx + 4) return null;
+            const [region, realm, name] = parts.slice(idx + 1, idx + 4);
+            return `${region.toLowerCase()}/${realm.toLowerCase()}/${decodeURIComponent(name)}`;
+        } catch {
+            return null;
+        }
+    };
+    const ka = key(a);
+    return ka !== null && ka === key(b);
+}
+
+// Close `tabId` only if it is still showing the character page the decision was
+// made about. Pre-flight answers asynchronously — a token exchange plus a
+// GraphQL call, up to the 10 s fetch timeout each — and the user can navigate
+// that tab in the meantime: back to the gearscore listing they clicked through
+// from, or on to the next candidate. Closing by id alone then took the listing
+// (or the next candidate) with it. The tab is re-read at close time, which is
+// what the pre-1.4 closeWowProgressTab() got right by matching on URL.
+async function closeTabIfStillOn(tabId, expectedUrl) {
+    let tab;
+    try {
+        tab = await chrome.tabs.get(tabId);
+    } catch {
+        return false;   // already closed
+    }
+    // tab.url is the committed URL; pendingUrl is set while a new navigation is
+    // loading, and a tab mid-navigation away from the candidate is not theirs.
+    if (tab.pendingUrl && !isSameWowProgressCharacter(tab.pendingUrl, expectedUrl)) return false;
+    if (!isSameWowProgressCharacter(tab.url, expectedUrl)) return false;
+    await chrome.tabs.remove(tabId).catch(() => {});
+    return true;
+}
+
 // ─── Sender validation ─────────────────────────────────────────────────────────
 
 const TRUSTED_HOSTS = [
@@ -130,9 +172,13 @@ function isTrustedSender(sender) {
     return isTrustedTabSender(sender) || isExtensionPageSender(sender);
 }
 
-// Exported for tests/background-senders.test.js. The listeners below are the
+// Exported for tests/background-senders.test.js and
+// tests/background-source-tab.test.js. The listeners below are the
 // only production callers; nothing imports background.js.
-export { isTrustedTabSender, isExtensionPageSender, isTrustedSender, TRUSTED_HOSTS };
+export {
+    isTrustedTabSender, isExtensionPageSender, isTrustedSender, TRUSTED_HOSTS,
+    isSameWowProgressCharacter, closeTabIfStillOn,
+};
 
 // ─── Scout pre-flight ──────────────────────────────────────────────────────────
 // The scout flow used to be: open the candidate's WarcraftLogs tab, let the
@@ -195,7 +241,7 @@ async function recordScoutSkip(character, score) {
 // them. `sourceTabId` is the page the request came from; it is closed on a
 // reject only when the caller asks for it (WoWProgress parity — Raider.IO
 // never closed its own tab).
-async function scoutAndOpenTab(wclUrl, { sourceTabId = null, closeSourceTabOnReject = false } = {}) {
+async function scoutAndOpenTab(wclUrl, { sourceTabId = null, sourceUrl = null, closeSourceTabOnReject = false } = {}) {
     const { preflight, openInBackground, thresholds } = await readScoutSettings();
 
     let result = { verdict: 'unknown', score: null, character: null };
@@ -207,7 +253,7 @@ async function scoutAndOpenTab(wclUrl, { sourceTabId = null, closeSourceTabOnRej
         await recordScoutSkip(result.character, result.score);
         updateBadge();
         if (closeSourceTabOnReject && sourceTabId != null) {
-            chrome.tabs.remove(sourceTabId).catch(() => {});
+            await closeTabIfStillOn(sourceTabId, sourceUrl);
         }
         return { opened: false, verdict: result.verdict, score: result.score };
     }
@@ -226,7 +272,11 @@ chrome.webNavigation.onCompleted.addListener(function(details) {
         if (options.wowprogressEnabled === false || !options.openWarcraftLogsTab) return;
         const wclUrl = buildWarcraftLogsUrl(details.url);
         if (!wclUrl) return;
-        scoutAndOpenTab(wclUrl, { sourceTabId: details.tabId, closeSourceTabOnReject: true });
+        scoutAndOpenTab(wclUrl, {
+            sourceTabId: details.tabId,
+            sourceUrl: details.url,
+            closeSourceTabOnReject: true,
+        });
     });
 }, { url: [{ hostContains: WOWPROGRESS_HOST }] });
 
