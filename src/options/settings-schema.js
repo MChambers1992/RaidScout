@@ -8,6 +8,8 @@
 //   domId      — getElementById id (omit for checkboxGroup)
 //   selector   — CSS selector for querySelectorAll (checkboxGroup only)
 //   parse      — optional custom parse fn; receives raw string from DOM element
+//   allowZero  — numeric entries only: a typed 0 is kept rather than replaced
+//                by a non-zero default (0 means "no minimum" for the thresholds)
 //
 // load(data)  — reads data object, populates DOM
 // collect()   — reads DOM, returns plain object to pass to chrome.storage.sync.set
@@ -18,8 +20,8 @@
 const SCHEMA = [
     // ── WarcraftLogs ─────────────────────────────────────────────────────────
     { key: 'warcraftlogsEnabled',        type: 'bool',   default: true,  domId: 'warcraftlogsEnabled' },
-    { key: 'parseThreshold',             type: 'int',    default: 50,    domId: 'parseThreshold' },
-    { key: 'bestParseThreshold',         type: 'int',    default: 60,    domId: 'bestParseThreshold' },
+    { key: 'parseThreshold',             type: 'int',    default: 50,    domId: 'parseThreshold',     allowZero: true },
+    { key: 'bestParseThreshold',         type: 'int',    default: 60,    domId: 'bestParseThreshold', allowZero: true },
     // Shared proactive-scoring thresholds (drive WoWProgress/Raider.IO/GoW).
     // DPS Best/Median reuse bestParseThreshold/parseThreshold above.
     { key: 'wclMinBestHealer',           type: 'int',    default: 0,     domId: 'wclMinBestHealer' },
@@ -96,6 +98,11 @@ const DEFAULTS = Object.fromEntries(SCHEMA.map(s => [s.key, s.default]));
 // Parse a raw DOM value for a given schema entry
 function parseValue(entry, rawValue) {
     if (entry.type === 'bool')   return !!rawValue;
+    if (entry.type === 'int' && entry.allowZero) {
+        // Blank falls back to the default; an explicit 0 is a real choice.
+        const n = parseInt(rawValue);
+        return Number.isNaN(n) ? entry.default : n;
+    }
     if (entry.type === 'int')    return parseInt(rawValue)   || entry.default || 0;
     if (entry.type === 'float')  return parseFloat(rawValue) || entry.default || 0;
     if (entry.type === 'string') return rawValue ?? entry.default ?? '';

@@ -9,6 +9,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- **A WarcraftLogs tab you opened yourself could be closed** — The below-threshold check runs on every WarcraftLogs character page, and the extension closed whichever tab reported, plus every WoWProgress tab showing that character. It now closes only tabs RaidScout opened, and only while they still show the character they were opened for.
+- **Duplicate WarcraftLogs tabs from one WoWProgress visit** — WoWProgress's Cloudflare check reloads the page once it passes, and each load opened a tab; so did a refresh. One visit now opens one tab (repeats for the same character from the same tab within 30 seconds are ignored).
+- **Raider.IO only opened WarcraftLogs for the first character you viewed** — Raider.IO switches pages without reloading, and the "already opened" flag was never reset. It now tracks which character it opened, so each new character gets their tab.
+- **"Auto-open WarcraftLogs" and "Remove Raider.IO Ads" were off until you saved settings once** — Both show as ticked by default but were read as off when never saved.
+- **Parse thresholds were 0 until you saved settings once, and could not be set to 0 afterwards** — A fresh install displayed 60 best / 50 median but filtered against nothing; and typing 0 ("no minimum") in the popup or Full Settings saved 50/60 instead.
+- **A query string or `#` on a WoWProgress character URL broke the WarcraftLogs link** — It was folded into the character name.
+- **Docs claimed parse checks work without API credentials** — They do not: both the pre-flight check and the check on the WarcraftLogs page read parses through the API, so without credentials every tab stays open. The settings hint and troubleshooting now say so.
 - **Pre-flight scouting could close the wrong WoWProgress tab** — When a candidate was rejected, the WoWProgress tab they were opened from was closed by tab id once the API answered. That answer is asynchronous (a token exchange plus a GraphQL call), so a user who clicked a name on the gearscore listing and pressed Back, or moved on to the next candidate, before it arrived lost that tab — listing and all. The tab is now re-read at close time and only closed if it still shows the rejected character.
 
 ## [1.5.0] — 2026-09-09

@@ -1,6 +1,11 @@
 // raiderio.js — content script for raider.io
 
-let warcraftLogsRedirected = false;
+// The character page a WarcraftLogs tab was last requested for. Raider.IO is a
+// single-page app: moving from one character to the next is a client-side
+// route change, and this script keeps running. A plain `redirected` boolean
+// therefore opened a tab for the first character of the session and never
+// again — so it is keyed by the character path instead.
+let warcraftLogsRedirectedFor = null;
 let filterSettings = { minIlvl: 0, selectedClasses: [], selectedRoles: [], selectedRegions: [] };
 let wclSettings = {
     enabled: false,
@@ -34,6 +39,18 @@ function convertRaiderIoToWarcraftLogs(raiderIoUrl) {
     }
 }
 
+// `/characters/eu/tarren-mill/Thrall/mythic-plus` and `/characters/eu/tarren-mill/Thrall`
+// are the same character: tab sub-routes must not count as a new visit.
+function characterPathKey(raiderIoUrl) {
+    try {
+        const parts = new URL(raiderIoUrl).pathname.split('/');
+        if (parts.length < 5 || parts[1] !== 'characters') return null;
+        return parts.slice(2, 5).join('/').toLowerCase();
+    } catch {
+        return null;
+    }
+}
+
 function enforceSortingAndPublishedColumn() {
     if (!isSearchPage()) return;
     const href   = window.location.href;
@@ -53,23 +70,25 @@ function enforceSortingAndPublishedColumn() {
 }
 
 function handleWarcraftLogsRedirection(enabled) {
-    if (!enabled || warcraftLogsRedirected) return;
-    if (isRaiderIoCharacterPage()) {
-        setTimeout(() => {
-            if (warcraftLogsRedirected) return;
-            const url = convertRaiderIoToWarcraftLogs(window.location.href);
-            if (!url) return;
-            warcraftLogsRedirected = true;
-            // The background pre-flights the parse check and may decide this
-            // character isn't worth a tab. Nothing opening is the *point*, so
-            // say why rather than looking like the feature broke.
-            sendMessageToBackground('openTab', { url }, response => {
-                if (response && response.opened === false && response.verdict === 'reject') {
-                    showScoutSkipNotice(response.score);
-                }
-            });
-        }, 500);
-    }
+    if (!enabled || !isRaiderIoCharacterPage()) return;
+    if (warcraftLogsRedirectedFor === characterPathKey(window.location.href)) return;
+    setTimeout(() => {
+        const url = convertRaiderIoToWarcraftLogs(window.location.href);
+        if (!url) return;
+        // Re-checked after the delay: the observer can call this several
+        // times while the page settles, and only the first may send.
+        const key = characterPathKey(window.location.href);
+        if (warcraftLogsRedirectedFor === key) return;
+        warcraftLogsRedirectedFor = key;
+        // The background pre-flights the parse check and may decide this
+        // character isn't worth a tab. Nothing opening is the *point*, so
+        // say why rather than looking like the feature broke.
+        sendMessageToBackground('openTab', { url }, response => {
+            if (response && response.opened === false && response.verdict === 'reject') {
+                showScoutSkipNotice(response.score);
+            }
+        });
+    }, 500);
 }
 
 // Small transient banner explaining a skipped WarcraftLogs tab.
@@ -326,7 +345,9 @@ chrome.storage.sync.get([
     handleWarcraftLogsRedirection(wclEnabled);
     filterSearchRows();
 
-    if (options.hideRaiderIoAds) hideAds();
+    // Defaults to on, like the checkbox that controls it: a truthy check left
+    // ads showing on every install that had never saved its settings.
+    if (options.hideRaiderIoAds !== false) hideAds();
 });
 
 // ─── Scout harvest ─────────────────────────────────────────────────────────────

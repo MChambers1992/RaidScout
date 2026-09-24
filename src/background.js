@@ -55,29 +55,28 @@ function isWowProgressCharacterPage(url) {
     return url.includes('wowprogress.com/character');
 }
 
+// Parsed from the pathname, not by splitting the whole URL: a query string or
+// hash on the WoWProgress page (`…/Thrall?tab=gear`, `…/Thrall#pve`) used to
+// ride along into the name segment and send WarcraftLogs a character that does
+// not exist.
 function buildWarcraftLogsUrl(wowProgressUrl) {
-    const urlParts = wowProgressUrl.split('/');
-    const charIdx = urlParts.indexOf('character');
-    if (charIdx === -1 || urlParts.length < charIdx + 4) return null;
-    const region    = urlParts[charIdx + 1];
-    const realm     = urlParts[charIdx + 2];
-    const character = urlParts[charIdx + 3];
-    if (!region || !realm || !character) return null;
+    let parts;
+    try {
+        parts = new URL(wowProgressUrl).pathname.split('/').filter(Boolean);
+    } catch {
+        return null;
+    }
+    const charIdx = parts.indexOf('character');
+    if (charIdx === -1 || parts.length < charIdx + 4) return null;
+    const [region, realm, character] = parts.slice(charIdx + 1, charIdx + 4);
     return `${WCL_ORIGIN}/character/${region.toLowerCase()}/${realm.toLowerCase()}/${character}`;
 }
 
-function closeWowProgressTab(warcraftLogsUrl) {
-    const urlParts = warcraftLogsUrl.split('/');
-    const charIdx = urlParts.indexOf('character');
-    if (charIdx === -1) return;
-    const region    = urlParts[charIdx + 1];
-    const realm     = urlParts[charIdx + 2];
-    const character = urlParts[charIdx + 3]?.split('?')[0];
-    if (!region || !realm || !character) return;
-    const pattern = `https://www.wowprogress.com/character/${region}/${realm}/${character}*`;
-    chrome.tabs.query({ url: pattern }, tabs => {
-        tabs.forEach(tab => chrome.tabs.remove(tab.id));
-    });
+// Identity of a WCL character URL for comparisons: WarcraftLogs treats names
+// case-insensitively, and characterFromWclUrl already normalises region/realm.
+function wclCharacterKey(wclUrl) {
+    const c = characterFromWclUrl(wclUrl);
+    return c ? `${c.region}/${c.realm}/${c.name.toLowerCase()}` : null;
 }
 
 // True when two WoWProgress URLs are the same character page. Query string and
@@ -121,6 +120,105 @@ async function closeTabIfStillOn(tabId, expectedUrl) {
     await chrome.tabs.remove(tabId).catch(() => {});
     return true;
 }
+
+// ─── Repeat-visit guard ────────────────────────────────────────────────────────
+// webNavigation.onCompleted fires for every load of the character page, not
+// once per visit. WoWProgress is behind Cloudflare, which serves its challenge
+// at the page's own URL and reloads it once the check passes — two completed
+// loads, two scouts, two identical WarcraftLogs tabs. A reload or a Back/
+// Forward onto the page did the same. The first scout for a character from a
+// given tab claims it for SCOUT_REPEAT_WINDOW_MS; repeats inside that window
+// are dropped. Claimed before any await, so two events racing each other
+// still produce one tab.
+//
+// In memory on purpose: the duplicates arrive seconds apart, while the worker
+// is necessarily awake handling them.
+
+const SCOUT_REPEAT_WINDOW_MS = 30_000;
+const recentScouts = new Map();   // `${sourceTabId}|${characterKey}` → claimed-at ms
+
+function claimScout(sourceTabId, wclUrl, now = Date.now()) {
+    const key = `${sourceTabId ?? '-'}|${wclCharacterKey(wclUrl) ?? wclUrl}`;
+    for (const [k, at] of recentScouts) {
+        if (now - at >= SCOUT_REPEAT_WINDOW_MS) recentScouts.delete(k);
+    }
+    if (recentScouts.has(key)) return false;
+    recentScouts.set(key, now);
+    return true;
+}
+
+// ─── Scouted-tab registry ──────────────────────────────────────────────────────
+// warcraftlogs.js runs on every WarcraftLogs character page, and its backstop
+// asks for the tab to be closed whenever the character is below threshold. The
+// background used to comply unconditionally — so a WCL page the user opened
+// themselves (a link from Discord, a bookmark, a search) was closed out from
+// under them, and every WoWProgress tab showing that character went with it.
+// The settings promise to close an *auto-opened* tab, so that is now the only
+// kind closed: each tab scoutAndOpenTab creates is recorded here with the page
+// that asked for it, and parseThresholdFailed acts only on a recorded tab
+// still showing the character it was opened for.
+//
+// storage.session rather than memory: the backstop can report long after the
+// tab opened (it waits out a Cloudflare challenge first), well past the ~30 s
+// an idle MV3 worker survives.
+
+const SCOUTED_TABS_KEY = 'scoutedTabs';
+
+async function readScoutedTabs() {
+    const stored = await chrome.storage.session.get(SCOUTED_TABS_KEY).catch(() => ({}));
+    return stored?.[SCOUTED_TABS_KEY] || {};
+}
+
+// Every write is a read-modify-write of one object, and two scouts can finish
+// together (two WoWProgress tabs restored at once), so updates are queued: an
+// interleaved pair would otherwise drop whichever record was written first.
+let scoutedTabsQueue = Promise.resolve();
+function updateScoutedTabs(mutate) {
+    const run = scoutedTabsQueue.then(async () => {
+        const tabs = await readScoutedTabs();
+        const result = mutate(tabs);
+        await chrome.storage.session.set({ [SCOUTED_TABS_KEY]: tabs }).catch(() => {});
+        return result;
+    });
+    scoutedTabsQueue = run.catch(() => {});
+    return run;
+}
+
+function rememberScoutedTab(tabId, record) {
+    return updateScoutedTabs(tabs => { tabs[tabId] = record; });
+}
+
+// Removes and returns the record, or null when the tab was never ours.
+function forgetScoutedTab(tabId) {
+    return updateScoutedTabs(tabs => {
+        const record = tabs[tabId] ?? null;
+        delete tabs[tabId];
+        return record;
+    });
+}
+
+// The backstop reported `tabId` below threshold. Returns true when it acted.
+async function handleParseThresholdFailed(tabId, warcraftLogsUrl, score) {
+    const record = (await readScoutedTabs())[tabId];
+    if (!record) return false;                              // not a tab we opened
+    // The user may have navigated our tab on to another character; that page
+    // is theirs now, and so is the decision about it.
+    const key = wclCharacterKey(warcraftLogsUrl);
+    if (!key || key !== wclCharacterKey(record.wclUrl)) return false;
+
+    // Claimed through the queue so a duplicate report cannot close twice or
+    // count the skip twice.
+    if (!await forgetScoutedTab(tabId)) return false;
+    await chrome.tabs.remove(tabId).catch(() => {});
+    if (record.closeSource && record.sourceTabId != null && record.sourceUrl) {
+        await closeTabIfStillOn(record.sourceTabId, record.sourceUrl);
+    }
+    await recordScoutSkip(characterFromWclUrl(warcraftLogsUrl), score);
+    updateBadge();
+    return true;
+}
+
+chrome.tabs.onRemoved.addListener(tabId => { forgetScoutedTab(tabId).catch(() => {}); });
 
 // ─── Sender validation ─────────────────────────────────────────────────────────
 
@@ -178,6 +276,8 @@ function isTrustedSender(sender) {
 export {
     isTrustedTabSender, isExtensionPageSender, isTrustedSender, TRUSTED_HOSTS,
     isSameWowProgressCharacter, closeTabIfStillOn,
+    buildWarcraftLogsUrl, claimScout, scoutAndOpenTab, handleParseThresholdFailed,
+    SCOUT_REPEAT_WINDOW_MS,
 };
 
 // ─── Scout pre-flight ──────────────────────────────────────────────────────────
@@ -242,6 +342,10 @@ async function recordScoutSkip(character, score) {
 // reject only when the caller asks for it (WoWProgress parity — Raider.IO
 // never closed its own tab).
 async function scoutAndOpenTab(wclUrl, { sourceTabId = null, sourceUrl = null, closeSourceTabOnReject = false } = {}) {
+    if (!claimScout(sourceTabId, wclUrl)) {
+        return { opened: false, verdict: 'duplicate', score: null };
+    }
+
     const { preflight, openInBackground, thresholds } = await readScoutSettings();
 
     let result = { verdict: 'unknown', score: null, character: null };
@@ -258,7 +362,12 @@ async function scoutAndOpenTab(wclUrl, { sourceTabId = null, sourceUrl = null, c
         return { opened: false, verdict: result.verdict, score: result.score };
     }
 
-    chrome.tabs.create({ url: wclUrl, active: !openInBackground });
+    const tab = await chrome.tabs.create({ url: wclUrl, active: !openInBackground });
+    if (tab?.id != null) {
+        await rememberScoutedTab(tab.id, {
+            wclUrl, sourceTabId, sourceUrl, closeSource: closeSourceTabOnReject,
+        });
+    }
     return { opened: true, verdict: result.verdict, score: result.score };
 }
 
@@ -269,7 +378,10 @@ chrome.webNavigation.onCompleted.addListener(function(details) {
     if (!isWowProgressCharacterPage(details.url)) return;
 
     chrome.storage.sync.get(['wowprogressEnabled', 'openWarcraftLogsTab'], function(options) {
-        if (options.wowprogressEnabled === false || !options.openWarcraftLogsTab) return;
+        // `!== false`: the setting defaults to on (the popup and options page
+        // both show it ticked), so an install that never saved it must open
+        // tabs too. A truthy check left it silently off until the first Save.
+        if (options.wowprogressEnabled === false || options.openWarcraftLogsTab === false) return;
         const wclUrl = buildWarcraftLogsUrl(details.url);
         if (!wclUrl) return;
         scoutAndOpenTab(wclUrl, {
@@ -286,10 +398,8 @@ chrome.runtime.onMessage.addListener(function(message, sender) {
     if (!isTrustedTabSender(sender)) return;
 
     if (message.action === 'parseThresholdFailed') {
-        chrome.tabs.remove(sender.tab.id);
-        closeWowProgressTab(message.warcraftLogsUrl);
-        recordScoutSkip(characterFromWclUrl(message.warcraftLogsUrl), message.score);
-        updateBadge();
+        handleParseThresholdFailed(sender.tab.id, message.warcraftLogsUrl, message.score)
+            .catch(() => {});
     }
 
     // A real WarcraftLogs page rendered in a tab means the browser cleared any

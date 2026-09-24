@@ -52,7 +52,7 @@
                     <input type="checkbox" id="scoutPreflight">
                     <span class="toggle-slider"></span>
                 </label>
-                <p class="hint">Scores the character through the API <em>first</em> and only opens their WarcraftLogs tab if they pass your thresholds &mdash; so rejected candidates never have to get through WarcraftLogs' Cloudflare check just to have their tab closed again. Needs API credentials; without them (or if a lookup fails) RaidScout falls back to opening the tab and checking afterwards. On by default.</p>
+                <p class="hint">Scores the character through the API <em>first</em> and only opens their WarcraftLogs tab if they pass your thresholds &mdash; so rejected candidates never have to get through WarcraftLogs' Cloudflare check just to have their tab closed again. Needs API credentials. If a lookup fails, RaidScout opens the tab and checks again from the WarcraftLogs page; with no credentials at all nothing is checked, so every tab opens and stays open. On by default.</p>
             </div>
             <div class="option toggle-inline">
                 <label for="scoutOpenInBackground">Open scouted tabs in the background</label>

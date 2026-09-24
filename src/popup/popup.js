@@ -104,6 +104,11 @@ function scheduleSave() {
     saveTimer = setTimeout(saveAll, 400);
 }
 
+function intOr(raw, fallback) {
+    const n = parseInt(raw);
+    return Number.isNaN(n) ? fallback : n;
+}
+
 function saveAll() {
     const wclSelectedRegions = Array.from(document.querySelectorAll('.q-wclRegionFilter:checked')).map(cb => cb.value);
     const selectedRegions = Array.from(document.querySelectorAll('.q-regionFilter:checked')).map(cb => cb.value);
@@ -113,8 +118,10 @@ function saveAll() {
 
     chrome.storage.sync.set({
         warcraftlogsEnabled: document.getElementById('q-warcraftlogsEnabled').checked,
-        parseThreshold: parseInt(document.getElementById('q-parseThreshold').value) || 50,
-        bestParseThreshold: parseInt(document.getElementById('q-bestParseThreshold').value) || 60,
+        // 0 is a valid threshold ("no minimum"); only a blank field falls
+        // back to the default. `|| 50` turned a typed 0 back into 50.
+        parseThreshold: intOr(document.getElementById('q-parseThreshold').value, 50),
+        bestParseThreshold: intOr(document.getElementById('q-bestParseThreshold').value, 60),
         wclSearchParseThreshold: parseInt(document.getElementById('q-wclSearchParseThreshold').value) || 0,
         wclSelectedRegions,
         wclMinMythicKills: parseInt(document.getElementById('q-wclMinMythicKills').value) || 0,

@@ -208,13 +208,27 @@ function wclSortEnabled(options) {
     return !!(options.wpWclSort || options.rioWclSort || options.gowWclSort);
 }
 
+// The DPS pair are the only thresholds with a non-zero default (60 best / 50
+// median — what the popup and options page show on a fresh install). An absent
+// key means "never saved", so it takes that default; a saved 0 means "no
+// minimum" and must stay 0. `parseInt(x) || 0` got the first case wrong and
+// scored fresh installs against no threshold at all while displaying 60/50.
+const DEFAULT_BEST_PARSE   = 60;
+const DEFAULT_MEDIAN_PARSE = 50;
+
+function thresholdSetting(value, fallback) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const n = parseInt(value);
+    return Number.isNaN(n) ? fallback : n;
+}
+
 // Build the role-aware settings object consumed by thresholdsForRole /
 // failsWclThresholds from a storage snapshot. The per-site enable flag is
 // handled by each caller; this only carries the shared thresholds.
 function buildWclSettings(options) {
     return {
-        minBest:         parseInt(options.bestParseThreshold) || 0,
-        minMedian:       parseInt(options.parseThreshold)     || 0,
+        minBest:         thresholdSetting(options.bestParseThreshold, DEFAULT_BEST_PARSE),
+        minMedian:       thresholdSetting(options.parseThreshold,     DEFAULT_MEDIAN_PARSE),
         minBestHealer:   parseInt(options.wclMinBestHealer)   || 0,
         minMedianHealer: parseInt(options.wclMinMedianHealer) || 0,
         minBestTank:     parseInt(options.wclMinBestTank)     || 0,
