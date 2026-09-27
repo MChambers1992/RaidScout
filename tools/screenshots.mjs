@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
-import { wowprogressListingHtml, raiderioProfile, wclScore, tabHarvest } from './scout-fixture.mjs';
+import { wowprogressListingHtml, raiderioProfile, wclScore, tabHarvest, FIXTURE_NOW } from './scout-fixture.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'docs/screenshots');
@@ -216,6 +216,8 @@ await shot('options-wowprogress.png', `file://${ROOT}/src/options/options.html`,
     // so a screenshot cannot show a layout the code could not produce.
     const scoutStub = `
       ${chromeStub}
+      // Pinned so the Listed column's "3d ago" is the same on every run.
+      Date.now = () => ${FIXTURE_NOW};
       const __scores = ${JSON.stringify(SCORES)};
       const __canned = ${JSON.stringify(RESPONSES)};
       chrome.runtime.sendMessage = (msg, cb) => {
