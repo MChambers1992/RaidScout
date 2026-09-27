@@ -487,10 +487,30 @@ const SORT_ACCESSORS = {
     mythicKills: c => c.mythicKills,
     mplusScore:  c => c.mplusScore,
     listedAt:    c => c.listedAt,
-    wclBest:     c => c.wcl?.best ?? null,
-    wclMedian:   c => c.wcl?.median ?? null,
+    // Grouped by difficulty: see parseSortValue().
+    wclBest:     c => parseSortValue(c.wcl, 'best'),
+    wclMedian:   c => parseSortValue(c.wcl, 'median'),
     sources:     c => c.sources.length,
 };
+
+// A parse only means something next to parses from the same raid difficulty:
+// mythic fields are stronger, so a mythic 60% can be the better player than a
+// heroic 80%, and one list of raw percentages mixing the two ranks them wrongly.
+// So the parse sort groups first — every mythic parse, then heroic, then normal,
+// then parses whose difficulty is unknown (a score cached before it was
+// recorded) — and ranks by percentage within each group. Encoded as one number
+// (difficulty × 1000 + percent) so the generic sort, including its ascending
+// direction and missing-values-last rule, needs no special case. The per-site
+// sort in content/common.js (wclSortValue) uses the same encoding.
+export function parseSortValue(score, field = 'median') {
+    if (!score) return null;
+    const other = field === 'median' ? 'best' : 'median';
+    const value = score[field] ?? score[other] ?? null;
+    if (value === null || value === undefined) return null;
+    return (Number(score.difficulty) || 0) * 1000 + value;
+}
+
+export const DIFFICULTY_NAMES = { 3: 'normal', 4: 'heroic', 5: 'mythic' };
 
 // Sorts a copy. Missing values always sort last regardless of direction — an
 // unscored row sinking to the bottom is far more useful to an officer than it
@@ -644,6 +664,7 @@ const CSV_COLUMNS = [
     ['mplus_score', c => c.mplusScore],
     ['wcl_best',    c => c.wcl?.best],
     ['wcl_median',  c => c.wcl?.median],
+    ['wcl_difficulty', c => DIFFICULTY_NAMES[c.wcl?.difficulty] ?? null],
     ['listed_at',   c => c.listedAt ? new Date(c.listedAt).toISOString() : null],
     ['sources',     c => c.sources.join(' ')],
     ['note',        c => c.note],

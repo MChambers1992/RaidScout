@@ -239,6 +239,17 @@ describe('raid difficulty', () => {
         expect(bodyOf(fetchMock, 1).query).not.toContain('difficulty');
     });
 
+    it('records which difficulty WarcraftLogs picked when unpinned', async () => {
+        // So a list can rank mythic parses ahead of heroic ones.
+        mockFetch(tokenResponse(), charResponse({ dps: { ...rankings({ best: 60, median: 50 }), difficulty: 5 } }));
+        expect((await api.getCharacterScore({ ...CHAR, role: 'dps' })).difficulty).toBe(5);
+    });
+
+    it('does not claim a difficulty for a character with no parses', async () => {
+        mockFetch(tokenResponse(), charResponse({ dps: { ...rankings(), difficulty: 5 } }));
+        expect((await api.getCharacterScore({ ...CHAR, role: 'dps' })).difficulty).toBeUndefined();
+    });
+
     it('never serves a default-difficulty cache entry as a heroic score', async () => {
         const { syncStore } = installChrome({ local: CREDS.local, sync: { ...CREDS.sync } });
         vi.resetModules();

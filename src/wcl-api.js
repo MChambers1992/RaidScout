@@ -300,8 +300,17 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
     const resolvedRole = metric === 'auto' ? (specRole || 'dps') : role;
 
     const scores = extractScores(source);
-    if (debug) dbg('scores', { ...scores, spec, role: resolvedRole });
-    return { ...scores, notFound: false, spec: spec || null, role: resolvedRole };
+    // Which difficulty these numbers describe. Unpinned, WarcraftLogs picks the
+    // hardest one the character has logs on, so the same "75%" can be a mythic
+    // or a heroic parse; recording it is what lets a list rank mythic parses
+    // ahead of heroic ones instead of mixing the two on one scale.
+    const rankedDifficulty = (scores.best !== null || scores.median !== null) &&
+        typeof source?.difficulty === 'number' ? source.difficulty : null;
+    if (debug) dbg('scores', { ...scores, spec, role: resolvedRole, difficulty: rankedDifficulty });
+    return {
+        ...scores, notFound: false, spec: spec || null, role: resolvedRole,
+        ...(rankedDifficulty ? { difficulty: rankedDifficulty } : {}),
+    };
 }
 
 // ─── Cache ─────────────────────────────────────────────────────────────────────
@@ -366,6 +375,8 @@ async function getCharacterScore({ region, realm, name, role }) {
             const scores = await queryCharacter({ name, serverSlug: realm, serverRegion: region, metric, role: role || 'dps', difficulty });
             // Carried on the result so a badge can say which difficulty its
             // numbers describe — a heroic 90 and a mythic 90 are not the same.
+            // When pinned it is set even with no logs, so the no-logs badge can
+            // say "no heroic data" rather than "no data".
             if (difficulty) scores.difficulty = difficulty;
             await writeCache(key, scores);
             // An 'auto' lookup also answers the role-specific question, so write

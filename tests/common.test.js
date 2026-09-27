@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { buildScoutThresholds } from '../src/preflight.js';
+import { parseSortValue } from '../src/scout/scout-core.js';
 
 const commonSource = readFileSync(new URL('../src/content/common.js', import.meta.url), 'utf8');
 
@@ -22,6 +23,7 @@ const EXPOSED = [
     'normalizeClassName', 'hasNoWclLogs', 'failsWclThresholds', 'thresholdsForRole',
     'wclSortEnabled', 'effectiveRole', 'badgeStateForScore', 'buildWclSettings',
     'roleForSpec', 'isCloudflareChallengePage',
+    'wclSortValue', 'sortByWclScore', 'readListedDate', 'makeBadge',
 ];
 
 const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
@@ -31,6 +33,7 @@ const {
     normalizeClassName, hasNoWclLogs, failsWclThresholds, thresholdsForRole,
     wclSortEnabled, effectiveRole, badgeStateForScore, buildWclSettings,
     roleForSpec, isCloudflareChallengePage,
+    wclSortValue, sortByWclScore, readListedDate, makeBadge,
 } = dom.window.__api;
 
 // ─── Still mirrored, deliberately ─────────────────────────────────────────────
@@ -481,5 +484,76 @@ describe('buildWclSettings', () => {
             const { concurrency, ...shared } = buildWclSettings(snap);
             expect({ ...shared }, JSON.stringify(snap)).toEqual(buildScoutThresholds(snap));
         }
+    });
+});
+
+// ─── Parse sort: difficulty first ──────────────────────────────────────────────
+
+describe('sortByWclScore', () => {
+    const doc = dom.window.document;
+    function list(rows) {
+        const parent = doc.createElement('div');
+        for (const [name, difficulty, median] of rows) {
+            const el = doc.createElement('div');
+            el.textContent = name;
+            if (difficulty) el.dataset.wclDifficulty = String(difficulty);
+            if (median !== null) el.dataset.wclMedian = String(median);
+            parent.appendChild(el);
+        }
+        return parent;
+    }
+
+    it('ranks every mythic parse ahead of every heroic one', () => {
+        // A mythic 55% outranks a heroic 90%: the two are not on one scale.
+        const parent = list([['H90', 4, 90], ['M55', 5, 55], ['Unscored', null, null], ['M70', 5, 70], ['H60', 4, 60]]);
+        sortByWclScore(Array.from(parent.children));
+        expect(Array.from(parent.children, el => el.textContent)).toEqual(['M70', 'M55', 'H90', 'H60', 'Unscored']);
+    });
+
+    it('puts parses of unknown difficulty after the known ones', () => {
+        const parent = list([['Unknown99', null, 99], ['H40', 4, 40]]);
+        sortByWclScore(Array.from(parent.children));
+        expect(Array.from(parent.children, el => el.textContent)).toEqual(['H40', 'Unknown99']);
+    });
+
+    it('encodes exactly as the Scout sort does', () => {
+        for (const score of [
+            { difficulty: 5, best: 80, median: 60 }, { difficulty: 4, best: 99, median: null },
+            { best: 50, median: 40 }, { difficulty: 3, best: null, median: null },
+        ]) {
+            expect(wclSortValue(score.difficulty, score.best, score.median))
+                .toBe(parseSortValue(score, 'median'));
+        }
+    });
+});
+
+describe('makeBadge difficulty tag', () => {
+    it('says which difficulty the numbers are from', () => {
+        expect(makeBadge('score', { best: 80, median: 70, difficulty: 5 }).textContent).toBe('WCL M 80% / 70%');
+        expect(makeBadge('score', { best: 80, median: 70, difficulty: 4 }).textContent).toBe('WCL H 80% / 70%');
+        expect(makeBadge('score', { best: 80, median: 70 }).textContent).toBe('WCL 80% / 70%');
+    });
+});
+
+// ─── Listing date ──────────────────────────────────────────────────────────────
+
+describe('readListedDate', () => {
+    const el = html => { const d = dom.window.document.createElement('div'); d.innerHTML = html; return d; };
+
+    it('prefers explicit timestamps', () => {
+        expect(readListedDate(el('<span class="datetime" data-ts="1790000000">Sep</span>'))).toBe('1790000000');
+        expect(readListedDate(el('<time datetime="2026-09-01">Sep 1</time>'))).toBe('2026-09-01');
+    });
+
+    it('accepts a leaf that reads entirely as a relative date', () => {
+        expect(readListedDate(el('<p>Remnant 2020</p><span>3 days ago</span>'))).toBe('3 days ago');
+    });
+
+    it('never mistakes arbitrary text for a date', () => {
+        expect(readListedDate(el('<span>Remnant 2020</span><span>620.5</span>'))).toBeNull();
+    });
+
+    it('uses a date cell\'s own text when told it is one', () => {
+        expect(readListedDate(el('2 weeks ago'), { cellText: true })).toBe('2 weeks ago');
     });
 });

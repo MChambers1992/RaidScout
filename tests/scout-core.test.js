@@ -11,7 +11,7 @@ import {
     matchesFilters, normalizeFilters, activeFilterCount, hasActiveFilters, DEFAULT_FILTERS,
     normalizeClassKey, roleFromClass, classIconUrl, DPS_ONLY_CLASSES,
     describeScoreError, summarizeScoreErrors, SOURCE_IDS, RETIRED_SOURCE_IDS, SOURCE_META,
-    formatMythicProgress, parseListedDate, formatListedAge,
+    formatMythicProgress, parseListedDate, formatListedAge, parseSortValue,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -871,5 +871,44 @@ describe('listedAt on candidates', () => {
         const col = header.split(',').indexOf('listed_at');
         expect(col).toBeGreaterThan(-1);
         expect(row.split(',')[col]).toBe(new Date(NOW).toISOString());
+    });
+});
+
+// ─── Parse sort: difficulty first ──────────────────────────────────────────────
+
+describe('parse sort groups by difficulty', () => {
+    const make = (name, wcl) => ({ ...normalizeCandidate(raw({ name }), 'raiderio'), wcl });
+    const list = [
+        make('Heroic90', { best: 95, median: 90, difficulty: 4 }),
+        make('Mythic55', { best: 70, median: 55, difficulty: 5 }),
+        make('Unscored', null),
+        make('Mythic72', { best: 80, median: 72, difficulty: 5 }),
+        make('Old80',    { best: 85, median: 80 }),              // cached before difficulty was recorded
+        make('Heroic60', { best: 65, median: 60, difficulty: 4 }),
+        make('NoLogs',   { best: null, median: null, notFound: true }),
+    ];
+
+    it('ranks mythic parses first, then heroic, each by percentage', () => {
+        expect(sortCandidates(list, 'wclMedian', 'desc').map(c => c.name))
+            .toEqual(['Mythic72', 'Mythic55', 'Heroic90', 'Heroic60', 'Old80', 'Unscored', 'NoLogs']);
+    });
+
+    it('reverses cleanly and still sinks the unscored', () => {
+        const asc = sortCandidates(list, 'wclMedian', 'asc').map(c => c.name);
+        expect(asc.slice(0, 5)).toEqual(['Old80', 'Heroic60', 'Heroic90', 'Mythic55', 'Mythic72']);
+    });
+
+    it('sorts the best column the same way', () => {
+        expect(sortCandidates(list, 'wclBest', 'desc')[0].name).toBe('Mythic72');
+    });
+
+    it('falls back to the other metric when one is missing', () => {
+        expect(parseSortValue({ best: 70, median: null, difficulty: 5 }, 'median')).toBe(5070);
+        expect(parseSortValue(null)).toBeNull();
+    });
+
+    it('exports the difficulty by name', () => {
+        const [header, row] = toCsv([list[1]]).split('\n');
+        expect(row.split(',')[header.split(',').indexOf('wcl_difficulty')]).toBe('mythic');
     });
 });

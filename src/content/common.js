@@ -338,17 +338,18 @@ function makeBadge(state, score, settings, role) {
 
     const metric = role === 'healer' ? 'HPS' : 'DPS';
     const fmt = v => v !== null ? Math.round(v) + '%' : '?';
-    const tag = score.difficulty === 4 ? 'H ' : score.difficulty === 5 ? 'M ' : '';
+    const tag = { 3: 'N ', 4: 'H ', 5: 'M ' }[score.difficulty] || '';
     el.textContent = `WCL ${tag}${fmt(best)} / ${fmt(median)}`;
     el.title = `RaidScout WarcraftLogs ${difficultyLabel(score.difficulty)}${metric}: Best ${fmt(best)}, Median ${fmt(median)}`;
     return el;
 }
 
-// wclDifficulty pins scoring to one raid difficulty (see wcl-api.js). A score
-// carries the difficulty it was read at, so the badge can say so — "Heroic "
-// with its trailing space, or nothing for WarcraftLogs' own highest-difficulty
-// default.
+// A score carries the raid difficulty its numbers were read at — the pinned
+// wclDifficulty, or whichever WarcraftLogs picked (the hardest one logged) — so
+// the badge can say so: "Heroic " with its trailing space, or nothing when the
+// difficulty is unknown.
 function difficultyLabel(difficulty) {
+    if (difficulty === 3) return 'Normal ';
     if (difficulty === 4) return 'Heroic ';
     if (difficulty === 5) return 'Mythic ';
     return '';
@@ -413,6 +414,7 @@ function clearWclMarkers(elements) {
         delete el.dataset.wclHidden;
         delete el.dataset.wclBest;
         delete el.dataset.wclMedian;
+        delete el.dataset.wclDifficulty;
         const badge = el.querySelector('.rs-badge');
         if (badge) badge.remove();
     }
@@ -423,16 +425,27 @@ function clearWclMarkers(elements) {
 // first. Reads `dataset.wclMedian` (falling back to `dataset.wclBest`), set by
 // each site's scoring pass. Items with no score sort last. No-op below 2 items
 // or if the items aren't attached to a common parent.
+//
+// Grouped by raid difficulty first — every mythic parse, then every heroic one
+// — because the two are not on one scale: mythic fields are stronger, so a
+// mythic 60% can be the better player than a heroic 80%. Mirrors parseSortValue()
+// in scout-core.js; tests/common.test.js pins the two against each other.
+function wclSortValue(difficulty, best, median) {
+    const value = median ?? best ?? null;
+    if (value === null || value === undefined || Number.isNaN(value)) return null;
+    return (Number(difficulty) || 0) * 1000 + value;
+}
+
 function sortByWclScore(items) {
     if (!items || items.length < 2) return;
     const parent = items[0].parentNode;
     if (!parent) return;
-    const scored = items.map(el => {
-        const median = parseFloat(el.dataset.wclMedian);
-        const best   = parseFloat(el.dataset.wclBest);
-        const value  = !isNaN(median) ? median : (!isNaN(best) ? best : -1);
-        return { el, value };
-    });
+    const num = v => { const n = parseFloat(v); return Number.isNaN(n) ? null : n; };
+    const scored = items.map(el => ({
+        el,
+        value: wclSortValue(el.dataset.wclDifficulty,
+                            num(el.dataset.wclBest), num(el.dataset.wclMedian)) ?? -1,
+    }));
     scored.sort((a, b) => b.value - a.value);
     for (const { el } of scored) parent.appendChild(el);
 }

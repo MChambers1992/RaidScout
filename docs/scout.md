@@ -84,6 +84,15 @@ sort in — a missing date is never guessed as "now".
 
 ### Heroic vs. mythic parses
 
+Mythic and heroic parses are not on one scale — the mythic field is stronger,
+so a mythic 60% can be the better player than a heroic 80%. Sorting by **WCL
+parse** therefore groups them: every mythic parse first, highest to lowest, then
+every heroic parse, then normal. Each badge is tagged **M** or **H** so you can
+see where one group ends. (A score cached before this was recorded has no
+difficulty and sorts after the known ones until the cache refreshes — six hours
+by default, or clear it in Settings → WarcraftLogs.) The same grouping applies
+to **Sort lists by parse** on the sites themselves.
+
 By default WarcraftLogs reports each character's parses from the hardest
 difficulty they have logs on, so a raider with a single mythic kill is ranked
 on mythic parses while everyone else is ranked on heroic — not a like-for-like

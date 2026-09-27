@@ -276,6 +276,7 @@ async function applyWclScoring() {
         group.dataset.wclScored = 'done';
         if (score.best   !== null && score.best   !== undefined) group.dataset.wclBest   = String(score.best);
         if (score.median !== null && score.median !== undefined) group.dataset.wclMedian = String(score.median);
+        if (score.difficulty) group.dataset.wclDifficulty = String(score.difficulty);
 
         const badgeState = badgeStateForScore(score);
         const role       = effectiveRole(score, character.role);
