@@ -261,6 +261,7 @@ registerHarvester('guildsofwow', '#recruits-list .card', function () {
                 ilvl:        getCardIlvl(card),
                 mythicKills: getCardMythicKills(card),
                 mplusScore:  getCardMythicPlusScore(card),
+                listed:      readListedDate(card),
                 note:        card.querySelector('.card-notes, .recruit-notes')?.textContent?.trim() || null,
             };
         })

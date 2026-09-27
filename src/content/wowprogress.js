@@ -293,6 +293,8 @@ registerHarvester('wowprogress', '.rating tr', function () {
                 role:        getPlayerRole(row),
                 ilvl:        parseFloat(ilvlText),
                 inGuild:     row.querySelector('.guild') !== null,
+                // WoWProgress stamps its dates as <span class="datetime" data-ts="…">.
+                listed:      readListedDate(row),
                 link:        link ? `https://www.wowprogress.com${link}` : null,
             };
         })

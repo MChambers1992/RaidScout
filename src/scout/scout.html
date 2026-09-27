@@ -44,6 +44,14 @@
             <input type="checkbox" id="hideBelowThresholds">
             Hide below thresholds &amp; no logs
         </label>
+        <label class="inline-select" title="Which raid difficulty parses are compared at. WarcraftLogs' default is the hardest difficulty each character has logs on, so one mythic kill switches a character onto mythic parses. Shared with every site.">
+            Parses
+            <select id="wclDifficultySelect">
+                <option value="0">Highest logged</option>
+                <option value="4">Heroic only</option>
+                <option value="5">Mythic only</option>
+            </select>
+        </label>
         <span class="result-count" id="resultCount" role="status" aria-live="polite"></span>
         <span class="spacer"></span>
         <button id="toggleFilters" class="ghost" aria-expanded="false" aria-controls="scoutFilters">
@@ -118,6 +126,7 @@
                     <th data-sort="mplusScore" class="num" tabindex="0" role="columnheader" aria-sort="none">M+</th>
                     <th data-sort="mythicKills" class="num" tabindex="0" role="columnheader" aria-sort="none">Mythic</th>
                     <th data-sort="wclMedian" class="num" tabindex="0" role="columnheader" aria-sort="none">WCL parse</th>
+                    <th data-sort="listedAt" class="num" tabindex="0" role="columnheader" aria-sort="none" title="When they posted or last bumped their looking-for-guild listing (the most recent across sites)">Listed</th>
                     <th data-sort="sources" tabindex="0" role="columnheader" aria-sort="none" title="Which recruitment sites this player is advertising on">Advertising on</th>
                     <th>Links</th>
                 </tr>

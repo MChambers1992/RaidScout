@@ -258,6 +258,11 @@ export function parseWowProgressDocument(doc) {
             playerClass: rowClass(row),
             ilvl:        parseFloat(ilvlText),
             inGuild:     row.querySelector('.guild') !== null,
+            // Mirrors readListedDate() in content/common.js for this markup:
+            // WoWProgress stamps its dates as <span class="datetime" data-ts="…">.
+            listed:      row.querySelector('[data-ts]')?.getAttribute('data-ts')
+                         ?? row.querySelector('time[datetime]')?.getAttribute('datetime')
+                         ?? null,
             note:        row.querySelector('.charnotes, .note')?.textContent?.trim() || null,
             link:        `https://www.wowprogress.com${link.getAttribute('href')}`,
         });

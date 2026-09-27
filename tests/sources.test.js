@@ -23,7 +23,7 @@ function fixture(rows) {
 
 const row = ({
     href = '/character/eu/Tarren%20Mill/Thrall', cls = 'shaman',
-    ilvl = '620', guild = false, spec = null,
+    ilvl = '620', guild = false, spec = null, ts = null,
 } = {}) => `
     <tr>
         <td class="character ${cls}">
@@ -32,6 +32,7 @@ const row = ({
         </td>
         <td class="center">${ilvl}</td>
         <td>${guild ? '<span class="guild">Some Guild</span>' : ''}</td>
+        ${ts ? `<td><span class="datetime" data-ts="${ts}">Sep 25, 2026</span></td>` : ''}
     </tr>`;
 
 describe('parseWowProgressDocument', () => {
@@ -64,6 +65,13 @@ describe('parseWowProgressDocument', () => {
         expect(parseWowProgressDocument(fixture(row({ spec: 'Protection Tank' })))[0].role).toBe('tank');
         expect(parseWowProgressDocument(fixture(row({ spec: 'Fire' })))[0].role).toBe('dps');
         expect(parseWowProgressDocument(fixture(row()))[0].role).toBeNull();
+    });
+
+    it('reads the listing timestamp, or leaves it null', () => {
+        const [dated] = parseWowProgressDocument(fixture(row({ ts: '1790000000' })));
+        expect(dated.listed).toBe('1790000000');
+        expect(normalizeCandidate(dated, 'wowprogress', 1800000000000).listedAt).toBe(1790000000000);
+        expect(parseWowProgressDocument(fixture(row()))[0].listed).toBeNull();
     });
 
     it('builds an absolute profile link', () => {

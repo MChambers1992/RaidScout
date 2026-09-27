@@ -156,13 +156,23 @@ button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 
 /* Every interactive control needs a visible focus ring; only the search box
    had one, which left keyboard users unable to see where they were. */
-:where(button, a, input, th[data-sort]):focus-visible {
+:where(button, a, input, select, th[data-sort]):focus-visible {
     outline: 2px solid #4a90d9;
     outline-offset: 2px;
     border-radius: 3px;
 }
 
 .inline-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; cursor: pointer; }
+.inline-select { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; }
+.inline-select select {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    padding: 6px 8px;
+    font: inherit;
+}
+.inline-select select:disabled { opacity: 0.6; }
 .result-count { color: #888; font-size: 12px; }
 
 /* ── Filters ────────────────────────────────────────────────────────────── */

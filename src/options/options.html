@@ -116,6 +116,19 @@
                 <input type="number" id="wclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50"
                        aria-label="Minimum median healer parse percent">
             </div>
+            <div class="option option--wide">
+                <label for="wclDifficulty">Compare parses from</label>
+                <select id="wclDifficulty">
+                    <option value="">Highest difficulty logged (WarcraftLogs default)</option>
+                    <option value="4">Heroic only</option>
+                    <option value="5">Mythic only</option>
+                </select>
+                <p class="hint">By default WarcraftLogs reports each character's parses from the hardest difficulty
+                they have logs on, so anyone with a single mythic kill is judged on mythic parses while everyone
+                else is judged on heroic. <strong>Heroic only</strong> compares everyone on the same footing.
+                A character with no logs on the chosen difficulty counts as having no logs. Applies to every site
+                and to Scout; badges show <em>H</em> or <em>M</em> when a difficulty is pinned.</p>
+            </div>
             <div class="option toggle-inline option--wide">
                 <label for="wclSortByParse">Sort lists by parse</label>
                 <label class="toggle-switch">

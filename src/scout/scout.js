@@ -13,7 +13,7 @@
 import {
     SOURCE_META, SOURCE_IDS, normalizeCandidate, mergeCandidates, hasNoLogs, classLabel,
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency, classIconUrl,
-    formatMythicProgress,
+    formatMythicProgress, formatListedAge,
     matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS, summarizeScoreErrors,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS } from './sources.js';
@@ -79,6 +79,7 @@ const el = {
     toolbar:      document.getElementById('scoutToolbar'),
     search:       document.getElementById('searchBox'),
     hideBelow:    document.getElementById('hideBelowThresholds'),
+    difficulty:   document.getElementById('wclDifficultySelect'),
     count:        document.getElementById('resultCount'),
     copyNames:    document.getElementById('copyNames'),
     exportCsv:    document.getElementById('exportCsv'),
@@ -234,6 +235,8 @@ async function runScout() {
     state.notices = [];
     state.rowIndex.clear();
     el.run.disabled = true;
+    // Changing difficulty mid-run would leave half the table scored at each.
+    el.difficulty.disabled = true;
     el.run.textContent = '⏳ Scouting…';
     renderNotices();
     el.table.hidden = true;
@@ -244,6 +247,8 @@ async function runScout() {
     state.settings = settings;
     state.wclSettings = buildWclSettings(settings);
     el.hideBelow.checked = settings.scoutHideBelowThresholds !== false;
+    el.difficulty.value = String([4, 5].includes(parseInt(settings.wclDifficulty, 10))
+        ? parseInt(settings.wclDifficulty, 10) : 0);
     restoreFilters(settings);
 
     const requested = Array.isArray(settings.scoutSources) ? settings.scoutSources : SCOUT_DEFAULTS.scoutSources;
@@ -355,6 +360,7 @@ async function runScout() {
 function finishRun(emptyMessage) {
     state.running = false;
     el.run.disabled = false;
+    el.difficulty.disabled = false;
     el.run.textContent = '🔎 Run scout';
     if (emptyMessage) {
         el.empty.hidden = false;
@@ -621,6 +627,16 @@ function mythicCell(candidate) {
         : escapeHtml(killed);
 }
 
+// "3d ago", with the exact date on hover. A listing is a signal that decays —
+// someone who posted yesterday is looking now, someone who posted in spring may
+// well have found a guild — so the age is what is worth scanning.
+function listedCell(candidate) {
+    const age = formatListedAge(candidate.listedAt);
+    if (age === null) return '<span class="muted">—</span>';
+    const exact = new Date(candidate.listedAt).toLocaleString();
+    return `<span title="Listed ${escapeHtml(exact)}">${escapeHtml(age)}</span>`;
+}
+
 function buildRow(candidate) {
     const tr = document.createElement('tr');
     if (isBelowThreshold(candidate)) tr.classList.add('below-threshold');
@@ -637,6 +653,7 @@ function buildRow(candidate) {
         <td class="num mplus-cell">${numCell(candidate.mplusScore)}</td>
         <td class="num mythic-cell">${mythicCell(candidate)}</td>
         <td class="num wcl-cell"></td>
+        <td class="num listed-cell">${listedCell(candidate)}</td>
         <td class="sources-cell">${sourcesCellHtml(candidate)}</td>
         <td class="row-links">
             <a href="${escapeHtml(links.warcraftlogs)}" target="_blank" rel="noreferrer">WCL</a>
@@ -860,6 +877,32 @@ el.hideBelow.addEventListener('change', () => {
         state.settings.scoutEnrichRaiderio !== false) {
         const pending = state.candidates.filter(c => !c.enriched);
         if (pending.length) enrichCandidates(pending);
+    }
+});
+
+// The difficulty is the shared wclDifficulty setting, not a Scout-only one:
+// comparing heroic parses here and mythic ones on the sites would make the two
+// disagree about the same player. The score cache is keyed by difficulty, so
+// flipping back and forth re-queries each character at most once per setting.
+el.difficulty.addEventListener('change', async () => {
+    const value = parseInt(el.difficulty.value, 10) || 0;
+    await chrome.storage.sync.set({ wclDifficulty: value });
+    state.settings.wclDifficulty = value;
+    if (state.running || state.candidates.length === 0 ||
+        state.settings.scoutWclEnabled === false) return;
+
+    state.running = true;
+    el.run.disabled = true;
+    el.difficulty.disabled = true;
+    try {
+        for (const candidate of state.candidates) candidate.wcl = null;
+        render();
+        await scoreCandidates(state.candidates);
+        render();
+    } finally {
+        state.running = false;
+        el.run.disabled = false;
+        el.difficulty.disabled = false;
     }
 });
 

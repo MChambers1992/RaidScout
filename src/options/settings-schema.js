@@ -36,6 +36,10 @@ const SCHEMA = [
     { key: 'wclDebug',                   type: 'bool',   default: false, domId: 'wclDebug' },
     { key: 'wclConcurrency',             type: 'int',    default: 4,     domId: 'wclConcurrency' },
     { key: 'wclSortByParse',             type: 'bool',   default: false, domId: 'wclSortByParse' },
+    // Raid difficulty parses are read at: 0 = highest with logs, 4 = heroic, 5 = mythic.
+    // A <select> whose "highest" option has value "" — loadFromData writes a
+    // default 0 as '', and parseValue reads '' back as 0.
+    { key: 'wclDifficulty',              type: 'int',    default: 0,     domId: 'wclDifficulty' },
 
     // Pre-flight scouting (shared by the WoWProgress and Raider.IO auto-open features)
     { key: 'scoutPreflight',             type: 'bool',   default: true,  domId: 'scoutPreflight' },

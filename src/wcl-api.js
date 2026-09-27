@@ -192,10 +192,16 @@ function roleToMetric(role) {
 
 // metric 'auto' fetches both metrics in a single request under aliases, so
 // resolving a character's role costs one round trip rather than two.
-function buildQuery(metric) {
+//
+// `difficulty` pins the rankings to one raid difficulty (WCL ids: 4 heroic,
+// 5 mythic). Omitted, WarcraftLogs answers for the highest difficulty the
+// character has logs on — so anyone with a single mythic kill is judged on
+// their mythic parses, which is not comparable against a heroic-only raider.
+function buildQuery(metric, difficulty = null) {
+    const diffArg = difficulty ? `, difficulty: ${difficulty}` : '';
     const rankings = metric === 'auto'
-        ? '      dps: zoneRankings(metric: dps)\n      hps: zoneRankings(metric: hps)'
-        : `      dps: zoneRankings(metric: ${metric})`;
+        ? `      dps: zoneRankings(metric: dps${diffArg})\n      hps: zoneRankings(metric: hps${diffArg})`
+        : `      dps: zoneRankings(metric: ${metric}${diffArg})`;
     return `
 query ($name: String!, $serverSlug: String!, $serverRegion: String!) {
   characterData {
@@ -227,7 +233,7 @@ function extractSpec(zoneRankings) {
     return ranking ? (ranking.bestSpec || ranking.spec) : null;
 }
 
-async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', role = 'dps' }, retryOnAuth = true) {
+async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', role = 'dps', difficulty = null }, retryOnAuth = true) {
     // Both cooldowns are stored as ms but reported as seconds, matching the
     // Retry-After header the 429 path echoes.
     const cfCooldown = await getCloudflareCooldown();
@@ -238,7 +244,7 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
 
     const token = await getAccessToken();
     const debug = await isDebugEnabled();
-    if (debug) dbg('querying', { name, serverSlug, serverRegion, metric });
+    if (debug) dbg('querying', { name, serverSlug, serverRegion, metric, difficulty });
 
     const res = await fetchWithTimeout(WCL_CLIENT_API, {
         method: 'POST',
@@ -247,7 +253,7 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            query: buildQuery(metric),
+            query: buildQuery(metric, difficulty),
             variables: { name, serverSlug, serverRegion },
         }),
     });
@@ -255,7 +261,7 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
     if (res.status === 401 && retryOnAuth) {
         tokenCache = null;
         await chrome.storage.local.remove('wclToken');
-        return queryCharacter({ name, serverSlug, serverRegion, metric, role }, false);
+        return queryCharacter({ name, serverSlug, serverRegion, metric, role, difficulty }, false);
     }
 
     if (res.status === 429) {
@@ -300,9 +306,24 @@ async function queryCharacter({ name, serverSlug, serverRegion, metric = 'dps', 
 
 // ─── Cache ─────────────────────────────────────────────────────────────────────
 
-function characterKey({ region, realm, name, role }) {
-    // Include role in the key so DPS/healer caches don't collide on alts
-    return `${region}/${realm}/${name}/${role || 'dps'}`.toLowerCase();
+function characterKey({ region, realm, name, role, difficulty }) {
+    // Include role in the key so DPS/healer caches don't collide on alts, and
+    // the difficulty so a heroic-only score is never served as the default
+    // (highest-difficulty) one. The default keeps the pre-difficulty key shape,
+    // so existing cache entries stay valid.
+    const suffix = difficulty ? `/d${difficulty}` : '';
+    return `${region}/${realm}/${name}/${role || 'dps'}${suffix}`.toLowerCase();
+}
+
+// wclDifficulty (sync): 0 = highest difficulty with logs (WarcraftLogs' own
+// default), 4 = heroic only, 5 = mythic only. Anything else reads as 0, so a
+// stray stored value degrades to the old behaviour rather than to no scores.
+const WCL_DIFFICULTIES = [4, 5];
+
+async function getDifficulty() {
+    const { wclDifficulty } = await chrome.storage.sync.get('wclDifficulty');
+    const value = parseInt(wclDifficulty, 10);
+    return WCL_DIFFICULTIES.includes(value) ? value : null;
 }
 
 async function getCacheTtlMs() {
@@ -328,10 +349,11 @@ async function writeCache(key, scores) {
 }
 
 // ─── Public API ────────────────────────────────────────────────────────────────
-// getCharacterScore: never throws. Returns { best, median, notFound?, error?, rateLimitMs? }
+// getCharacterScore: never throws. Returns { best, median, notFound?, difficulty?, error?, rateLimitMs? }
 
 async function getCharacterScore({ region, realm, name, role }) {
-    const key = characterKey({ region, realm, name, role });
+    const difficulty = await getDifficulty();
+    const key = characterKey({ region, realm, name, role, difficulty });
 
     const cached = await readCache(key);
     if (cached) return cached;
@@ -341,13 +363,16 @@ async function getCharacterScore({ region, realm, name, role }) {
     const promise = (async () => {
         try {
             const metric = role === 'auto' ? 'auto' : roleToMetric(role);
-            const scores = await queryCharacter({ name, serverSlug: realm, serverRegion: region, metric, role: role || 'dps' });
+            const scores = await queryCharacter({ name, serverSlug: realm, serverRegion: region, metric, role: role || 'dps', difficulty });
+            // Carried on the result so a badge can say which difficulty its
+            // numbers describe — a heroic 90 and a mythic 90 are not the same.
+            if (difficulty) scores.difficulty = difficulty;
             await writeCache(key, scores);
             // An 'auto' lookup also answers the role-specific question, so write
             // it under the resolved role too — a later proactive pass that knows
             // the role from the page then hits the cache instead of the API.
             if (role === 'auto' && scores.role) {
-                await writeCache(characterKey({ region, realm, name, role: scores.role }), scores);
+                await writeCache(characterKey({ region, realm, name, role: scores.role, difficulty }), scores);
             }
             return scores;
         } catch (err) {

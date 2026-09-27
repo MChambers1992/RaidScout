@@ -8,6 +8,10 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Sort Scout by when the character was looking for a guild** — A new **Listed** column shows how long ago each candidate posted or bumped their looking-for-guild listing (the most recent across sites), with the exact date on hover, and sorts freshest-first. Read from WoWProgress's timestamps, Raider.IO's "Published" column and any date Guilds of WoW prints; a listing with no readable date shows "—" and sorts last rather than being guessed. Also exported as `listed_at` in the CSV.
+- **Compare heroic parses only** — New shared setting **Compare parses from** (`wclDifficulty`): WarcraftLogs' default (the hardest difficulty logged), **Heroic only** or **Mythic only**. By default a character with one mythic kill was scored on their mythic parses while everyone else was scored on heroic; pinning the difficulty compares everyone on the same footing. Applies on every site, to pre-flight scouting and to Scout, which also has a **Parses** picker in its toolbar that re-scores the table immediately. Badges read `WCL H …` / `WCL M …` when a difficulty is pinned, and scores are cached per difficulty.
+
 ### Fixed
 - **A WarcraftLogs tab you opened yourself could be closed** — The below-threshold check runs on every WarcraftLogs character page, and the extension closed whichever tab reported, plus every WoWProgress tab showing that character. It now closes only tabs RaidScout opened, and only while they still show the character they were opened for.
 - **Duplicate WarcraftLogs tabs from one WoWProgress visit** — WoWProgress's Cloudflare check reloads the page once it passes, and each load opened a tab; so did a refresh. One visit now opens one tab (repeats for the same character from the same tab within 30 seconds are ignored).

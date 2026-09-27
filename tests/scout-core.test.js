@@ -11,7 +11,7 @@ import {
     matchesFilters, normalizeFilters, activeFilterCount, hasActiveFilters, DEFAULT_FILTERS,
     normalizeClassKey, roleFromClass, classIconUrl, DPS_ONLY_CLASSES,
     describeScoreError, summarizeScoreErrors, SOURCE_IDS, RETIRED_SOURCE_IDS, SOURCE_META,
-    formatMythicProgress,
+    formatMythicProgress, parseListedDate, formatListedAge,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -779,5 +779,97 @@ describe('mythicTotal through the merge', () => {
         const merged = mergeCandidate(src({ mythicKills: 3, mythicTotal: 8 }, 'wowprogress'),
                                       src({ mythicKills: 3, mythicTotal: 12 }, 'guildsofwow'));
         expect(merged.mythicTotal).toBe(8);
+    });
+});
+
+// ─── Listing date ──────────────────────────────────────────────────────────────
+
+describe('parseListedDate', () => {
+    const NOW  = Date.UTC(2026, 8, 27, 12, 0, 0);
+    const HOUR = 60 * 60 * 1000;
+    const DAY  = 24 * HOUR;
+
+    it('reads a unix timestamp in seconds or milliseconds', () => {
+        const ts = Date.UTC(2026, 8, 20);
+        expect(parseListedDate(ts / 1000, NOW)).toBe(ts);
+        expect(parseListedDate(String(ts / 1000), NOW)).toBe(ts);   // data-ts is a string
+        expect(parseListedDate(ts, NOW)).toBe(ts);
+    });
+
+    it('reads an ISO date from a <time datetime>', () => {
+        expect(parseListedDate('2026-09-25T10:00:00Z', NOW)).toBe(Date.UTC(2026, 8, 25, 10));
+    });
+
+    it('reads the relative phrasings the sites print', () => {
+        expect(parseListedDate('3 days ago', NOW)).toBe(NOW - 3 * DAY);
+        expect(parseListedDate('an hour ago', NOW)).toBe(NOW - HOUR);
+        expect(parseListedDate('a month ago', NOW)).toBe(NOW - 30 * DAY);
+        expect(parseListedDate('2h ago', NOW)).toBe(NOW - 2 * HOUR);
+        expect(parseListedDate('5 mins ago', NOW)).toBe(NOW - 5 * 60 * 1000);
+        expect(parseListedDate('about 2 weeks ago', NOW)).toBe(NOW - 14 * DAY);
+        expect(parseListedDate('Yesterday', NOW)).toBe(NOW - DAY);
+        expect(parseListedDate('today', NOW)).toBe(NOW);
+    });
+
+    it('returns null rather than guessing', () => {
+        // A missing date sorts last; an invented "now" would float a stale
+        // listing to the top of the sort that exists to push it down.
+        for (const value of [null, undefined, '', 'soon', '3 fortnights ago', 'Method', '620.5', 0, -5]) {
+            expect(parseListedDate(value, NOW)).toBeNull();
+        }
+    });
+
+    it('rejects dates in the future or before WoW existed', () => {
+        expect(parseListedDate(NOW / 1000 + 30 * 24 * 3600, NOW)).toBeNull();
+        expect(parseListedDate('1999-01-01', NOW)).toBeNull();
+    });
+});
+
+describe('formatListedAge', () => {
+    const NOW = Date.UTC(2026, 8, 27, 12);
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it('is coarse enough to scan', () => {
+        expect(formatListedAge(NOW - 10 * 60 * 1000, NOW)).toBe('just now');
+        expect(formatListedAge(NOW - 5 * 60 * 60 * 1000, NOW)).toBe('5h ago');
+        expect(formatListedAge(NOW - 3 * DAY, NOW)).toBe('3d ago');
+        expect(formatListedAge(NOW - 21 * DAY, NOW)).toBe('3w ago');
+        expect(formatListedAge(NOW - 90 * DAY, NOW)).toBe('3mo ago');
+        expect(formatListedAge(NOW - 800 * DAY, NOW)).toBe('2y ago');
+        expect(formatListedAge(null, NOW)).toBeNull();
+    });
+});
+
+describe('listedAt on candidates', () => {
+    const NOW = Date.UTC(2026, 8, 27, 12);
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it('is parsed from the raw listed value at normalisation', () => {
+        expect(normalizeCandidate(raw({ listed: '2 days ago' }), 'raiderio', NOW).listedAt).toBe(NOW - 2 * DAY);
+        expect(normalizeCandidate(raw(), 'raiderio', NOW).listedAt).toBeNull();
+    });
+
+    it('merges to the most recent listing across sites', () => {
+        const [merged] = mergeCandidates([
+            normalizeCandidate(raw({ listed: '10 days ago' }), 'wowprogress', NOW),
+            normalizeCandidate(raw({ listed: 'yesterday' }), 'raiderio', NOW),
+            normalizeCandidate(raw(), 'guildsofwow', NOW),
+        ]);
+        expect(merged.listedAt).toBe(NOW - DAY);
+    });
+
+    it('sorts newest first, with undated listings last either way', () => {
+        const make = (name, listed) => normalizeCandidate(raw({ name, listed }), 'raiderio', NOW);
+        const list = [make('Old', '9 days ago'), make('Undated', null), make('New', '1 hour ago')];
+        expect(sortCandidates(list, 'listedAt', 'desc').map(c => c.name)).toEqual(['New', 'Old', 'Undated']);
+        expect(sortCandidates(list, 'listedAt', 'asc').map(c => c.name)).toEqual(['Old', 'New', 'Undated']);
+    });
+
+    it('exports as an ISO timestamp column', () => {
+        const csv = toCsv([normalizeCandidate(raw({ listed: String(NOW / 1000) }), 'wowprogress', NOW)]);
+        const [header, row] = csv.split('\n');
+        const col = header.split(',').indexOf('listed_at');
+        expect(col).toBeGreaterThan(-1);
+        expect(row.split(',')[col]).toBe(new Date(NOW).toISOString());
     });
 });
