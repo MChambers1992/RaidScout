@@ -210,6 +210,66 @@ describe('role to metric', () => {
     });
 });
 
+// ─── Raid difficulty ───────────────────────────────────────────────────────────
+
+describe('raid difficulty', () => {
+    it('leaves the difficulty to WarcraftLogs by default', async () => {
+        // Omitted, WarcraftLogs answers for the highest difficulty with logs.
+        const fetchMock = mockFetch(tokenResponse(), charResponse({ dps: rankings({ best: 50 }) }));
+        const score = await api.getCharacterScore({ ...CHAR, role: 'dps' });
+        expect(bodyOf(fetchMock, 1).query).not.toContain('difficulty');
+        expect(score.difficulty).toBeUndefined();
+    });
+
+    it('pins every metric to heroic when wclDifficulty is 4', async () => {
+        await load({ local: CREDS.local, sync: { ...CREDS.sync, wclDifficulty: 4 } });
+        const fetchMock = mockFetch(tokenResponse(), charResponse({ dps: rankings({ best: 70 }) }));
+        const score = await api.getCharacterScore({ ...CHAR, role: 'auto' });
+
+        const { query } = bodyOf(fetchMock, 1);
+        expect(query).toContain('dps: zoneRankings(metric: dps, difficulty: 4)');
+        expect(query).toContain('hps: zoneRankings(metric: hps, difficulty: 4)');
+        expect(score.difficulty).toBe(4);
+    });
+
+    it('ignores a stored value that is not a difficulty it supports', async () => {
+        await load({ local: CREDS.local, sync: { ...CREDS.sync, wclDifficulty: 'nonsense' } });
+        const fetchMock = mockFetch(tokenResponse(), charResponse({ dps: rankings({ best: 70 }) }));
+        await api.getCharacterScore({ ...CHAR, role: 'dps' });
+        expect(bodyOf(fetchMock, 1).query).not.toContain('difficulty');
+    });
+
+    it('records which difficulty WarcraftLogs picked when unpinned', async () => {
+        // So a list can rank mythic parses ahead of heroic ones.
+        mockFetch(tokenResponse(), charResponse({ dps: { ...rankings({ best: 60, median: 50 }), difficulty: 5 } }));
+        expect((await api.getCharacterScore({ ...CHAR, role: 'dps' })).difficulty).toBe(5);
+    });
+
+    it('does not claim a difficulty for a character with no parses', async () => {
+        mockFetch(tokenResponse(), charResponse({ dps: { ...rankings(), difficulty: 5 } }));
+        expect((await api.getCharacterScore({ ...CHAR, role: 'dps' })).difficulty).toBeUndefined();
+    });
+
+    it('never serves a default-difficulty cache entry as a heroic score', async () => {
+        const { syncStore } = installChrome({ local: CREDS.local, sync: { ...CREDS.sync } });
+        vi.resetModules();
+        api = await import('../src/wcl-api.js');
+        const fetchMock = mockFetch(
+            tokenResponse(),
+            charResponse({ dps: rankings({ best: 95 }) }),   // mythic (default)
+            charResponse({ dps: rankings({ best: 60 }) }),   // heroic
+        );
+
+        const mythic = await api.getCharacterScore({ ...CHAR, role: 'dps' });
+        syncStore.wclDifficulty = 4;
+        const heroic = await api.getCharacterScore({ ...CHAR, role: 'dps' });
+
+        expect(mythic.best).toBe(95);
+        expect(heroic.best).toBe(60);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+});
+
 // ─── Role auto-resolution ──────────────────────────────────────────────────────
 
 describe('role auto-resolution', () => {

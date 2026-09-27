@@ -134,9 +134,91 @@ function num(value) {
     return Number.isFinite(n) ? n : null;
 }
 
+// ─── Listing date ──────────────────────────────────────────────────────────────
+
+// When the character posted (or last refreshed) their looking-for-guild listing,
+// as epoch milliseconds. Each site prints this differently, so the harvesters
+// pass along whatever they found — a unix timestamp (WoWProgress's `data-ts` is
+// in seconds), an ISO string from a <time datetime>, or display text such as
+// "3 days ago" / "yesterday" — and this is the one place it is interpreted.
+//
+// Returns null for anything it cannot read. A missing date sorts last rather
+// than being guessed: an invented "now" would float a stale listing to the top
+// of the one sort that exists to push stale listings down.
+const RELATIVE_UNITS_MS = {
+    second: 1000,
+    minute: 60 * 1000,
+    hour:   60 * 60 * 1000,
+    day:    24 * 60 * 60 * 1000,
+    week:   7 * 24 * 60 * 60 * 1000,
+    month:  30 * 24 * 60 * 60 * 1000,
+    year:   365 * 24 * 60 * 60 * 1000,
+};
+
+const RELATIVE_ALIASES = {
+    sec: 'second', secs: 'second', s: 'second',
+    min: 'minute', mins: 'minute', m: 'minute',
+    hr: 'hour', hrs: 'hour', h: 'hour',
+    d: 'day', w: 'week', wk: 'week', wks: 'week',
+    mo: 'month', mos: 'month', y: 'year', yr: 'year', yrs: 'year',
+};
+
+// Anything before WoW's release is not a listing date — it is a parse of
+// something else (an item level, a kill count) that happened to be numeric.
+const EARLIEST_LISTING_MS = Date.UTC(2004, 0, 1);
+
+export function parseListedDate(value, now = Date.now()) {
+    if (value === null || value === undefined || value === '') return null;
+
+    if (typeof value === 'number' || /^\s*\d{9,13}\s*$/.test(String(value))) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        // Ten digits is a unix timestamp in seconds; thirteen is milliseconds.
+        const ms = n < 1e12 ? n * 1000 : n;
+        return ms >= EARLIEST_LISTING_MS && ms <= now + RELATIVE_UNITS_MS.day ? ms : null;
+    }
+
+    const text = String(value).trim().toLowerCase();
+    if (!text) return null;
+
+    if (/^(just now|now|moments? ago|a few seconds ago)$/.test(text)) return now;
+    if (text === 'today')     return now;
+    if (text === 'yesterday') return now - RELATIVE_UNITS_MS.day;
+
+    // "3 days ago", "an hour ago", "a month ago", "2h ago", "5 mins ago"
+    const rel = text.match(/^(?:about\s+|over\s+|almost\s+)?(\d+|an?|one)\s*([a-z]+?)s?\s+ago$/);
+    if (rel) {
+        const count = /^\d+$/.test(rel[1]) ? parseInt(rel[1], 10) : 1;
+        const unit  = RELATIVE_UNITS_MS[rel[2]] ? rel[2] : RELATIVE_ALIASES[rel[2]];
+        if (unit) return now - count * RELATIVE_UNITS_MS[unit];
+        return null;
+    }
+
+    // Absolute dates. Date.parse understands ISO and the "Sep 26, 2026" shape;
+    // anything it misreads into the future or before WoW existed is rejected.
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed) && parsed >= EARLIEST_LISTING_MS && parsed <= now + RELATIVE_UNITS_MS.day) {
+        return parsed;
+    }
+    return null;
+}
+
+// "3d ago" for the table cell. Coarse on purpose: the column answers "is this
+// listing fresh", and minutes of precision would only make it harder to scan.
+export function formatListedAge(listedAt, now = Date.now()) {
+    if (listedAt === null || listedAt === undefined) return null;
+    const diff = Math.max(0, now - listedAt);
+    if (diff < RELATIVE_UNITS_MS.hour)  return 'just now';
+    if (diff < RELATIVE_UNITS_MS.day)   return `${Math.floor(diff / RELATIVE_UNITS_MS.hour)}h ago`;
+    if (diff < RELATIVE_UNITS_MS.week * 2) return `${Math.floor(diff / RELATIVE_UNITS_MS.day)}d ago`;
+    if (diff < RELATIVE_UNITS_MS.month * 2) return `${Math.floor(diff / RELATIVE_UNITS_MS.week)}w ago`;
+    if (diff < RELATIVE_UNITS_MS.year)  return `${Math.floor(diff / RELATIVE_UNITS_MS.month)}mo ago`;
+    return `${Math.floor(diff / RELATIVE_UNITS_MS.year)}y ago`;
+}
+
 // Turn one raw scraped row into a canonical candidate. Returns null when the
 // row lacks the identity needed to score it — a nameless row is not a lead.
-export function normalizeCandidate(raw, source) {
+export function normalizeCandidate(raw, source, now = Date.now()) {
     if (!raw) return null;
     const name   = String(raw.name || '').trim();
     const realm  = slugRealm(raw.realm);
@@ -167,6 +249,8 @@ export function normalizeCandidate(raw, source) {
         // later rather than harvested.
         mythicTotal: num(raw.mythicTotal),
         mplusScore:  num(raw.mplusScore),
+        // When they posted or last bumped their looking-for-guild listing.
+        listedAt:    parseListedDate(raw.listed, now),
         note:        raw.note ? String(raw.note).trim().slice(0, 300) : null,
         sources:     [source],
         // Which source supplied role/playerClass. Only meaningful once a
@@ -235,6 +319,9 @@ export function mergeCandidate(existing, incoming) {
         // so there is no "freshest reading" to pick — first known value wins.
         mythicTotal: existing.mythicTotal ?? incoming.mythicTotal ?? null,
         mplusScore:  preferHigher(existing.mplusScore, incoming.mplusScore),
+        // The most recent listing across sites: someone who bumped their post
+        // on one site yesterday is looking now, however old their other post.
+        listedAt:    preferHigher(existing.listedAt, incoming.listedAt),
         note:        existing.note || incoming.note,
         sources:     existing.sources.includes(incomingSource)
                         ? existing.sources
@@ -399,10 +486,31 @@ const SORT_ACCESSORS = {
     ilvl:        c => c.ilvl,
     mythicKills: c => c.mythicKills,
     mplusScore:  c => c.mplusScore,
-    wclBest:     c => c.wcl?.best ?? null,
-    wclMedian:   c => c.wcl?.median ?? null,
+    listedAt:    c => c.listedAt,
+    // Grouped by difficulty: see parseSortValue().
+    wclBest:     c => parseSortValue(c.wcl, 'best'),
+    wclMedian:   c => parseSortValue(c.wcl, 'median'),
     sources:     c => c.sources.length,
 };
+
+// A parse only means something next to parses from the same raid difficulty:
+// mythic fields are stronger, so a mythic 60% can be the better player than a
+// heroic 80%, and one list of raw percentages mixing the two ranks them wrongly.
+// So the parse sort groups first — every mythic parse, then heroic, then normal,
+// then parses whose difficulty is unknown (a score cached before it was
+// recorded) — and ranks by percentage within each group. Encoded as one number
+// (difficulty × 1000 + percent) so the generic sort, including its ascending
+// direction and missing-values-last rule, needs no special case. The per-site
+// sort in content/common.js (wclSortValue) uses the same encoding.
+export function parseSortValue(score, field = 'median') {
+    if (!score) return null;
+    const other = field === 'median' ? 'best' : 'median';
+    const value = score[field] ?? score[other] ?? null;
+    if (value === null || value === undefined) return null;
+    return (Number(score.difficulty) || 0) * 1000 + value;
+}
+
+export const DIFFICULTY_NAMES = { 3: 'normal', 4: 'heroic', 5: 'mythic' };
 
 // Sorts a copy. Missing values always sort last regardless of direction — an
 // unscored row sinking to the bottom is far more useful to an officer than it
@@ -556,6 +664,8 @@ const CSV_COLUMNS = [
     ['mplus_score', c => c.mplusScore],
     ['wcl_best',    c => c.wcl?.best],
     ['wcl_median',  c => c.wcl?.median],
+    ['wcl_difficulty', c => DIFFICULTY_NAMES[c.wcl?.difficulty] ?? null],
+    ['listed_at',   c => c.listedAt ? new Date(c.listedAt).toISOString() : null],
     ['sources',     c => c.sources.join(' ')],
     ['note',        c => c.note],
     ['warcraftlogs_url', c => profileLinks(c).warcraftlogs],

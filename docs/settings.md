@@ -21,7 +21,8 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Min. Median HPS % (Healer) | — | **Shared** — minimum median HPS parse for healers |
 | Min. Best % (Tank override) | — | **Shared** — overrides the DPS best threshold for tanks only |
 | Min. Median % (Tank override) | — | **Shared** — overrides the DPS median threshold for tanks only |
-| Sort lists by parse | Off | **Shared** — ranks candidates by parse (highest first) on every site with proactive filtering on. Was three per-site toggles before 1.4.0; your existing choice carries over |
+| Compare parses from | Highest difficulty logged | **Shared** — which raid difficulty parses are read at: WarcraftLogs' default (the hardest difficulty each character has logs on), **Heroic only**, or **Mythic only**. Pinning it compares everyone on the same footing instead of judging a character with one mythic kill on mythic parses. A character with no logs on the chosen difficulty counts as no logs. Also switchable from the Scout toolbar |
+| Sort lists by parse | Off | **Shared** — ranks candidates by parse (highest first, mythic parses ahead of heroic ones) on every site with proactive filtering on. Was three per-site toggles before 1.4.0; your existing choice carries over |
 | Check parses before opening a tab | On | Scout via the API first and only open a WarcraftLogs tab for candidates who pass. Needs credentials. If a lookup fails the tab opens and is re-checked on the WarcraftLogs page; with no credentials at all, nothing is checked and every tab stays open |
 | Open scouted tabs in the background | Off | Open WarcraftLogs tabs without switching to them |
 | Recruitment search parse filter | — | Minimum parse % on the WarcraftLogs recruitment search page |

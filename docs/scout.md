@@ -72,6 +72,39 @@ the bare number.
 Turn it off if you'd rather the run finish faster, or if you only care about
 parses.
 
+### Listed
+
+**Listed** is how long ago the character posted — or last bumped — their
+looking-for-guild listing, with the exact date on hover. Click the header to
+put the freshest listings first: someone who posted yesterday is looking now,
+someone who posted months ago may well have found a guild. A player on more
+than one site shows their most recent listing. Rows whose site printed no
+readable date show "—" and always sort to the bottom, whichever direction you
+sort in — a missing date is never guessed as "now".
+
+### Heroic vs. mythic parses
+
+Mythic and heroic parses are not on one scale — the mythic field is stronger,
+so a mythic 60% can be the better player than a heroic 80%. Sorting by **WCL
+parse** therefore groups them: every mythic parse first, highest to lowest, then
+every heroic parse, then normal. Each badge is tagged **M** or **H** so you can
+see where one group ends. (A score cached before this was recorded has no
+difficulty and sorts after the known ones until the cache refreshes — six hours
+by default, or clear it in Settings → WarcraftLogs.) The same grouping applies
+to **Sort lists by parse** on the sites themselves.
+
+By default WarcraftLogs reports each character's parses from the hardest
+difficulty they have logs on, so a raider with a single mythic kill is ranked
+on mythic parses while everyone else is ranked on heroic — not a like-for-like
+comparison. The **Parses** picker in the toolbar pins scoring to **Heroic only**
+(or **Mythic only**) and re-scores the table on the spot; badges then read
+`WCL H 85% / 70%`. It is the same setting as **Compare parses from** in
+Settings → WarcraftLogs, so the sites and Scout always agree. Scores are cached
+per difficulty, so switching back and forth costs each character one lookup
+per setting. Note that someone with no logs at the chosen difficulty counts as
+*no logs* and is hidden with the others when "Hide below thresholds & no logs"
+is on.
+
 ---
 
 ## Why WarcraftLogs isn't a source

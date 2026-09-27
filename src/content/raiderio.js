@@ -187,7 +187,10 @@ function getRowData(row) {
     const spec = getRowSpec(cells[1]);
     const role = roleForSpec(spec);
 
-    return { playerClass, region, ilvl: isNaN(ilvl) ? null : ilvl, role, spec };
+    // cells[5] is the "Published" column — when the recruitment profile went up.
+    const listed = readListedDate(cells[5], { cellText: true });
+
+    return { playerClass, region, ilvl: isNaN(ilvl) ? null : ilvl, role, spec, listed };
 }
 
 function getRowCharacter(group) {
@@ -273,6 +276,7 @@ async function applyWclScoring() {
         group.dataset.wclScored = 'done';
         if (score.best   !== null && score.best   !== undefined) group.dataset.wclBest   = String(score.best);
         if (score.median !== null && score.median !== undefined) group.dataset.wclMedian = String(score.median);
+        if (score.difficulty) group.dataset.wclDifficulty = String(score.difficulty);
 
         const badgeState = badgeStateForScore(score);
         const role       = effectiveRole(score, character.role);
@@ -370,6 +374,7 @@ registerHarvester('raiderio', '.rt-tr-group', function () {
                 spec:        data?.spec ?? null,
                 playerClass: data?.playerClass ?? null,
                 ilvl:        data?.ilvl ?? null,
+                listed:      data?.listed ?? null,
                 link:        href ? new URL(href, 'https://raider.io').toString() : null,
             };
         })

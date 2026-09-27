@@ -15,22 +15,34 @@
 
 // spec drives the role (roleForSpec), so tanks/healers/DPS in the table are
 // resolved the same way a live run resolves them.
+// `diff` is the raid difficulty WarcraftLogs ranked them at (5 mythic, 4 heroic)
+// — heroic-only raiders deliberately carry *higher* percentages than the mythic
+// ones, so the shot shows the parse sort grouping mythic first rather than
+// mixing the two on one scale. `listed` is how many days ago they posted.
 export const CANDIDATES = [
-    { name: 'Thalyndra', realm: 'Tarren Mill',     cls: 'druid',        spec: 'Restoration',   ilvl: 322.1, mplus: 3104, kills: 6, best: 96, median: 91, alsoOn: ['raiderio', 'guildsofwow'] },
-    { name: 'Morvath',   realm: 'Draenor',         cls: 'deathknight',  spec: 'Blood',         ilvl: 320.6, mplus: 2870, kills: 8, best: 92, median: 84 },
-    { name: 'Silvaraen', realm: 'Kazzak',          cls: 'evoker',       spec: 'Devastation',   ilvl: 321.4, mplus: 3011, kills: 6, best: 89, median: 80, alsoOn: ['raiderio'] },
-    { name: 'Brenndar',  realm: 'Twisting Nether', cls: 'warrior',      spec: 'Fury',          ilvl: 319.3, mplus: 2744, kills: 5, best: 84, median: 77 },
-    { name: 'Okthiri',   realm: 'Ragnaros',        cls: 'monk',         spec: 'Mistweaver',    ilvl: 320.0, mplus: 2955, kills: 6, best: 81, median: 74, alsoOn: ['guildsofwow'] },
-    { name: 'Vexanya',   realm: 'Silvermoon',      cls: 'demon_hunter', spec: 'Havoc',         ilvl: 318.8, mplus: 2820, kills: 4, best: 78, median: 69 },
-    { name: 'Duskerin',  realm: 'Argent Dawn',     cls: 'rogue',        spec: 'Assassination', ilvl: 317.5, mplus: 2690, kills: 4, best: 72, median: 64, alsoOn: ['raiderio'] },
-    { name: 'Halgrimm',  realm: 'Stormscale',      cls: 'paladin',      spec: 'Protection',    ilvl: 321.9, mplus: 2610, kills: 7, best: 69, median: 61 },
-    { name: 'Nyxaris',   realm: 'Ravencrest',      cls: 'mage',         spec: 'Frost',         ilvl: 316.4, mplus: 2588, kills: 3, best: 64, median: 55 },
-    { name: 'Torvahl',   realm: 'Antonidas',       cls: 'shaman',       spec: 'Elemental',     ilvl: 318.1, mplus: 2733, kills: 5, best: 61, median: 52 },
+    { name: 'Thalyndra', realm: 'Tarren Mill',     cls: 'druid',        spec: 'Restoration',   ilvl: 322.1, mplus: 3104, kills: 6, diff: 5, best: 81, median: 72, listed: 1,  alsoOn: ['raiderio', 'guildsofwow'] },
+    { name: 'Morvath',   realm: 'Draenor',         cls: 'deathknight',  spec: 'Blood',         ilvl: 320.6, mplus: 2870, kills: 8, diff: 5, best: 78, median: 66, listed: 9 },
+    { name: 'Silvaraen', realm: 'Kazzak',          cls: 'evoker',       spec: 'Devastation',   ilvl: 321.4, mplus: 3011, kills: 6, diff: 5, best: 74, median: 63, listed: 3,  alsoOn: ['raiderio'] },
+    { name: 'Halgrimm',  realm: 'Stormscale',      cls: 'paladin',      spec: 'Protection',    ilvl: 321.9, mplus: 2610, kills: 7, diff: 5, best: 70, median: 58, listed: 21 },
+    { name: 'Okthiri',   realm: 'Ragnaros',        cls: 'monk',         spec: 'Mistweaver',    ilvl: 320.0, mplus: 2955, kills: 6, diff: 5, best: 69, median: 57, listed: 5,  alsoOn: ['guildsofwow'] },
+    { name: 'Vexanya',   realm: 'Silvermoon',      cls: 'demon_hunter', spec: 'Havoc',         ilvl: 318.8, mplus: 2820, kills: 0, diff: 4, best: 95, median: 91, listed: 2 },
+    { name: 'Duskerin',  realm: 'Argent Dawn',     cls: 'rogue',        spec: 'Assassination', ilvl: 317.5, mplus: 2690, kills: 0, diff: 4, best: 92, median: 86, listed: 0.3, alsoOn: ['raiderio'] },
+    { name: 'Brenndar',  realm: 'Twisting Nether', cls: 'warrior',      spec: 'Fury',          ilvl: 319.3, mplus: 2744, kills: 0, diff: 4, best: 88, median: 80, listed: 14 },
+    { name: 'Torvahl',   realm: 'Antonidas',       cls: 'shaman',       spec: 'Elemental',     ilvl: 318.1, mplus: 2733, kills: 0, diff: 4, best: 84, median: 76, listed: 40 },
+    { name: 'Nyxaris',   realm: 'Ravencrest',      cls: 'mage',         spec: 'Frost',         ilvl: 316.4, mplus: 2588, kills: 0, diff: 4, best: 79, median: 70, listed: 7 },
     // Below the stubbed thresholds, so the "N below thresholds" counter in the
     // toolbar is showing a real number rather than a decorative one.
-    { name: 'Grumbald',  realm: 'Blackmoore',      cls: 'hunter',       spec: 'Marksmanship',  ilvl: 314.2, mplus: 2401, kills: 2, best: 44, median: 38 },
-    { name: 'Pellonir',  realm: 'Kil’jaeden', cls: 'priest',       spec: 'Discipline',    ilvl: 315.0, mplus: 2470, kills: 3, best: 41, median: 33 },
+    { name: 'Grumbald',  realm: 'Blackmoore',      cls: 'hunter',       spec: 'Marksmanship',  ilvl: 314.2, mplus: 2401, kills: 0, diff: 4, best: 44, median: 38, listed: 4 },
+    { name: 'Pellonir',  realm: 'Kil’jaeden', cls: 'priest',       spec: 'Discipline',    ilvl: 315.0, mplus: 2470, kills: 0, diff: 4, best: 41, median: 33, listed: 6 },
 ];
+
+/**
+ * The instant the screenshots are taken at. The page's Date.now is pinned to it
+ * so "3d ago" in the Listed column renders identically on every run — the
+ * output stays byte-stable (quirk 38).
+ */
+export const FIXTURE_NOW = Date.UTC(2026, 8, 27, 12, 0, 0);
+const listedTs = (c) => Math.round((FIXTURE_NOW - c.listed * 24 * 60 * 60 * 1000) / 1000);
 
 /**
  * The rows a tab-mode source (Raider.IO, Guilds of WoW) hands back from its
@@ -49,6 +61,7 @@ export function tabHarvest(sourceId) {
             // the case that makes formatMythicProgress fall back to a bare number
             // until the Raider.IO cross-reference supplies the denominator.
             mythicKills: sourceId === 'guildsofwow' ? c.kills : null,
+            listed: listedTs(c),
             link: sourceId === 'raiderio'
                 ? `https://raider.io/characters/eu/${c.realm.toLowerCase().replace(/[' ]/g, '-')}/${c.name}`
                 : null,
@@ -77,6 +90,7 @@ export function wowprogressListingHtml() {
             </td>
             <td class="center">${c.ilvl.toFixed(2)}</td>
             <td></td>
+            <td><span class="datetime" data-ts="${listedTs(c)}"></span></td>
         </tr>`).join('');
 
     return `<!doctype html><html><head><title>WoWProgress: Gear Score Rating</title></head><body>
@@ -108,7 +122,7 @@ export function raiderioProfile(name) {
 export function wclScore(character) {
     const c = CANDIDATES.find(x => x.name.toLowerCase() === String(character?.name).toLowerCase());
     if (!c) return { best: null, median: null, notFound: true };
-    return { best: c.best, median: c.median, notFound: false, spec: c.spec, role: roleForSpec(c.spec) };
+    return { best: c.best, median: c.median, notFound: false, spec: c.spec, role: roleForSpec(c.spec), difficulty: c.diff };
 }
 
 // Mirrors roleForSpec() in content/common.js — the fixture cannot import a

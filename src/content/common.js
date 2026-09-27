@@ -192,6 +192,8 @@ const SHARED_WCL_KEYS = [
     'wclMinBestHealer', 'wclMinMedianHealer',
     'wclMinBestTank', 'wclMinMedianTank',
     'wclConcurrency', 'wclSortByParse',
+    // Not a threshold, but it changes every score, so a change must re-score.
+    'wclDifficulty',
     // Read only for migration — see wclSortEnabled() below.
     'wpWclSort', 'rioWclSort', 'gowWclSort',
 ];
@@ -296,7 +298,7 @@ function makeBadge(state, score, settings, role) {
     }
     if (state === 'no-logs') {
         el.classList.add('rs-badge--no-logs');
-        el.title = 'RaidScout: no WarcraftLogs data for this character';
+        el.title = `RaidScout: no ${difficultyLabel(score?.difficulty)}WarcraftLogs data for this character`;
         el.textContent = '📋 No logs';
         return el;
     }
@@ -336,9 +338,21 @@ function makeBadge(state, score, settings, role) {
 
     const metric = role === 'healer' ? 'HPS' : 'DPS';
     const fmt = v => v !== null ? Math.round(v) + '%' : '?';
-    el.textContent = `WCL ${fmt(best)} / ${fmt(median)}`;
-    el.title = `RaidScout WarcraftLogs ${metric}: Best ${fmt(best)}, Median ${fmt(median)}`;
+    const tag = { 3: 'N ', 4: 'H ', 5: 'M ' }[score.difficulty] || '';
+    el.textContent = `WCL ${tag}${fmt(best)} / ${fmt(median)}`;
+    el.title = `RaidScout WarcraftLogs ${difficultyLabel(score.difficulty)}${metric}: Best ${fmt(best)}, Median ${fmt(median)}`;
     return el;
+}
+
+// A score carries the raid difficulty its numbers were read at — the pinned
+// wclDifficulty, or whichever WarcraftLogs picked (the hardest one logged) — so
+// the badge can say so: "Heroic " with its trailing space, or nothing when the
+// difficulty is unknown.
+function difficultyLabel(difficulty) {
+    if (difficulty === 3) return 'Normal ';
+    if (difficulty === 4) return 'Heroic ';
+    if (difficulty === 5) return 'Mythic ';
+    return '';
 }
 
 // Map a score result to its badge state. Every site scored rows the same way,
@@ -400,6 +414,7 @@ function clearWclMarkers(elements) {
         delete el.dataset.wclHidden;
         delete el.dataset.wclBest;
         delete el.dataset.wclMedian;
+        delete el.dataset.wclDifficulty;
         const badge = el.querySelector('.rs-badge');
         if (badge) badge.remove();
     }
@@ -410,18 +425,64 @@ function clearWclMarkers(elements) {
 // first. Reads `dataset.wclMedian` (falling back to `dataset.wclBest`), set by
 // each site's scoring pass. Items with no score sort last. No-op below 2 items
 // or if the items aren't attached to a common parent.
+//
+// Grouped by raid difficulty first — every mythic parse, then every heroic one
+// — because the two are not on one scale: mythic fields are stronger, so a
+// mythic 60% can be the better player than a heroic 80%. Mirrors parseSortValue()
+// in scout-core.js; tests/common.test.js pins the two against each other.
+function wclSortValue(difficulty, best, median) {
+    const value = median ?? best ?? null;
+    if (value === null || value === undefined || Number.isNaN(value)) return null;
+    return (Number(difficulty) || 0) * 1000 + value;
+}
+
 function sortByWclScore(items) {
     if (!items || items.length < 2) return;
     const parent = items[0].parentNode;
     if (!parent) return;
-    const scored = items.map(el => {
-        const median = parseFloat(el.dataset.wclMedian);
-        const best   = parseFloat(el.dataset.wclBest);
-        const value  = !isNaN(median) ? median : (!isNaN(best) ? best : -1);
-        return { el, value };
-    });
+    const num = v => { const n = parseFloat(v); return Number.isNaN(n) ? null : n; };
+    const scored = items.map(el => ({
+        el,
+        value: wclSortValue(el.dataset.wclDifficulty,
+                            num(el.dataset.wclBest), num(el.dataset.wclMedian)) ?? -1,
+    }));
     scored.sort((a, b) => b.value - a.value);
     for (const { el } of scored) parent.appendChild(el);
+}
+
+// ─── Listing date ──────────────────────────────────────────────────────────────
+// Scout can sort by when a character posted (or last bumped) their
+// looking-for-guild listing. Each harvester hands back whatever raw date it can
+// find and scout-core.js parseListedDate() interprets it, so the reading here is
+// deliberately narrow: only markup that is unambiguously a timestamp, never a
+// guess over arbitrary text — a guild called "Remnant 2020" must not read as a
+// listing date. Returns a raw value (timestamp or text) or null.
+//
+//   root     — the row/card/cell to search
+//   cellText — true when `root` IS the date cell (Raider.IO's "Published"
+//              column), so its own text may be used as a last resort
+const RELATIVE_DATE_TEXT = /^(?:about |over |almost )?(?:\d+|an?|one)\s*[a-z]+\s+ago$|^(?:today|yesterday|just now)$/i;
+
+function readListedDate(root, { cellText = false } = {}) {
+    if (!root) return null;
+    const time = root.matches?.('time[datetime]') ? root : root.querySelector('time[datetime]');
+    if (time) return time.getAttribute('datetime');
+    const ts = root.matches?.('[data-ts]') ? root : root.querySelector('[data-ts]');
+    if (ts) return ts.getAttribute('data-ts');
+
+    if (cellText) {
+        const titled = root.matches?.('[title]') ? root : root.querySelector('[title]');
+        const text = root.textContent?.trim();
+        return text || titled?.getAttribute('title') || null;
+    }
+
+    // Otherwise only a leaf whose whole text reads as a relative date.
+    for (const el of root.querySelectorAll('span, small, div, p, time')) {
+        if (el.children.length) continue;
+        const text = el.textContent.trim();
+        if (RELATIVE_DATE_TEXT.test(text)) return text;
+    }
+    return null;
 }
 
 // ─── Scout harvest hook ────────────────────────────────────────────────────────

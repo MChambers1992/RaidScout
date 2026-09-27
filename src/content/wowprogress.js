@@ -128,6 +128,7 @@ async function applyWclScoring(wclSettings) {
         if (!row.isConnected) return;
         if (score.best   !== null && score.best   !== undefined) row.dataset.wclBest   = String(score.best);
         if (score.median !== null && score.median !== undefined) row.dataset.wclMedian = String(score.median);
+        if (score.difficulty) row.dataset.wclDifficulty = String(score.difficulty);
 
         const badgeState = badgeStateForScore(score);
         const role       = effectiveRole(score, character.role);
@@ -293,6 +294,8 @@ registerHarvester('wowprogress', '.rating tr', function () {
                 role:        getPlayerRole(row),
                 ilvl:        parseFloat(ilvlText),
                 inGuild:     row.querySelector('.guild') !== null,
+                // WoWProgress stamps its dates as <span class="datetime" data-ts="…">.
+                listed:      readListedDate(row),
                 link:        link ? `https://www.wowprogress.com${link}` : null,
             };
         })

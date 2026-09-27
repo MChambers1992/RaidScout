@@ -155,6 +155,7 @@ async function applyWclScoring(wclSettings) {
         card.dataset.wclScored = 'done';
         if (score.best   !== null && score.best   !== undefined) card.dataset.wclBest   = String(score.best);
         if (score.median !== null && score.median !== undefined) card.dataset.wclMedian = String(score.median);
+        if (score.difficulty) card.dataset.wclDifficulty = String(score.difficulty);
 
         const badgeState = badgeStateForScore(score);
         const role       = effectiveRole(score, character.role);
@@ -261,6 +262,7 @@ registerHarvester('guildsofwow', '#recruits-list .card', function () {
                 ilvl:        getCardIlvl(card),
                 mythicKills: getCardMythicKills(card),
                 mplusScore:  getCardMythicPlusScore(card),
+                listed:      readListedDate(card),
                 note:        card.querySelector('.card-notes, .recruit-notes')?.textContent?.trim() || null,
             };
         })
