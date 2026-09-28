@@ -279,6 +279,17 @@ button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
 
 .filter-note { margin: 7px 0 0; font-size: 11px; color: #6a6a6a; }
 
+#filterMaxAge {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #eee;
+    padding: 5px 7px;
+    font-size: 13px;
+    font-family: inherit;
+}
+#filterMaxAge:focus { outline: none; border-color: #007bff; }
+
 .filter-actions {
     display: flex;
     align-items: center;
@@ -401,6 +412,24 @@ tbody tr:hover .class-icon { opacity: 1; }
     color: #777;
     font-size: 14px;
     line-height: 1.6;
+}
+
+/* ── Load more ─────────────────────────────────────────────────────────── */
+
+.load-more {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 0 28px;
+}
+.load-more-note {
+    margin: 0;
+    font-size: 12px;
+    color: #777;
+    text-align: center;
+    max-width: 720px;
+    line-height: 1.5;
 }
 
 /* ── Footer ─────────────────────────────────────────────────────────────── */

@@ -237,6 +237,19 @@
                 </div>
             </div>
             <div class="option">
+                <label for="wpMaxListedDays">Listed Within</label>
+                <select id="wpMaxListedDays">
+                    <option value="">Any age</option>
+                    <option value="1">Last 24 hours</option>
+                    <option value="3">Last 3 days</option>
+                    <option value="7">Last week</option>
+                    <option value="14">Last 2 weeks</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                </select>
+                <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date cannot be read is kept.</p>
+            </div>
+            <div class="option">
                 <label for="guildFilter">Guild Status</label>
                 <select id="guildFilter">
                     <option value="any">Any</option>
@@ -298,6 +311,19 @@
                 <label for="rioMinIlvl">Min. Item Level</label>
                 <input type="number" id="rioMinIlvl" min="0" step="0.01" placeholder="e.g. 280">
                 <p class="hint">Hides recruits on the search table below this item level</p>
+            </div>
+            <div class="option">
+                <label for="rioMaxListedDays">Listed Within</label>
+                <select id="rioMaxListedDays">
+                    <option value="">Any age</option>
+                    <option value="1">Last 24 hours</option>
+                    <option value="3">Last 3 days</option>
+                    <option value="7">Last week</option>
+                    <option value="14">Last 2 weeks</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                </select>
+                <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date cannot be read is kept.</p>
             </div>
             <div class="option-group">
                 <div class="option-group-header">
@@ -377,6 +403,19 @@
             <div class="option">
                 <label for="gowMinMythicPlusScore">Min. M+ Score</label>
                 <input type="number" id="gowMinMythicPlusScore" min="0" step="1" placeholder="e.g. 2000">
+            </div>
+            <div class="option">
+                <label for="gowMaxListedDays">Listed Within</label>
+                <select id="gowMaxListedDays">
+                    <option value="">Any age</option>
+                    <option value="1">Last 24 hours</option>
+                    <option value="3">Last 3 days</option>
+                    <option value="7">Last week</option>
+                    <option value="14">Last 2 weeks</option>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                </select>
+                <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date cannot be read is kept.</p>
             </div>
             <div class="option-group">
                 <div class="option-group-header">

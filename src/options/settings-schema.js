@@ -53,6 +53,9 @@ const SCHEMA = [
     { key: 'minIlvl',                    type: 'float',  default: 0,     domId: 'minIlvl' },
     { key: 'maxIlvl',                    type: 'float',  default: 0,     domId: 'maxIlvl' },
     { key: 'guildFilter',                type: 'string', default: 'any', domId: 'guildFilter' },
+    // Hide listings older than N days (0 = any age). A <select> whose "any"
+    // option has value "", like wclDifficulty.
+    { key: 'wpMaxListedDays',            type: 'int',    default: 0,     domId: 'wpMaxListedDays' },
     { key: 'wpWclEnabled',               type: 'bool',   default: false, domId: 'wpWclEnabled' },
     { key: 'selectedRegions',            type: 'checkboxGroup', default: ['EU'], selector: '.regionFilter' },
     { key: 'selectedClasses',            type: 'checkboxGroup', default: [],     selector: '.classFilter' },
@@ -62,6 +65,7 @@ const SCHEMA = [
     { key: 'openWarcraftLogsFromRaiderIO', type: 'bool', default: true,  domId: 'openWarcraftLogsFromRaiderIO' },
     { key: 'hideRaiderIoAds',            type: 'bool',   default: true,  domId: 'hideRaiderIoAds' },
     { key: 'rioMinIlvl',                 type: 'float',  default: 0,     domId: 'rioMinIlvl' },
+    { key: 'rioMaxListedDays',           type: 'int',    default: 0,     domId: 'rioMaxListedDays' },
     { key: 'rioWclEnabled',              type: 'bool',   default: false, domId: 'rioWclEnabled' },
     { key: 'rioSelectedRegions',         type: 'checkboxGroup', default: [], selector: '.rioRegionFilter' },
     { key: 'rioSelectedRoles',           type: 'checkboxGroup', default: [], selector: '.rioRoleFilter' },
@@ -72,6 +76,7 @@ const SCHEMA = [
     { key: 'gowMinIlvl',                 type: 'float',  default: 0,     domId: 'gowMinIlvl' },
     { key: 'gowMinMythicKills',          type: 'int',    default: 0,     domId: 'gowMinMythicKills' },
     { key: 'gowMinMythicPlusScore',      type: 'int',    default: 0,     domId: 'gowMinMythicPlusScore' },
+    { key: 'gowMaxListedDays',           type: 'int',    default: 0,     domId: 'gowMaxListedDays' },
     { key: 'gowWclEnabled',              type: 'bool',   default: false, domId: 'gowWclEnabled' },
     { key: 'gowSelectedClasses',         type: 'checkboxGroup', default: [], selector: '.gowClassFilter' },
     { key: 'gowSelectedRoles',           type: 'checkboxGroup', default: [], selector: '.roleFilter' },

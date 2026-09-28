@@ -485,6 +485,73 @@ function readListedDate(root, { cellText = false } = {}) {
     return null;
 }
 
+// ─── Listing age filter ────────────────────────────────────────────────────────
+// Each site can hide listings older than N days (wpMaxListedDays,
+// rioMaxListedDays, gowMaxListedDays). Interpreting the raw date is
+// scout-core.js parseListedDate()'s job, but content scripts cannot import an ES
+// module, so this is a copy — tests/common.test.js runs both over the same inputs
+// and asserts they agree. If they ever disagree, scout-core.js is the reference.
+
+const LISTED_UNITS_MS = {
+    second: 1000, minute: 60 * 1000, hour: 60 * 60 * 1000, day: 24 * 60 * 60 * 1000,
+    week: 7 * 24 * 60 * 60 * 1000, month: 30 * 24 * 60 * 60 * 1000, year: 365 * 24 * 60 * 60 * 1000,
+};
+const LISTED_UNIT_ALIASES = {
+    sec: 'second', secs: 'second', s: 'second',
+    min: 'minute', mins: 'minute', m: 'minute',
+    hr: 'hour', hrs: 'hour', h: 'hour',
+    d: 'day', w: 'week', wk: 'week', wks: 'week',
+    mo: 'month', mos: 'month', y: 'year', yr: 'year', yrs: 'year',
+};
+const EARLIEST_LISTING_MS = Date.UTC(2004, 0, 1);
+
+function parseListedDate(value, now = Date.now()) {
+    if (value === null || value === undefined || value === '') return null;
+
+    if (typeof value === 'number' || /^\s*\d{9,13}\s*$/.test(String(value))) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        const ms = n < 1e12 ? n * 1000 : n;
+        return ms >= EARLIEST_LISTING_MS && ms <= now + LISTED_UNITS_MS.day ? ms : null;
+    }
+
+    const text = String(value).trim().toLowerCase();
+    if (!text) return null;
+
+    if (/^(just now|now|moments? ago|a few seconds ago)$/.test(text)) return now;
+    if (text === 'today')     return now;
+    if (text === 'yesterday') return now - LISTED_UNITS_MS.day;
+
+    const rel = text.match(/^(?:about\s+|over\s+|almost\s+)?(\d+|an?|one)\s*([a-z]+?)s?\s+ago$/);
+    if (rel) {
+        const count = /^\d+$/.test(rel[1]) ? parseInt(rel[1], 10) : 1;
+        const unit  = LISTED_UNITS_MS[rel[2]] ? rel[2] : LISTED_UNIT_ALIASES[rel[2]];
+        return unit ? now - count * LISTED_UNITS_MS[unit] : null;
+    }
+
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed) && parsed >= EARLIEST_LISTING_MS && parsed <= now + LISTED_UNITS_MS.day) {
+        return parsed;
+    }
+    return null;
+}
+
+// Mirrors scout-core.js isListedWithin(). An unreadable date is kept: the date
+// markup on WoWProgress and Guilds of WoW was never verified against live pages
+// (quirk 59), and hiding every row whose date could not be read would empty the
+// page the day a selector drifts.
+function isListedWithin(listedAt, maxDays, now = Date.now()) {
+    if (!(maxDays > 0)) return true;
+    if (listedAt === null || listedAt === undefined) return true;
+    return now - listedAt <= maxDays * LISTED_UNITS_MS.day;
+}
+
+// Storage → a day count. Anything absent, blank or nonsensical is 0 ("any age").
+function maxListedDaysSetting(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 // ─── Scout harvest hook ────────────────────────────────────────────────────────
 // The Scout page (src/scout/) aggregates candidates from every configured site
 // without the user browsing to each one. For sites whose listings are rendered
@@ -520,6 +587,10 @@ function registerHarvester(sourceId, readySelector, collect) {
                             source: sourceId,
                             url: location.href,
                             candidates: collect() || [],
+                            // Rows on the page before any filter hid them. Scout's
+                            // "Load more" needs it to tell a page the filters
+                            // emptied (keep paging) from the end of the listing.
+                            rowsSeen: document.querySelectorAll(readySelector).length,
                         });
                     } catch (err) {
                         sendResponse({

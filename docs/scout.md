@@ -135,8 +135,10 @@ your behalf any more.
 
 ## Narrowing the results
 
-The **Filters** button opens role, class, region and source filters plus
-minimums for item level, M+ score and mythic kills. The button carries a count
+The **Filters** button opens role, class, region and source filters, minimums
+for item level, M+ score and mythic kills, and **Listed within** — hide anyone
+whose listing is older than 24 hours to 90 days. A listing with no readable date
+is kept, the same way a minimum never rejects a stat the site didn't report. The button carries a count
 of how many are active, and the panel opens by itself if a filter is still set
 from a previous session.
 
@@ -196,6 +198,24 @@ Each source has a default listing URL, overridable in **Settings → Scout →
 Listing URLs**. Point one at the exact search you normally browse — a specific
 realm, region or role — and Scout harvests that instead. This is also how you
 repoint Scout yourself if a site moves its recruitment page.
+
+---
+
+## Loading more
+
+Read to the bottom of the table and a **Load more** button fetches the next
+page of every source that still has one, scores the new candidates and adds
+them to the table — anyone already listed just picks up the new site in
+*Advertising on*. Candidates the cap held back come first, since they are
+already harvested. It is a button rather than infinite scroll because every new
+candidate is a WarcraftLogs API call.
+
+The line under the button says what is left and why a source stopped: the end
+of its listing, or — for a listing sorted newest-first — listings older than
+your **Listed within** filter, in which case widening the filter re-opens it.
+Raider.IO's and Guilds of WoW's page parameter could not be verified against
+the live sites; if one hands back rows already loaded, Scout says so and stops
+asking that source rather than repeating itself.
 
 ---
 

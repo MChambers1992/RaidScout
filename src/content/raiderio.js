@@ -6,7 +6,7 @@
 // therefore opened a tab for the first character of the session and never
 // again — so it is keyed by the character path instead.
 let warcraftLogsRedirectedFor = null;
-let filterSettings = { minIlvl: 0, selectedClasses: [], selectedRoles: [], selectedRegions: [] };
+let filterSettings = { minIlvl: 0, selectedClasses: [], selectedRoles: [], selectedRegions: [], maxListedDays: 0 };
 let wclSettings = {
     enabled: false,
     minBest: 0, minMedian: 0,
@@ -215,7 +215,7 @@ function getRowCharacter(group) {
 
 function filterSearchRows() {
     if (!isSearchPage()) return;
-    const { minIlvl, selectedClasses, selectedRoles, selectedRegions } = filterSettings;
+    const { minIlvl, selectedClasses, selectedRoles, selectedRegions, maxListedDays } = filterSettings;
 
     for (const group of document.querySelectorAll('.rt-tr-group')) {
         // WCL-hidden rows stay hidden regardless of standard filters
@@ -230,7 +230,8 @@ function filterSearchRows() {
             (minIlvl === 0          || data.ilvl === null        || data.ilvl >= minIlvl) &&
             (selectedClasses.length === 0 || data.playerClass === null || selectedClasses.includes(data.playerClass)) &&
             (selectedRoles.length   === 0 || data.role === null        || selectedRoles.includes(data.role)) &&
-            (selectedRegions.length === 0 || data.region === null      || selectedRegions.includes(data.region));
+            (selectedRegions.length === 0 || data.region === null      || selectedRegions.includes(data.region)) &&
+            isListedWithin(parseListedDate(data.listed), maxListedDays);
 
         group.style.display = visible ? '' : 'none';
     }
@@ -330,7 +331,7 @@ function observePageChanges(wclEnabled) {
 
 chrome.storage.sync.get([
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
-    'rioMinIlvl', 'rioSelectedClasses', 'rioSelectedRoles', 'rioSelectedRegions',
+    'rioMinIlvl', 'rioSelectedClasses', 'rioSelectedRoles', 'rioSelectedRegions', 'rioMaxListedDays',
     'rioWclEnabled', ...SHARED_WCL_KEYS,
 ], function(options) {
     if (options.raiderioEnabled === false) return;
@@ -341,6 +342,7 @@ chrome.storage.sync.get([
         selectedClasses: options.rioSelectedClasses  || [],
         selectedRoles:   options.rioSelectedRoles    || [],
         selectedRegions: options.rioSelectedRegions  || [],
+        maxListedDays:   maxListedDaysSetting(options.rioMaxListedDays),
     };
     wclSettings = { enabled: !!options.rioWclEnabled, sort: wclSortEnabled(options), ...buildWclSettings(options) };
 

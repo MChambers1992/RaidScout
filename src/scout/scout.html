@@ -105,6 +105,12 @@
                 </div>
                 <p class="filter-note">A candidate is kept when the site never reported that stat.</p>
             </fieldset>
+
+            <fieldset class="filter-group">
+                <legend>Listed within</legend>
+                <select id="filterMaxAge" aria-label="Only show listings posted or bumped within"></select>
+                <p class="filter-note">Kept when the site gave no readable date.</p>
+            </fieldset>
         </div>
 
         <div class="filter-actions">
@@ -134,6 +140,13 @@
             <tbody id="resultsBody"></tbody>
         </table>
         <div class="empty-state" id="emptyState" hidden></div>
+        <!-- Sits at the end of the table, where an officer who has read every
+             row arrives. A button, not infinite scroll: each new candidate is a
+             WarcraftLogs API call. -->
+        <div class="load-more" id="loadMore" hidden>
+            <button id="loadMoreBtn" class="ghost">⬇ Load more</button>
+            <p class="load-more-note" id="loadMoreNote" role="status" aria-live="polite"></p>
+        </div>
     </section>
 
     <footer class="scout-footer">

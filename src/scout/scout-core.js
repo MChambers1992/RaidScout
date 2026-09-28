@@ -216,6 +216,27 @@ export function formatListedAge(listedAt, now = Date.now()) {
     return `${Math.floor(diff / RELATIVE_UNITS_MS.year)}y ago`;
 }
 
+// ─── Listing age filter ────────────────────────────────────────────────────────
+
+// The choices every "listed within" control offers, in days. One list so Scout's
+// filter panel, the options page and the popup cannot drift apart; 0 is "any".
+export const LISTED_AGE_OPTIONS = [1, 3, 7, 14, 30, 90];
+
+export const DAY_MS = RELATIVE_UNITS_MS.day;
+
+// True when a listing is recent enough for a "listed within N days" filter.
+// An unknown date is always kept, for the same reason a minimum never rejects a
+// stat the site did not report (quirk 36): the date markup is unverified on two
+// of the three sites, and treating "could not read it" as "too old" would
+// silently empty a source whose selector drifted. content/common.js carries a
+// copy (isListedWithin) for the site filters; tests/common.test.js asserts the
+// two agree.
+export function isListedWithin(listedAt, maxDays, now = Date.now()) {
+    if (!(maxDays > 0)) return true;
+    if (listedAt === null || listedAt === undefined) return true;
+    return now - listedAt <= maxDays * DAY_MS;
+}
+
 // Turn one raw scraped row into a canonical candidate. Returns null when the
 // row lacks the identity needed to score it — a nameless row is not a lead.
 export function normalizeCandidate(raw, source, now = Date.now()) {
@@ -455,7 +476,7 @@ export function summarizeScoreErrors(candidates) {
 export function passesWowProgressFilters(candidate, settings = {}) {
     const {
         selectedRegions = [], minIlvl = 0, maxIlvl = 0,
-        selectedClasses = [], guildFilter = 'any',
+        selectedClasses = [], guildFilter = 'any', maxListedDays = 0, now = Date.now(),
     } = settings;
 
     if (selectedRegions.length && candidate.region &&
@@ -471,6 +492,8 @@ export function passesWowProgressFilters(candidate, settings = {}) {
 
     if (guildFilter === 'in'  && candidate.inGuild === false) return false;
     if (guildFilter === 'out' && candidate.inGuild === true)  return false;
+
+    if (!isListedWithin(candidate.listedAt, maxListedDays, now)) return false;
 
     return true;
 }
@@ -565,6 +588,7 @@ export const DEFAULT_FILTERS = {
     minIlvl:     0,
     minMplus:    0,
     minMythic:   0,
+    maxAgeDays:  0,    // listed within N days; 0 = any age
     multiSource: false,
 };
 
@@ -589,6 +613,7 @@ export function normalizeFilters(raw) {
         minIlvl:     num(input.minIlvl),
         minMplus:    num(input.minMplus),
         minMythic:   num(input.minMythic),
+        maxAgeDays:  num(input.maxAgeDays),
         multiSource: input.multiSource === true,
     };
 }
@@ -602,6 +627,7 @@ export function activeFilterCount(filters) {
          + (f.minIlvl   > 0 ? 1 : 0)
          + (f.minMplus  > 0 ? 1 : 0)
          + (f.minMythic > 0 ? 1 : 0)
+         + (f.maxAgeDays > 0 ? 1 : 0)
          + (f.multiSource ? 1 : 0);
 }
 
@@ -618,7 +644,7 @@ function passesMinimum(value, minimum) {
     return value === null || value === undefined || value >= minimum;
 }
 
-export function matchesFilters(candidate, filters) {
+export function matchesFilters(candidate, filters, now = Date.now()) {
     if (!candidate) return false;
     const f = normalizeFilters(filters);
 
@@ -636,8 +662,51 @@ export function matchesFilters(candidate, filters) {
     if (!passesMinimum(candidate.ilvl,        f.minIlvl))   return false;
     if (!passesMinimum(candidate.mplusScore,  f.minMplus))  return false;
     if (!passesMinimum(candidate.mythicKills, f.minMythic)) return false;
+    if (!isListedWithin(candidate.listedAt, f.maxAgeDays, now)) return false;
 
     return true;
+}
+
+// ─── Loading more ──────────────────────────────────────────────────────────────
+// "Load more" harvests the next page of each source and folds it into the list
+// already on screen. Unlike mergeCandidates, which builds a list from nothing,
+// this has to update candidates the page already holds *in place*: the table's
+// row index, the scoring pass and the Raider.IO pass all hold them by reference,
+// and a replacement object would leave a rendered row pointing at a stale copy.
+//
+// Returns the genuinely new candidates (merged among themselves, first-seen
+// order) and the existing ones the page touched. An already-scored candidate
+// keeps its role: scoring replaced the listing's claim with the role WarcraftLogs
+// resolved (quirk 33), and a later page must not undo that.
+export function absorbCandidates(existing, incoming) {
+    const byKey = new Map(existing.map(c => [c.key, c]));
+    const fresh   = new Map();
+    const updated = new Set();
+
+    for (const candidate of incoming) {
+        if (!candidate) continue;
+        const known = byKey.get(candidate.key);
+        if (known) {
+            const merged = mergeCandidate(known, candidate);
+            if (known.wcl) { merged.role = known.role; merged.origins = { ...merged.origins, role: known.origins?.role ?? null }; }
+            Object.assign(known, merged);
+            updated.add(known);
+            continue;
+        }
+        const pending = fresh.get(candidate.key);
+        fresh.set(candidate.key, pending ? mergeCandidate(pending, candidate) : candidate);
+    }
+    return { added: Array.from(fresh.values()), updated: Array.from(updated) };
+}
+
+// Whether a page from a newest-first listing proves the rest of the listing is
+// older than `maxDays`. Every row on the next page is older than every row on
+// this one, so a single dated row past the limit is enough — the rows a site's
+// own filters hid do not change that. Undated rows prove nothing.
+export function reachedAgeLimit(candidates, maxDays, now = Date.now()) {
+    if (!(maxDays > 0)) return false;
+    return candidates.some(c => c?.listedAt !== null && c?.listedAt !== undefined &&
+                                now - c.listedAt > maxDays * DAY_MS);
 }
 
 export function profileLinks(candidate) {

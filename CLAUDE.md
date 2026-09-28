@@ -199,6 +199,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `minIlvl` | number | `0` | Minimum item level (float; 0 = no minimum) |
 | `maxIlvl` | number | `0` | Maximum item level (float; 0 = no maximum) |
 | `guildFilter` | string | `"any"` | Guild status: `"any"` / `"in"` / `"out"` |
+| `wpMaxListedDays` | number | `0` | Hide rows listed longer ago than N days (0 = any age; see quirk 61) |
 | `selectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `wpWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the WoWProgress player table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
 
@@ -214,6 +215,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `rioMinIlvl` | number | `0` | Minimum item level on the recruitment search table (0 = no minimum) |
 | `rioSelectedRegions` | string[] | `[]` | Filter search rows by region (`"EU"` / `"US"` / `"OC"` / `"KR"` / `"TW"`) — empty shows all |
 | `rioSelectedRoles` | string[] | `[]` | Filter search rows by main role (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
+| `rioMaxListedDays` | number | `0` | Hide search rows published longer ago than N days (0 = any age; quirk 61) |
 | `rioSelectedClasses` | string[] | `[]` | Filter search rows by class — empty shows all (Full Settings only; not in popup) |
 | `rioWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the Raider.IO search table (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
 
@@ -225,6 +227,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `gowMinIlvl` | number | `0` | Minimum item level (0 = no minimum) |
 | `gowMinMythicKills` | number | `0` | Minimum current-tier mythic kills (0 = no minimum) |
 | `gowMinMythicPlusScore` | number | `0` | Minimum M+ score (0 = no minimum) |
+| `gowMaxListedDays` | number | `0` | Hide recruit cards listed longer ago than N days (0 = any age; quirk 61) |
 | `gowSelectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
 | `gowSelectedRoles` | string[] | `[]` | Allowed roles (`"tank"` / `"healer"` / `"dps"`) — empty shows all |
 | `gowWclEnabled` | boolean | `false` | Enable proactive WCL score filtering on the recruits list (thresholds are the shared `wcl*` keys in the WarcraftLogs section) |
@@ -235,14 +238,14 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 |-----|------|---------|---------|
 | `scoutSources` | string[] | all three | Which sources a Scout run harvests (`wowprogress`, `raiderio`, `guildsofwow`) |
 | `scoutMaxCandidates` | number | `150` | Cap on unique candidates scored per run (each is one WCL API call) |
-| `scoutPagesPerSource` | number | `1` | WoWProgress listing pages to pull (`fetch` adapter only) |
+| `scoutPagesPerSource` | number | `1` | WoWProgress listing pages to pull per run and per "Load more" (`fetch` adapter only) |
 | `scoutWclEnabled` | boolean | `true` | Fetch WarcraftLogs parses for harvested candidates |
 | `scoutHideBelowThresholds` | boolean | `true` | Apply the shared parse thresholds to Scout results, and hide no-logs candidates (see quirk 29) |
 | `scoutEnrichRaiderio` | boolean | `true` | Cross-reference every candidate against Raider.IO's public character API to fill in M+ score, mythic progress and item level (see quirk 39) |
 | `scoutUrlWowprogress` | string | `""` | Listing URL override — blank uses `DEFAULT_SOURCE_URLS` |
 | `scoutUrlRaiderio` | string | `""` | Listing URL override |
 | `scoutUrlGuildsofwow` | string | `""` | Listing URL override |
-| `scoutFilters` | object | all empty | Remembered Scout table filters: `{roles, classes, regions, sources, minIlvl, minMplus, minMythic, multiSource}`. Empty lists and zero minimums mean "no opinion" — see quirk 36 |
+| `scoutFilters` | object | all empty | Remembered Scout table filters: `{roles, classes, regions, sources, minIlvl, minMplus, minMythic, maxAgeDays, multiSource}`. Empty lists and zero minimums mean "no opinion" — see quirk 36 |
 | `scoutSortKey` | string | `"wclMedian"` | Remembered Scout sort column; ignored unless it matches a `th[data-sort]` |
 | `scoutSortDir` | string | `"desc"` | Remembered Scout sort direction (`"asc"` / `"desc"`) |
 
@@ -425,3 +428,7 @@ RaidScout/
 59. **Scout's Listed column is parsed in one place and never guessed.** Harvesters return a raw `listed` value — WoWProgress's `data-ts` (unix seconds), a `<time datetime>`, Raider.IO's "Published" cell text, or a leaf element on a GoW card whose *entire* text reads as a relative date — via `readListedDate()` in `common.js` (the fetch parser in `sources.js` mirrors the WoWProgress case). `parseListedDate()` in `scout-core.js` turns it into epoch ms, rejecting anything in the future or before 2004, so a stray number or a guild name like "Remnant 2020" can't become a date. Unreadable dates stay `null` and sort last in both directions; an invented "now" would float stale listings to the top of the sort that exists to sink them. Merging keeps the most recent listing across sites. The WoWProgress and GoW date markup was not verified against live pages when this was written — if the column stays blank for a source, that source's selector is the thing to check.
 
 60. **Parse sorts group by difficulty before percentage.** Unpinned, the same "75%" can be a mythic or a heroic parse, and mythic fields are stronger, so one list of raw percentages ranked a heroic 80% above a mythic 60%. `queryCharacter()` now records the `difficulty` field of the `zoneRankings` block it read (only when there are parses — a no-logs result claims none), badges tag it `M`/`H`/`N`, and both sorts encode `difficulty × 1000 + percent`: `parseSortValue()` in `scout-core.js` for Scout's WCL columns and `wclSortValue()` in `common.js` for `sortByWclScore()` (the sites store it as `dataset.wclDifficulty`). One number keeps the generic sort's direction and missing-last rules without a special case; `tests/common.test.js` asserts the two encodings agree. A score with no recorded difficulty — cached before this existed — encodes as difficulty 0 and sorts after the known groups until its TTL expires.
+
+61. **"Listed within" keeps what it cannot date.** The age filter exists in Scout (`scoutFilters.maxAgeDays`) and per site (`wpMaxListedDays`, `rioMaxListedDays`, `gowMaxListedDays`), and every one of them keeps a row whose date is unreadable — the WoWProgress and GoW date markup is unverified (quirk 59), so "unknown" treated as "too old" would empty a source the day a selector drifts. The same rule as quirk 36's minimums. Content scripts cannot import `scout-core.js`, so `common.js` carries copies of `parseListedDate()` and `isListedWithin()`; `tests/common.test.js` runs both over one input table and asserts they agree. The choices offered (1/3/7/14/30/90 days) are `LISTED_AGE_OPTIONS`; the options page and popup spell them out in HTML, with `""` for "any age" like `wclDifficulty`.
+
+62. **Scout's "Load more" pages each source, and trusts nothing about the page parameter it cannot verify.** `harvestRound()` in `scout.js` serves both the first run (page 0 everywhere) and Load more; `state.paging[source]` carries `{ nextPage, exhausted, ageLimit, seen, found }`, and `pageUrl()` in `sources.js` builds the URL — WoWProgress's known `next_page`, and a plain `page` parameter for Raider.IO and GoW that could not be checked against the live sites. So the loop defends itself: a page whose rows this source already returned is skipped once (absorbing a 0- vs 1-based guess), a second repeat ends the source with "its page parameter may not work", a page with no rows at all (`rowsSeen`, now part of every harvest response) ends it, and a tab page that fails to render past page one is read as the end of the listing rather than raised as a failure. On a newest-first listing (`isNewestFirst()`, read from the URL's own sort) one row older than the "listed within" filter proves every later page is older still, so paging stops there — and `reopenAgeLimitedSources()` undoes that if the filter is widened. New rows are folded in by `absorbCandidates()` in `scout-core.js`, which updates known candidates *in place* (the row index and both scoring passes hold them by reference) and never lets a later page overwrite a role WarcraftLogs already resolved (quirk 33). The per-run cap applies per batch; candidates over it wait in `state.overflow` and are served first, since they cost no further harvest. It is a button rather than infinite scroll because each new candidate is an API call.

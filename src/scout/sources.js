@@ -22,7 +22,7 @@
 // listing pages; an officer should be able to paste the URL they actually use
 // rather than wait for an extension update.
 
-import { normalizeCandidate, passesWowProgressFilters, slugRealm } from './scout-core.js';
+import { normalizeCandidate, passesWowProgressFilters, reachedAgeLimit, slugRealm } from './scout-core.js';
 
 const FETCH_TIMEOUT_MS = 15_000;
 const TAB_LOAD_TIMEOUT_MS = 25_000;
@@ -189,6 +189,11 @@ async function harvestViaTab(sourceId, url, { timeoutMs = 15_000 } = {}) {
     }
 }
 
+async function harvestTabPage(sourceId, url, { page = 0 } = {}) {
+    const result = await harvestViaTab(sourceId, pageUrl(sourceId, url, page));
+    return { ...result, nextPage: page + 1 };
+}
+
 // ─── WoWProgress: direct fetch + parse ─────────────────────────────────────────
 
 async function fetchWithTimeout(url, timeoutMs = FETCH_TIMEOUT_MS) {
@@ -284,12 +289,18 @@ function applyWowProgressFilters(rows, filters = {}) {
     });
 }
 
-async function harvestWowProgress(url, { pages = 1, filters = {} } = {}) {
+async function harvestWowProgress(url, { startPage = 0, pages = 1, filters = {}, maxListedDays = 0 } = {}) {
     const collected = [];
     const warnings  = [];
+    // Where the next "Load more" should start, and whether there is anything
+    // left to load. Stays null/false unless a page proves the listing ended.
+    let nextPage  = startPage + pages;
+    let exhausted = null;
+    let ageLimit  = 0;   // set when `exhausted` is only the age filter talking
 
-    for (let page = 0; page < pages; page++) {
+    for (let page = startPage; page < startPage + pages; page++) {
         const pageUrl = page === 0 ? url : appendPageParam(url, page);
+        const first   = page === startPage;
         const response = await fetchWithTimeout(pageUrl);
         const body = await response.text().catch(() => '');
 
@@ -301,14 +312,16 @@ async function harvestWowProgress(url, { pages = 1, filters = {} } = {}) {
             // through pagination still leaves the pages already collected, and
             // the tab fallback reads page one only — so it would hand back fewer
             // rows than we are already holding.
-            if (page === 0) throw new CloudflareChallenge();
+            if (first) throw new CloudflareChallenge();
             warnings.push(`Page ${page + 1} was challenged by Cloudflare — stopped paginating`);
+            nextPage = page;
             break;
         }
 
         if (!response.ok) {
-            if (page === 0) throw new Error(`WoWProgress returned HTTP ${response.status}`);
+            if (first) throw new Error(`WoWProgress returned HTTP ${response.status}`);
             warnings.push(`Page ${page + 1} returned HTTP ${response.status} — stopped paginating`);
+            nextPage = page;
             break;
         }
 
@@ -318,15 +331,27 @@ async function harvestWowProgress(url, { pages = 1, filters = {} } = {}) {
                 throw new Error('No results table (.rating) in the response — check the listing URL, ' +
                                 'or WoWProgress changed its markup');
             }
+            exhausted = 'reached the end of the listing';
             break;
         }
 
         const rows = parseWowProgressDocument(doc);
-        if (rows.length === 0) break;   // ran past the last page
+        if (rows.length === 0) { exhausted = 'reached the end of the listing'; break; }
         collected.push(...rows);
+
+        // A newest-first listing that has reached listings older than the
+        // officer's age filter has nothing further worth fetching.
+        if (isNewestFirst('wowprogress', url) &&
+            reachedAgeLimit(rows.map(r => normalizeCandidate(r, 'wowprogress')), maxListedDays)) {
+            exhausted = `reached listings older than ${maxListedDays} day${maxListedDays === 1 ? '' : 's'}`;
+            ageLimit  = maxListedDays;
+            nextPage = page + 1;
+            break;
+        }
     }
 
-    return { ok: true, source: 'wowprogress', url,
+    return { ok: true, source: 'wowprogress', url, nextPage, exhausted, ageLimit,
+             rowsSeen: collected.length,
              candidates: applyWowProgressFilters(collected, filters), warnings };
 }
 
@@ -355,9 +380,10 @@ async function harvestWowProgressWithFallback(url, options) {
             };
         }
 
-        const viaTab = await harvestViaTab('wowprogress', url);
+        const startPage = options?.startPage || 0;
+        const viaTab = await harvestViaTab('wowprogress', startPage === 0 ? url : appendPageParam(url, startPage));
         const note = 'Cloudflare challenged the direct request, so the listing was harvested in a background ' +
-                     'tab instead — slower, and first page only.';
+                     'tab instead — slower, and one page at a time.';
 
         if (!viaTab.ok) {
             return {
@@ -370,6 +396,7 @@ async function harvestWowProgressWithFallback(url, options) {
         return {
             ...viaTab,
             url,
+            nextPage: startPage + 1,
             candidates: applyWowProgressFilters(viaTab.candidates || [], options?.filters),
             warnings: [...(viaTab.warnings || []), note],
         };
@@ -407,6 +434,42 @@ export function ensureRaiderioSearchParams(url) {
     }
 }
 
+// ─── Paging ─────────────────────────────────────────────────────────────────────
+// "Load more" asks each source for the page after the last one it harvested.
+// WoWProgress's `next_page` parameter is known (the fetch harvester has always
+// paginated with it). Raider.IO and Guilds of WoW render client-side and their
+// page parameter was never verified against the live sites — the container this
+// was written in had no route to them — so both use a plain `page` query
+// parameter and lean on the safety net in scout.js: a page that repeats rows
+// already seen is skipped once (which also absorbs a 0- vs 1-based guess), and a
+// second repeat or an empty page ends that source with a notice rather than a
+// silent loop. Page 0 is always the listing URL exactly as configured.
+export function pageUrl(sourceId, url, page) {
+    if (!page) return url;
+    if (sourceId === 'wowprogress') return appendPageParam(url, page);
+    try {
+        const parsed = new URL(url);
+        parsed.searchParams.set('page', String(page));
+        return parsed.toString();
+    } catch {
+        return url;
+    }
+}
+
+// Whether a listing URL is sorted newest-first, which is what lets a page full
+// of old listings prove the rest are older still. Read from the URL rather than
+// assumed per site, because the listing URL is the officer's to change.
+export function isNewestFirst(sourceId, url) {
+    try {
+        const params = new URL(url).searchParams;
+        if (sourceId === 'wowprogress') return params.get('sortby') === 'ts';
+        if (sourceId === 'raiderio') {
+            return params.get('sort[recruitment.guild_raids.profile.published_at]') === 'desc';
+        }
+    } catch { /* unparseable → no claim */ }
+    return false;
+}
+
 // ─── Adapter registry ──────────────────────────────────────────────────────────
 
 export const SOURCE_ADAPTERS = [
@@ -415,18 +478,23 @@ export const SOURCE_ADAPTERS = [
         mode: 'fetch',
         supportsPagination: true,
         run: (url, ctx) => harvestWowProgressWithFallback(url, {
+            startPage: ctx.page || 0,
             pages: ctx.pagesPerSource,
+            maxListedDays: ctx.maxListedDays || 0,
             filters: {
                 selectedRegions: (ctx.settings.selectedRegions ?? ['EU']).map(r => r.toLowerCase()),
                 minIlvl:         parseFloat(ctx.settings.minIlvl) || 0,
                 maxIlvl:         parseFloat(ctx.settings.maxIlvl) || 0,
                 selectedClasses: ctx.settings.selectedClasses || [],
                 guildFilter:     ctx.settings.guildFilter || 'any',
+                maxListedDays:   parseInt(ctx.settings.wpMaxListedDays, 10) || 0,
             },
         }),
     },
-    { id: 'raiderio',     mode: 'tab', run: url => harvestViaTab('raiderio', ensureRaiderioSearchParams(url)) },
-    { id: 'guildsofwow',  mode: 'tab', run: url => harvestViaTab('guildsofwow', url) },
+    // The tab sources read one page per run; `nextPage` tells "Load more"
+    // where to resume.
+    { id: 'raiderio',     mode: 'tab', run: (url, ctx = {}) => harvestTabPage('raiderio', ensureRaiderioSearchParams(url), ctx) },
+    { id: 'guildsofwow',  mode: 'tab', run: (url, ctx = {}) => harvestTabPage('guildsofwow', url, ctx) },
     // WarcraftLogs is not a source — see RETIRED_SOURCE_IDS in scout-core.js.
 ];
 

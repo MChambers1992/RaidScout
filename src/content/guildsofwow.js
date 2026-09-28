@@ -88,7 +88,7 @@ function getCardCharacter(card) {
 
 // ─── Standard filter ──────────────────────────────────────────────────────────
 
-function filterCards(minIlvl, minMythicKills, minMythicPlusScore, selectedClasses, selectedRoles) {
+function filterCards(minIlvl, minMythicKills, minMythicPlusScore, selectedClasses, selectedRoles, maxListedDays = 0) {
     assertSelector('#recruits-list', document, 'GoW recruits-list');
 
     for (const card of document.querySelectorAll('#recruits-list .card')) {
@@ -106,7 +106,8 @@ function filterCards(minIlvl, minMythicKills, minMythicPlusScore, selectedClasse
             (minMythicKills   === 0 || mythicKills  === null || mythicKills >= minMythicKills) &&
             (minMythicPlusScore === 0 || mplusScore  === null || mplusScore  >= minMythicPlusScore) &&
             (selectedClasses.length === 0 || playerClass === null || selectedClasses.includes(playerClass)) &&
-            (selectedRoles.length   === 0 || role        === null || selectedRoles.includes(role));
+            (selectedRoles.length   === 0 || role        === null || selectedRoles.includes(role)) &&
+            isListedWithin(parseListedDate(readListedDate(card)), maxListedDays);
 
         card.style.display = visible ? '' : 'none';
     }
@@ -192,14 +193,15 @@ watchSettings(GOW_WCL_KEYS, (changes) => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get(
         ['gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedClasses', 'gowSelectedRoles',
-         'gowWclEnabled', ...SHARED_WCL_KEYS],
+         'gowMaxListedDays', 'gowWclEnabled', ...SHARED_WCL_KEYS],
         function(options) {
             filterCards(
                 parseFloat(options.gowMinIlvl)          || 0,
                 parseInt(options.gowMinMythicKills)      || 0,
                 parseInt(options.gowMinMythicPlusScore)  || 0,
                 options.gowSelectedClasses || [],
-                options.gowSelectedRoles   || []
+                options.gowSelectedRoles   || [],
+                maxListedDaysSetting(options.gowMaxListedDays)
             );
             if (options.gowWclEnabled) {
                 applyWclScoring({ ...buildWclSettings(options), sort: wclSortEnabled(options) });
