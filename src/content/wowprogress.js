@@ -24,7 +24,7 @@ function getPlayerRole(playerRow) {
     return 'dps';
 }
 
-function filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter) {
+function filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter, maxListedDays = 0) {
     // Same reasoning as the poll in handlePageNavigation: on a Cloudflare
     // interstitial there is no table, and reporting that as changed markup is
     // wrong. handlePageNavigation is what notices a genuinely missing table.
@@ -48,8 +48,9 @@ function filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guild
             (playerIlvl >= minIlvl && (maxIlvl === 0 || playerIlvl <= maxIlvl));
         const classMatch = selectedClasses.length === 0 || playerClass === null || selectedClasses.includes(playerClass);
         const guildMatch = guildFilter === 'any' || (guildFilter === 'in' && inGuild) || (guildFilter === 'out' && !inGuild);
+        const ageMatch   = isListedWithin(parseListedDate(readListedDate(playerRow)), maxListedDays);
 
-        if (!(regionMatch && ilvlMatch && classMatch && guildMatch)) {
+        if (!(regionMatch && ilvlMatch && classMatch && guildMatch && ageMatch)) {
             playerRow.remove();
             hiddenCount++;
         }
@@ -167,14 +168,15 @@ watchSettings(WP_WCL_KEYS, () => {
 function loadSettingsAndFilter() {
     chrome.storage.sync.get([
         'selectedRegions', 'region', 'minIlvl', 'maxIlvl', 'selectedClasses', 'guildFilter',
-        'wpWclEnabled', ...SHARED_WCL_KEYS,
+        'wpMaxListedDays', 'wpWclEnabled', ...SHARED_WCL_KEYS,
     ], function(options) {
         const selectedRegions = options.selectedRegions ?? (options.region ? [options.region] : ['EU']);
         const minIlvl         = parseFloat(options.minIlvl) || 0;
         const maxIlvl         = parseFloat(options.maxIlvl) || 0;
         const selectedClasses = options.selectedClasses || [];
         const guildFilter     = options.guildFilter || 'any';
-        filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter);
+        filterPlayers(selectedRegions, minIlvl, maxIlvl, selectedClasses, guildFilter,
+                      maxListedDaysSetting(options.wpMaxListedDays));
 
         if (options.wpWclEnabled) {
             applyWclScoring({ ...buildWclSettings(options), sort: wclSortEnabled(options) });

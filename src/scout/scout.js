@@ -15,8 +15,9 @@ import {
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency, classIconUrl,
     formatMythicProgress, formatListedAge,
     matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS, summarizeScoreErrors,
+    absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS,
 } from './scout-core.js';
-import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS } from './sources.js';
+import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS, isNewestFirst } from './sources.js';
 import { fetchProfileFields, applyEnrichment, ENRICH_ORIGIN } from './enrich.js';
 
 // ─── Defaults ──────────────────────────────────────────────────────────────────
@@ -63,6 +64,13 @@ const state = {
     running:    false,
     rowIndex:   new Map(),
     notices:    [],
+    // Per-source paging for "Load more": { nextPage, exhausted, seen, found }.
+    // `exhausted` is null while the source may have more, else the reason it
+    // does not — shown under the button so an ended list explains itself.
+    paging:     {},
+    // Candidates harvested but held back by the per-run cap. "Load more" shows
+    // these before fetching anything, since they cost no further harvest.
+    overflow:   [],
 };
 
 // ─── Elements ──────────────────────────────────────────────────────────────────
@@ -99,6 +107,10 @@ const el = {
     minIlvl:      document.getElementById('filterMinIlvl'),
     minMplus:     document.getElementById('filterMinMplus'),
     minMythic:    document.getElementById('filterMinMythic'),
+    maxAge:       document.getElementById('filterMaxAge'),
+    loadMore:     document.getElementById('loadMore'),
+    loadMoreBtn:  document.getElementById('loadMoreBtn'),
+    loadMoreNote: document.getElementById('loadMoreNote'),
 };
 
 // ─── Settings ──────────────────────────────────────────────────────────────────
@@ -210,17 +222,22 @@ function fail(message) { addNotice(message, 'error'); }
 
 // ─── Harvest ───────────────────────────────────────────────────────────────────
 
-async function harvestSource(sourceId, settings) {
+async function harvestSource(sourceId, settings, page = 0) {
     const adapter = adapterFor(sourceId);
     if (!adapter) return { ok: false, source: sourceId, candidates: [], error: 'No adapter registered' };
 
     const url = sourceUrl(sourceId, settings);
-    setChip(sourceId, 'is-running', adapter.mode === 'tab' ? 'opening…' : 'fetching…');
+    setChip(sourceId, 'is-running', page > 0 ? `page ${page + 1}…`
+                                             : (adapter.mode === 'tab' ? 'opening…' : 'fetching…'));
 
     try {
         const result = await adapter.run(url, {
             settings,
+            page,
             pagesPerSource: Math.max(1, parseInt(settings.scoutPagesPerSource) || 1),
+            // Lets a newest-first listing stop paging once it is past the
+            // officer's "listed within" filter.
+            maxListedDays:  state.filters.maxAgeDays,
         });
         return { ...result, source: sourceId, url };
     } catch (err) {
@@ -242,6 +259,7 @@ async function runScout() {
     el.table.hidden = true;
     el.toolbar.hidden = true;
     el.empty.hidden = true;
+    el.loadMore.hidden = true;
 
     const settings = await loadSettings();
     state.settings = settings;
@@ -273,51 +291,12 @@ async function runScout() {
     }
 
     setProgress('Harvesting…');
-    const raw = [];
-    let rowTotal = 0;
-    // Sources that rendered but matched nobody. Collected rather than warned
-    // about one at a time: the sentence is identical for each, and three
-    // repetitions of it buried the warnings that actually differ.
-    const cameBackEmpty = [];
+    state.paging = Object.fromEntries(sourceIds.map(id =>
+        [id, { nextPage: 0, exhausted: null, ageLimit: 0, seen: new Set(), found: 0 }]));
+    state.overflow = [];
+    renderLoadMore();
 
-    await runWithConcurrency(sourceIds, async (sourceId) => {
-        const result = await harvestSource(sourceId, settings);
-
-        if (!result.ok) {
-            setChip(sourceId, 'is-failed', 'failed');
-            fail(`<strong>${SOURCE_META[sourceId].label}</strong> returned nothing: ${escapeHtml(result.error || 'unknown error')} ` +
-                 `<br><code>${escapeHtml(result.url || '')}</code>`);
-            return;
-        }
-
-        const normalized = (result.candidates || [])
-            .map(row => normalizeCandidate(row, sourceId))
-            .filter(Boolean);
-
-        const dropped = (result.candidates || []).length - normalized.length;
-        rowTotal += normalized.length;
-        raw.push(...normalized);
-
-        // A source that matched nobody is not the same result as one that
-        // found candidates, so it does not get the green "done" treatment.
-        setChip(sourceId, normalized.length ? 'is-done' : 'is-empty', `${normalized.length}`);
-        for (const w of result.warnings || []) warn(`<strong>${SOURCE_META[sourceId].label}</strong>: ${escapeHtml(w)}`);
-        if (dropped > 0) {
-            warn(`<strong>${SOURCE_META[sourceId].label}</strong>: ${dropped} row(s) skipped — no readable ` +
-                 `character name/realm/region, so they could not be scored.`);
-        }
-        if (normalized.length === 0) cameBackEmpty.push(SOURCE_META[sourceId].label);
-    }, HARVEST_CONCURRENCY);
-
-    if (cameBackEmpty.length) {
-        const names = cameBackEmpty.map(label => `<strong>${label}</strong>`);
-        const list  = names.length === 1
-            ? names[0]
-            : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-        warn(`${list} rendered but produced no candidates. ` +
-             `${names.length === 1 ? 'Its filters may be' : 'Their filters may be'} excluding everyone, ` +
-             `or the listing ${names.length === 1 ? 'URL is' : 'URLs are'} wrong.`);
-    }
+    const { raw, rowTotal } = await harvestRound(sourceIds, settings, { initial: true });
 
     let merged = mergeCandidates(raw);
     const uniqueCount = merged.length;
@@ -326,8 +305,10 @@ async function runScout() {
     const cap = Math.max(1, parseInt(settings.scoutMaxCandidates) || SCOUT_DEFAULTS.scoutMaxCandidates);
     if (merged.length > cap) {
         warn(`Found ${merged.length} candidates but the cap is ${cap} — showing the first ${cap}. ` +
-             `Raise “Max candidates per run” in Settings → Scout, or tighten your per-site filters. ` +
+             `“Load more” below the table shows the rest; raise “Max candidates per run” in Settings → Scout ` +
+             `to see them up front, or tighten your per-site filters. ` +
              `The cap exists because every extra candidate is a WarcraftLogs API call.`);
+        state.overflow = merged.slice(cap);
         merged = merged.slice(0, cap);
     }
 
@@ -357,11 +338,200 @@ async function runScout() {
     finishRun();
 }
 
+// One harvest pass: every source in `sourceIds` fetches the page its paging
+// state says is next. Used by the first run (page 0 everywhere) and by "Load
+// more", so both report failures, empty sources and warnings the same way.
+async function harvestRound(sourceIds, settings, { initial }) {
+    const raw = [];
+    let rowTotal = 0;
+    // Sources that rendered but matched nobody. Collected rather than warned
+    // about one at a time: the sentence is identical for each, and three
+    // repetitions of it buried the warnings that actually differ.
+    const cameBackEmpty = [];
+
+    await runWithConcurrency(sourceIds, async (sourceId) => {
+        const paging = state.paging[sourceId];
+        const label  = SOURCE_META[sourceId].label;
+        const url    = sourceUrl(sourceId, settings);
+
+        let result = await harvestSource(sourceId, settings, paging.nextPage);
+        let normalized = [];
+
+        // Paging safety net. The page parameter of the client-rendered sources
+        // is unverified (see pageUrl in sources.js), so a page that hands back
+        // only rows this source already gave us is treated as "that page was
+        // not the next one": try the one after once, then give up on the source
+        // rather than loop. A 1-based listing asked for page=1 lands here and is
+        // recovered by the retry.
+        for (let attempt = 0; ; attempt++) {
+            if (!result.ok) break;
+            normalized = (result.candidates || []).map(row => normalizeCandidate(row, sourceId)).filter(Boolean);
+            const repeated = !initial && normalized.length > 0 &&
+                             normalized.every(c => paging.seen.has(c.key));
+            if (!repeated) break;
+            paging.nextPage = result.nextPage ?? paging.nextPage + 1;
+            if (attempt >= 1) {
+                paging.exhausted = 'returned listings already loaded — its page parameter may not work';
+                normalized = [];
+                break;
+            }
+            result = await harvestSource(sourceId, settings, paging.nextPage);
+        }
+
+        if (!result.ok) {
+            if (initial) {
+                setChip(sourceId, 'is-failed', 'failed');
+                fail(`<strong>${label}</strong> returned nothing: ${escapeHtml(result.error || 'unknown error')} ` +
+                     `<br><code>${escapeHtml(result.url || '')}</code>`);
+                paging.exhausted = 'failed on the first page';
+            } else {
+                // Past the first page, a page that renders nothing is far more
+                // often the end of the listing than a fault, so it ends the
+                // source quietly with its reason under the button.
+                setChip(sourceId, paging.found ? 'is-done' : 'is-empty', `${paging.found}`);
+                paging.exhausted = `no further page loaded (${result.error || 'unknown error'})`;
+            }
+            return;
+        }
+
+        if (!paging.exhausted) {
+            paging.nextPage = result.nextPage ?? paging.nextPage + 1;
+            const maxAge = state.filters.maxAgeDays;
+            if (result.exhausted) {
+                paging.exhausted = result.exhausted;
+                paging.ageLimit  = result.ageLimit || 0;
+            } else if (!initial && (result.rowsSeen ?? normalized.length) === 0) {
+                paging.exhausted = 'reached the end of the listing';
+            } else if (isNewestFirst(sourceId, url) && reachedAgeLimit(normalized, maxAge)) {
+                paging.exhausted = `reached listings older than ${maxAge} day${maxAge === 1 ? '' : 's'}`;
+                paging.ageLimit  = maxAge;
+            }
+        }
+
+        const fresh = normalized.filter(c => !paging.seen.has(c.key));
+        for (const c of normalized) paging.seen.add(c.key);
+        paging.found += fresh.length;
+
+        const dropped = (result.candidates || []).length - normalized.length;
+        rowTotal += normalized.length;
+        raw.push(...normalized);
+
+        // A source that matched nobody is not the same result as one that
+        // found candidates, so it does not get the green "done" treatment.
+        setChip(sourceId, paging.found ? 'is-done' : 'is-empty', `${paging.found}`);
+        for (const w of result.warnings || []) warn(`<strong>${label}</strong>: ${escapeHtml(w)}`);
+        if (dropped > 0) {
+            warn(`<strong>${label}</strong>: ${dropped} row(s) skipped — no readable ` +
+                 `character name/realm/region, so they could not be scored.`);
+        }
+        if (initial && normalized.length === 0) cameBackEmpty.push(label);
+    }, HARVEST_CONCURRENCY);
+
+    if (cameBackEmpty.length) {
+        const names = cameBackEmpty.map(label => `<strong>${label}</strong>`);
+        const list  = names.length === 1
+            ? names[0]
+            : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+        warn(`${list} rendered but produced no candidates. ` +
+             `${names.length === 1 ? 'Its filters may be' : 'Their filters may be'} excluding everyone, ` +
+             `or the listing ${names.length === 1 ? 'URL is' : 'URLs are'} wrong.`);
+    }
+
+    return { raw, rowTotal };
+}
+
+// ─── Load more ─────────────────────────────────────────────────────────────────
+// Once an officer has read to the bottom of the table they can ask for more:
+// first whatever the per-run cap held back (free — already harvested), then the
+// next page of every source that has not run out. Deliberately a button rather
+// than infinite scroll: every new candidate is a WarcraftLogs API call, and
+// scrolling past the end of a table is not a decision to spend them.
+
+function sourcesWithMore() {
+    return Object.keys(state.paging).filter(id => !state.paging[id].exhausted);
+}
+
+function renderLoadMore() {
+    const more = sourcesWithMore();
+    const hasCandidates = state.candidates.length > 0;
+    el.loadMore.hidden = !hasCandidates;
+    if (!hasCandidates) return;
+
+    const canLoad = state.overflow.length > 0 || more.length > 0;
+    el.loadMoreBtn.hidden = !canLoad;
+    el.loadMoreBtn.disabled = state.running;
+
+    const parts = [];
+    if (state.overflow.length) parts.push(`${state.overflow.length} already harvested over the cap`);
+    // Names the sources rather than page numbers: the client-rendered sites'
+    // page parameter is a best guess (see pageUrl), so a number could be wrong.
+    if (more.length) parts.push('more from ' + more.map(id => SOURCE_META[id].label).join(', '));
+    const ended = Object.keys(state.paging).filter(id => state.paging[id].exhausted)
+        .map(id => `${SOURCE_META[id].label} ${state.paging[id].exhausted}`);
+    if (!canLoad) parts.unshift('End of the listings');
+    if (ended.length) parts.push(ended.join('; '));
+    const note = parts.join(' · ');
+    el.loadMoreNote.textContent = note.charAt(0).toUpperCase() + note.slice(1);
+}
+
+async function loadMore() {
+    if (state.running || state.candidates.length === 0) return;
+    state.running = true;
+    el.run.disabled = true;
+    el.difficulty.disabled = true;
+    el.loadMoreBtn.textContent = '⏳ Loading…';
+    renderLoadMore();
+
+    try {
+        const settings = state.settings;
+        const cap = Math.max(1, parseInt(settings.scoutMaxCandidates) || SCOUT_DEFAULTS.scoutMaxCandidates);
+
+        // The held-back candidates come first; only fetch when they would not
+        // fill a batch on their own.
+        let incoming = [];
+        const more = sourcesWithMore();
+        if (state.overflow.length < cap && more.length) {
+            setProgress('Loading the next page…');
+            ({ raw: incoming } = await harvestRound(more, settings, { initial: false }));
+        }
+
+        const { added } = absorbCandidates([...state.candidates, ...state.overflow], incoming);
+        const pool  = [...state.overflow, ...added];
+        const batch = pool.slice(0, cap);
+        state.overflow = pool.slice(cap);
+
+        if (batch.length === 0) {
+            setProgress(`No new candidates — ${state.candidates.length} in total.`);
+            render();
+            return;
+        }
+
+        state.candidates.push(...batch);
+        render();
+        setProgress(`Loaded ${batch.length} more candidate${batch.length === 1 ? '' : 's'} — ` +
+                    `${state.candidates.length} in total`);
+
+        // Same order and the same reasons as the first run.
+        if (settings.scoutWclEnabled !== false) await scoreCandidates(batch);
+        if (settings.scoutEnrichRaiderio !== false) await enrichCandidates(candidatesWorthHydrating(batch));
+        render();
+        setProgress(`Loaded ${batch.length} more candidate${batch.length === 1 ? '' : 's'} — ` +
+                    `${state.candidates.length} in total`);
+    } finally {
+        state.running = false;
+        el.run.disabled = false;
+        el.difficulty.disabled = false;
+        el.loadMoreBtn.textContent = '⬇ Load more';
+        renderLoadMore();
+    }
+}
+
 function finishRun(emptyMessage) {
     state.running = false;
     el.run.disabled = false;
     el.difficulty.disabled = false;
     el.run.textContent = '🔎 Run scout';
+    renderLoadMore();
     if (emptyMessage) {
         el.empty.hidden = false;
         el.empty.textContent = emptyMessage;
@@ -769,8 +939,18 @@ function buildFilterControls() {
     buildChips(el.filterClasses, WOW_CLASS_NAMES
         .map(value => ({ value, label: classLabel(value), colour: `var(--wow-${value.replace('_', '')})` })), 'classes');
 
+    el.maxAge.innerHTML = '<option value="">Any age</option>' + LISTED_AGE_OPTIONS
+        .map(days => `<option value="${days}">${listedAgeLabel(days)}</option>`).join('');
+
     buildChips(el.filterSources, SOURCE_IDS
         .map(value => ({ value, label: SOURCE_META[value].label, colour: SOURCE_META[value].colour })), 'sources');
+}
+
+function listedAgeLabel(days) {
+    if (days === 1) return 'Last 24 hours';
+    if (days === 7) return 'Last week';
+    if (days === 14) return 'Last 2 weeks';
+    return `Last ${days} days`;
 }
 
 // State → controls. Runs on load and after Clear, never on every keystroke.
@@ -783,6 +963,13 @@ function syncFilterControls() {
     el.minIlvl.value   = f.minIlvl   || '';
     el.minMplus.value  = f.minMplus  || '';
     el.minMythic.value = f.minMythic || '';
+    // A remembered value that is not an offered choice would leave the select
+    // blank while still filtering, so it is shown as the nearest thing: added.
+    const age = f.maxAgeDays ? String(f.maxAgeDays) : '';
+    if (age && !Array.from(el.maxAge.options).some(o => o.value === age)) {
+        el.maxAge.add(new Option(listedAgeLabel(f.maxAgeDays), age));
+    }
+    el.maxAge.value = age;
 }
 
 // Controls → state.
@@ -799,6 +986,7 @@ function readFilterControls() {
         minIlvl:     parseFloat(el.minIlvl.value),
         minMplus:    parseFloat(el.minMplus.value),
         minMythic:   parseFloat(el.minMythic.value),
+        maxAgeDays:  parseInt(el.maxAge.value, 10),
     });
 }
 
@@ -826,9 +1014,25 @@ function persistFilters() {
 
 function onFiltersChanged() {
     state.filters = readFilterControls();
+    reopenAgeLimitedSources();
     renderFilterState();
     persistFilters();
     render();
+}
+
+// A source that stopped paging only because it reached listings older than the
+// "listed within" filter has more to give once that filter is widened or
+// cleared — without this, loosening the filter would leave "Load more" claiming
+// the listings had ended until the next full run.
+function reopenAgeLimitedSources() {
+    const maxAge = state.filters.maxAgeDays;
+    for (const paging of Object.values(state.paging)) {
+        if (paging.ageLimit && (!maxAge || maxAge > paging.ageLimit)) {
+            paging.exhausted = null;
+            paging.ageLimit  = 0;
+        }
+    }
+    renderLoadMore();
 }
 
 // Restores what was remembered from the last visit. normalizeFilters absorbs
@@ -860,6 +1064,7 @@ function setFiltersOpen(open) {
 // ─── Events ────────────────────────────────────────────────────────────────────
 
 el.run.addEventListener('click', runScout);
+el.loadMoreBtn.addEventListener('click', loadMore);
 el.openSettings.addEventListener('click', () => chrome.runtime.openOptionsPage());
 
 el.search.addEventListener('input', () => { state.query = el.search.value; render(); });
@@ -919,6 +1124,7 @@ el.filters.addEventListener('input', (event) => {
 
 el.clearFilters.addEventListener('click', () => {
     state.filters = { ...DEFAULT_FILTERS };
+    reopenAgeLimitedSources();
     syncFilterControls();
     renderFilterState();
     persistFilters();

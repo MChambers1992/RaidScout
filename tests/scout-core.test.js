@@ -12,6 +12,7 @@ import {
     normalizeClassKey, roleFromClass, classIconUrl, DPS_ONLY_CLASSES,
     describeScoreError, summarizeScoreErrors, SOURCE_IDS, RETIRED_SOURCE_IDS, SOURCE_META,
     formatMythicProgress, parseListedDate, formatListedAge, parseSortValue,
+    isListedWithin, absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS,
 } from '../src/scout/scout-core.js';
 
 const raw = (over = {}) => ({
@@ -910,5 +911,90 @@ describe('parse sort groups by difficulty', () => {
     it('exports the difficulty by name', () => {
         const [header, row] = toCsv([list[1]]).split('\n');
         expect(row.split(',')[header.split(',').indexOf('wcl_difficulty')]).toBe('mythic');
+    });
+});
+
+describe('listed-within filter', () => {
+    const NOW = Date.UTC(2026, 8, 28);
+    const DAY = 24 * 60 * 60 * 1000;
+    const listed = (daysAgo, over = {}) =>
+        ({ ...normalizeCandidate(raw(over), 'raiderio', NOW), listedAt: daysAgo === null ? null : NOW - daysAgo * DAY });
+
+    it('keeps everything when no limit is set', () => {
+        expect(isListedWithin(NOW - 400 * DAY, 0, NOW)).toBe(true);
+    });
+
+    it('keeps listings inside the window, including its edge', () => {
+        expect(isListedWithin(NOW - 7 * DAY, 7, NOW)).toBe(true);
+        expect(isListedWithin(NOW - 7 * DAY - 1, 7, NOW)).toBe(false);
+    });
+
+    it('keeps a listing whose date could not be read', () => {
+        // Same rule as the minimums: an unverified date selector must not be
+        // able to empty a source.
+        expect(isListedWithin(null, 1, NOW)).toBe(true);
+    });
+
+    it('is part of the structured filters', () => {
+        const f = { ...DEFAULT_FILTERS, maxAgeDays: 7 };
+        expect(matchesFilters(listed(3), f, NOW)).toBe(true);
+        expect(matchesFilters(listed(10), f, NOW)).toBe(false);
+        expect(matchesFilters(listed(null), f, NOW)).toBe(true);
+    });
+
+    it('counts as an active filter and survives normalisation', () => {
+        expect(DEFAULT_FILTERS.maxAgeDays).toBe(0);
+        expect(activeFilterCount({ maxAgeDays: 14 })).toBe(1);
+        expect(normalizeFilters({ maxAgeDays: '30' }).maxAgeDays).toBe(30);
+        expect(normalizeFilters({ maxAgeDays: -3 }).maxAgeDays).toBe(0);
+        expect(normalizeFilters({}).maxAgeDays).toBe(0);
+    });
+
+    it('applies to the WoWProgress fetch filters', () => {
+        expect(passesWowProgressFilters(listed(10), { maxListedDays: 7, now: NOW })).toBe(false);
+        expect(passesWowProgressFilters(listed(2),  { maxListedDays: 7, now: NOW })).toBe(true);
+    });
+
+    it('offers choices in ascending order', () => {
+        expect([...LISTED_AGE_OPTIONS].sort((a, b) => a - b)).toEqual(LISTED_AGE_OPTIONS);
+    });
+
+    it('knows when a newest-first page has passed the limit', () => {
+        expect(reachedAgeLimit([listed(1), listed(9)], 7, NOW)).toBe(true);
+        expect(reachedAgeLimit([listed(1), listed(null)], 7, NOW)).toBe(false);
+        expect(reachedAgeLimit([listed(30)], 0, NOW)).toBe(false);
+    });
+});
+
+describe('absorbCandidates', () => {
+    const make = (over, source = 'raiderio') => normalizeCandidate(raw(over), source);
+
+    it('returns only the new candidates, merged among themselves', () => {
+        const existing = [make({ name: 'Old' })];
+        const { added, updated } = absorbCandidates(existing, [
+            make({ name: 'New', ilvl: 610 }), make({ name: 'New', ilvl: 625 }, 'guildsofwow'),
+        ]);
+        expect(added.map(c => c.name)).toEqual(['New']);
+        expect(added[0].ilvl).toBe(625);
+        expect(added[0].sources).toEqual(['raiderio', 'guildsofwow']);
+        expect(updated).toEqual([]);
+    });
+
+    it('updates a known candidate in place, keeping the object the table holds', () => {
+        const known = make({ name: 'Thrall', ilvl: 610 });
+        const { added, updated } = absorbCandidates([known], [make({ name: 'Thrall', ilvl: 630 }, 'guildsofwow')]);
+        expect(added).toEqual([]);
+        expect(updated[0]).toBe(known);
+        expect(known.ilvl).toBe(630);
+        expect(known.sources).toContain('guildsofwow');
+    });
+
+    it('does not let a later page overwrite a role WarcraftLogs resolved', () => {
+        const known = make({ name: 'Thrall', role: null }, 'guildsofwow');
+        known.wcl = { best: 80, median: 70, role: 'healer' };
+        known.role = 'healer';
+        absorbCandidates([known], [make({ name: 'Thrall', role: 'dps' }, 'wowprogress')]);
+        expect(known.role).toBe('healer');
+        expect(known.wcl.best).toBe(80);
     });
 });

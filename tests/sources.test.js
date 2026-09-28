@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { parseWowProgressDocument, DEFAULT_SOURCE_URLS, adapterFor, isCloudflareChallenge, withTabRetry,
-         ensureRaiderioSearchParams, SOURCE_ADAPTERS } from '../src/scout/sources.js';
+         ensureRaiderioSearchParams, SOURCE_ADAPTERS, pageUrl, isNewestFirst } from '../src/scout/sources.js';
 import { normalizeCandidate, mergeCandidates, SOURCE_IDS, RETIRED_SOURCE_IDS } from '../src/scout/scout-core.js';
 
 // Mirrors the markup wowprogress.js targets: a .rating table whose rows carry
@@ -304,6 +304,84 @@ describe('WoWProgress fetch harvest', () => {
     it('fails with a markup hint when the results table is missing', async () => {
         globalThis.fetch = vi.fn(async () => htmlResponse('<html><body>hello</body></html>'));
         await expect(wpAdapter().run(LISTING, ctx())).rejects.toThrow(/\.rating/);
+    });
+});
+
+describe('WoWProgress paging for "Load more"', () => {
+    const NOW_S = Math.floor(Date.now() / 1000);
+    const DAY_S = 24 * 60 * 60;
+
+    it('starts at the requested page and says where the next one is', async () => {
+        const fetchMock = vi.fn(async () => htmlResponse(listingHtml(row())));
+        globalThis.fetch = fetchMock;
+
+        const result = await wpAdapter().run(LISTING, { ...ctx({}, 2), page: 3 });
+        expect(fetchMock.mock.calls.map(c => c[0])).toEqual([
+            expect.stringContaining('next_page=3'), expect.stringContaining('next_page=4'),
+        ]);
+        expect(result.nextPage).toBe(5);
+        expect(result.exhausted).toBeNull();
+    });
+
+    it('reports the end of the listing on an empty page', async () => {
+        globalThis.fetch = vi.fn(async () => htmlResponse(listingHtml('')));
+        const result = await wpAdapter().run(LISTING, { ...ctx(), page: 4 });
+        expect(result.ok).toBe(true);
+        expect(result.exhausted).toMatch(/end of the listing/);
+    });
+
+    it('stops a newest-first listing once it passes the age limit', async () => {
+        const fetchMock = vi.fn(async () =>
+            htmlResponse(listingHtml(row({ ts: NOW_S - DAY_S }) + row({ href: '/character/eu/Tarren%20Mill/Old', ts: NOW_S - 10 * DAY_S }))));
+        globalThis.fetch = fetchMock;
+
+        const result = await wpAdapter().run(`${LISTING}&sortby=ts`, { ...ctx({}, 3), maxListedDays: 7 });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(result.exhausted).toMatch(/older than 7 days/);
+    });
+
+    it('does not claim an age limit on a listing not sorted by date', async () => {
+        globalThis.fetch = vi.fn(async () => htmlResponse(listingHtml(row({ ts: NOW_S - 10 * DAY_S }))));
+        const result = await wpAdapter().run(LISTING, { ...ctx(), maxListedDays: 7 });
+        expect(result.exhausted).toBeNull();
+    });
+
+    it("applies the site's own listed-within setting to the rows", async () => {
+        globalThis.fetch = vi.fn(async () => htmlResponse(listingHtml(
+            row({ ts: NOW_S - DAY_S }) + row({ href: '/character/eu/Tarren%20Mill/Old', ts: NOW_S - 10 * DAY_S }))));
+        const result = await wpAdapter().run(LISTING, ctx({ wpMaxListedDays: 7 }));
+        expect(result.candidates.map(c => c.name)).toEqual(['Thrall']);
+    });
+});
+
+describe('pageUrl', () => {
+    it('leaves page 0 exactly as configured', () => {
+        expect(pageUrl('raiderio', 'https://raider.io/search?type=character', 0))
+            .toBe('https://raider.io/search?type=character');
+    });
+
+    it("uses WoWProgress's next_page and a plain page parameter elsewhere", () => {
+        expect(pageUrl('wowprogress', LISTING, 2)).toContain('next_page=2');
+        expect(pageUrl('raiderio', 'https://raider.io/search?type=character', 2)).toContain('page=2');
+        expect(pageUrl('guildsofwow', 'https://guildsofwow.com/recruits?page=1', 3))
+            .toBe('https://guildsofwow.com/recruits?page=3');
+    });
+
+    it('hands back an unparseable URL untouched', () => {
+        expect(pageUrl('raiderio', 'not a url', 2)).toBe('not a url');
+    });
+});
+
+describe('isNewestFirst', () => {
+    it('reads the sort order from the default listing URLs', () => {
+        expect(isNewestFirst('wowprogress', DEFAULT_SOURCE_URLS.wowprogress)).toBe(true);
+        expect(isNewestFirst('raiderio', DEFAULT_SOURCE_URLS.raiderio)).toBe(true);
+        expect(isNewestFirst('guildsofwow', DEFAULT_SOURCE_URLS.guildsofwow)).toBe(false);
+    });
+
+    it('makes no claim for a URL the officer re-sorted', () => {
+        expect(isNewestFirst('wowprogress', LISTING)).toBe(false);
+        expect(isNewestFirst('raiderio', 'https://raider.io/search?type=character')).toBe(false);
     });
 });
 

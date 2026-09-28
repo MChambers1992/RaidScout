@@ -15,7 +15,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { buildScoutThresholds } from '../src/preflight.js';
-import { parseSortValue } from '../src/scout/scout-core.js';
+import { parseSortValue, parseListedDate as coreParseListedDate,
+         isListedWithin as coreIsListedWithin } from '../src/scout/scout-core.js';
 
 const commonSource = readFileSync(new URL('../src/content/common.js', import.meta.url), 'utf8');
 
@@ -24,6 +25,7 @@ const EXPOSED = [
     'wclSortEnabled', 'effectiveRole', 'badgeStateForScore', 'buildWclSettings',
     'roleForSpec', 'isCloudflareChallengePage',
     'wclSortValue', 'sortByWclScore', 'readListedDate', 'makeBadge',
+    'parseListedDate', 'isListedWithin', 'maxListedDaysSetting',
 ];
 
 const dom = new JSDOM('<!doctype html><body></body>', { runScripts: 'outside-only' });
@@ -34,6 +36,7 @@ const {
     wclSortEnabled, effectiveRole, badgeStateForScore, buildWclSettings,
     roleForSpec, isCloudflareChallengePage,
     wclSortValue, sortByWclScore, readListedDate, makeBadge,
+    parseListedDate, isListedWithin, maxListedDaysSetting,
 } = dom.window.__api;
 
 // ─── Still mirrored, deliberately ─────────────────────────────────────────────
@@ -555,5 +558,38 @@ describe('readListedDate', () => {
 
     it('uses a date cell\'s own text when told it is one', () => {
         expect(readListedDate(el('2 weeks ago'), { cellText: true })).toBe('2 weeks ago');
+    });
+});
+
+describe('listed-within filter (site copy)', () => {
+    const NOW = Date.UTC(2026, 8, 28, 12);
+    const DAY = 24 * 60 * 60 * 1000;
+
+    // content scripts cannot import scout-core.js, so common.js carries a copy.
+    // The same inputs must read the same way on a site and in Scout.
+    it('parses listing dates exactly as scout-core.js does', () => {
+        const inputs = [
+            null, '', 1790000000, '1790000000', '1790000000000', '123', 0, -5,
+            'just now', 'today', 'yesterday', '3 days ago', 'an hour ago', '2h ago', '5 mins ago',
+            'about 2 weeks ago', 'a month ago', '1 yr ago', '4 fortnights ago',
+            '2026-09-01', 'Sep 26, 2026', '2099-01-01', '1999-01-01', 'Remnant 2020', '620.5',
+        ];
+        for (const input of inputs) {
+            expect(parseListedDate(input, NOW), String(input)).toBe(coreParseListedDate(input, NOW));
+        }
+    });
+
+    it('judges the window exactly as scout-core.js does', () => {
+        for (const [listedAt, days] of [[null, 7], [NOW - 3 * DAY, 7], [NOW - 8 * DAY, 7], [NOW - 400 * DAY, 0]]) {
+            expect(isListedWithin(listedAt, days, NOW)).toBe(coreIsListedWithin(listedAt, days, NOW));
+        }
+    });
+
+    it('reads the stored setting, treating anything odd as "any age"', () => {
+        expect(maxListedDaysSetting(7)).toBe(7);
+        expect(maxListedDaysSetting('14')).toBe(14);
+        expect(maxListedDaysSetting(undefined)).toBe(0);
+        expect(maxListedDaysSetting('')).toBe(0);
+        expect(maxListedDaysSetting(-1)).toBe(0);
     });
 });

@@ -2,12 +2,12 @@ const SETTINGS_KEYS = [
     'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
     'scoutPreflight', 'scoutOpenInBackground',
     'wowprogressEnabled', 'openWarcraftLogsTab', 'minIlvl', 'maxIlvl', 'selectedRegions', 'guildFilter',
-    'wpWclEnabled',
+    'wpMaxListedDays', 'wpWclEnabled',
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
-    'rioMinIlvl', 'rioSelectedRegions', 'rioSelectedRoles',
+    'rioMinIlvl', 'rioSelectedRegions', 'rioSelectedRoles', 'rioMaxListedDays',
     'rioWclEnabled',
     'guildsofwowEnabled', 'gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedRoles',
-    'gowWclEnabled',
+    'gowMaxListedDays', 'gowWclEnabled',
 ];
 
 const SITE_PANEL_MAP = {
@@ -60,6 +60,7 @@ function applySettings(data) {
     document.getElementById('q-minIlvl').value = data.minIlvl || '';
     document.getElementById('q-maxIlvl').value = data.maxIlvl || '';
     document.getElementById('q-guildFilter').value = data.guildFilter ?? 'any';
+    setListedDays('q-wpMaxListedDays', data.wpMaxListedDays);
     document.getElementById('q-openWarcraftLogsTab').checked = data.openWarcraftLogsTab !== false;
     document.getElementById('q-wpWclEnabled').checked = !!data.wpWclEnabled;
 
@@ -73,6 +74,7 @@ function applySettings(data) {
     document.getElementById('q-hideRaiderIoAds').checked = data.hideRaiderIoAds !== false;
     document.getElementById('q-rioWclEnabled').checked = !!data.rioWclEnabled;
     document.getElementById('q-rioMinIlvl').value = data.rioMinIlvl || '';
+    setListedDays('q-rioMaxListedDays', data.rioMaxListedDays);
 
     const savedRioRegions = data.rioSelectedRegions ?? [];
     document.querySelectorAll('.q-rioRegionFilter').forEach(cb => {
@@ -89,11 +91,21 @@ function applySettings(data) {
     document.getElementById('q-gowMinIlvl').value = data.gowMinIlvl || '';
     document.getElementById('q-gowMinMythicKills').value = data.gowMinMythicKills || '';
     document.getElementById('q-gowMinMythicPlusScore').value = data.gowMinMythicPlusScore || '';
+    setListedDays('q-gowMaxListedDays', data.gowMaxListedDays);
 
     const savedRoles = data.gowSelectedRoles ?? [];
     document.querySelectorAll('.q-roleFilter').forEach(cb => {
         cb.checked = savedRoles.includes(cb.value);
     });
+}
+
+// A stored day count that is not one of the offered choices (written by a
+// future version, or by hand) would leave the <select> blank and then be saved
+// back as 0 — so fall back to "any age" explicitly rather than by accident.
+function setListedDays(id, value) {
+    const select = document.getElementById(id);
+    const wanted = String(parseInt(value, 10) || '');
+    select.value = Array.from(select.options).some(o => o.value === wanted) ? wanted : '';
 }
 
 let saveTimer = null;
@@ -135,6 +147,7 @@ function saveAll() {
         maxIlvl: parseFloat(document.getElementById('q-maxIlvl').value) || 0,
         selectedRegions,
         guildFilter: document.getElementById('q-guildFilter').value,
+        wpMaxListedDays: parseInt(document.getElementById('q-wpMaxListedDays').value) || 0,
 
         raiderioEnabled: document.getElementById('q-raiderioEnabled').checked,
         openWarcraftLogsFromRaiderIO: document.getElementById('q-openWarcraftLogsFromRaiderIO').checked,
@@ -142,6 +155,7 @@ function saveAll() {
         rioMinIlvl: parseFloat(document.getElementById('q-rioMinIlvl').value) || 0,
         rioSelectedRegions,
         rioSelectedRoles,
+        rioMaxListedDays: parseInt(document.getElementById('q-rioMaxListedDays').value) || 0,
         rioWclEnabled: document.getElementById('q-rioWclEnabled').checked,
 
         guildsofwowEnabled: document.getElementById('q-guildsofwowEnabled').checked,
@@ -149,6 +163,7 @@ function saveAll() {
         gowMinMythicKills: parseInt(document.getElementById('q-gowMinMythicKills').value) || 0,
         gowMinMythicPlusScore: parseInt(document.getElementById('q-gowMinMythicPlusScore').value) || 0,
         gowSelectedRoles,
+        gowMaxListedDays: parseInt(document.getElementById('q-gowMaxListedDays').value) || 0,
         gowWclEnabled: document.getElementById('q-gowWclEnabled').checked,
     }, showSaved);
 }
