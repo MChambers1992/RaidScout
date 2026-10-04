@@ -572,6 +572,7 @@ describe('listed-within filter (site copy)', () => {
             null, '', 1790000000, '1790000000', '1790000000000', '123', 0, -5,
             'just now', 'today', 'yesterday', '3 days ago', 'an hour ago', '2h ago', '5 mins ago',
             'about 2 weeks ago', 'a month ago', '1 yr ago', '4 fortnights ago',
+            '3d', '2w', '5h', '12m', '3 days', 'a day', 'ad', 'am',
             '2026-09-01', 'Sep 26, 2026', '2099-01-01', '1999-01-01', 'Remnant 2020', '620.5',
         ];
         for (const input of inputs) {

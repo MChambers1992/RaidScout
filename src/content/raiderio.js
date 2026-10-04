@@ -188,6 +188,8 @@ function getRowData(row) {
     const role = roleForSpec(spec);
 
     // cells[5] is the "Published" column — when the recruitment profile went up.
+    // It holds a bare age ("3d", "2w"); the exact date is only in a hover tooltip
+    // rendered into document.body, so parseListedDate() works backwards from it.
     const listed = readListedDate(cells[5], { cellText: true });
 
     return { playerClass, region, ilvl: isNaN(ilvl) ? null : ilvl, role, spec, listed };

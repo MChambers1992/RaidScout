@@ -812,6 +812,23 @@ describe('parseListedDate', () => {
         expect(parseListedDate('today', NOW)).toBe(NOW);
     });
 
+    it('works backwards from the bare age in Raider.IO\'s Published column', () => {
+        // Raider.IO prints only the largest unit and no "ago": "3d", "2w", "5h".
+        expect(parseListedDate('3d', NOW)).toBe(NOW - 3 * DAY);
+        expect(parseListedDate('2w', NOW)).toBe(NOW - 14 * DAY);
+        expect(parseListedDate('5h', NOW)).toBe(NOW - 5 * HOUR);
+        expect(parseListedDate('12m', NOW)).toBe(NOW - 12 * 60 * 1000);
+        expect(parseListedDate('3 days', NOW)).toBe(NOW - 3 * DAY);
+        expect(parseListedDate('1 week', NOW)).toBe(NOW - 7 * DAY);
+        expect(parseListedDate('a day', NOW)).toBe(NOW - DAY);
+    });
+
+    it('does not read short words as a one-unit age', () => {
+        for (const value of ['ad', 'am', 'as', 'one', '3']) {
+            expect(parseListedDate(value, NOW), value).toBeNull();
+        }
+    });
+
     it('returns null rather than guessing', () => {
         // A missing date sorts last; an invented "now" would float a stale
         // listing to the top of the sort that exists to push it down.

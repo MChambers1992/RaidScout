@@ -185,11 +185,15 @@ export function parseListedDate(value, now = Date.now()) {
     if (text === 'today')     return now;
     if (text === 'yesterday') return now - RELATIVE_UNITS_MS.day;
 
-    // "3 days ago", "an hour ago", "a month ago", "2h ago", "5 mins ago"
-    const rel = text.match(/^(?:about\s+|over\s+|almost\s+)?(\d+|an?|one)\s*([a-z]+?)s?\s+ago$/);
+    // "3 days ago", "an hour ago", "a month ago", "2h ago", "5 mins ago" — and the
+    // same without "ago": Raider.IO's Published column prints a bare age ("3d",
+    // "2w") through its short-duration formatter, which only ever names the
+    // largest unit, so working backwards from it is exact to that unit. A word
+    // count needs a space after it so "ad" or "am" cannot read as "1 d"/"1 m".
+    const rel = text.match(/^(?:about\s+|over\s+|almost\s+)?(?:(\d+)\s*|(an?|one)\s+)([a-z]+?)s?(?:\s+ago)?$/);
     if (rel) {
-        const count = /^\d+$/.test(rel[1]) ? parseInt(rel[1], 10) : 1;
-        const unit  = RELATIVE_UNITS_MS[rel[2]] ? rel[2] : RELATIVE_ALIASES[rel[2]];
+        const count = rel[1] !== undefined ? parseInt(rel[1], 10) : 1;
+        const unit  = RELATIVE_UNITS_MS[rel[3]] ? rel[3] : RELATIVE_ALIASES[rel[3]];
         if (unit) return now - count * RELATIVE_UNITS_MS[unit];
         return null;
     }

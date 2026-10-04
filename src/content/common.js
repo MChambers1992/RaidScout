@@ -522,10 +522,11 @@ function parseListedDate(value, now = Date.now()) {
     if (text === 'today')     return now;
     if (text === 'yesterday') return now - LISTED_UNITS_MS.day;
 
-    const rel = text.match(/^(?:about\s+|over\s+|almost\s+)?(\d+|an?|one)\s*([a-z]+?)s?\s+ago$/);
+    // "ago" is optional: Raider.IO's Published column prints a bare "3d" / "2w".
+    const rel = text.match(/^(?:about\s+|over\s+|almost\s+)?(?:(\d+)\s*|(an?|one)\s+)([a-z]+?)s?(?:\s+ago)?$/);
     if (rel) {
-        const count = /^\d+$/.test(rel[1]) ? parseInt(rel[1], 10) : 1;
-        const unit  = LISTED_UNITS_MS[rel[2]] ? rel[2] : LISTED_UNIT_ALIASES[rel[2]];
+        const count = rel[1] !== undefined ? parseInt(rel[1], 10) : 1;
+        const unit  = LISTED_UNITS_MS[rel[3]] ? rel[3] : LISTED_UNIT_ALIASES[rel[3]];
         return unit ? now - count * LISTED_UNITS_MS[unit] : null;
     }
 
