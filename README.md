@@ -98,8 +98,8 @@ Full details: **[docs/scout.md](docs/scout.md)**
 |---|---|
 | **WoWProgress** | Filters the LFG table by region, item level range, class and guild status. Auto-opens WarcraftLogs from character pages |
 | **Raider.IO** | Filters guild recruitment search by item level, region, role and class. Enforces sort-by-newest, hides ads, auto-opens WarcraftLogs |
-| **Guilds of WoW** | Filters recruit cards by item level, mythic kills, M+ score, class and role |
-| **WarcraftLogs** | Auto-closes tabs for below-threshold candidates; filters the recruitment search by parse, region, class and mythic kills |
+| **Guilds of WoW** | Filters recruit cards by item level, mythic kill range (min and max), M+ score, class and role |
+| **WarcraftLogs** | Auto-closes tabs for below-threshold candidates; filters the recruitment search by parse, region, class and mythic kill range |
 
 All three listing sites also support proactive parse filtering and inline badges
 once you've [set up an API key](docs/warcraftlogs-api.md).

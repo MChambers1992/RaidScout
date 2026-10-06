@@ -144,7 +144,7 @@ is kept, the same way a minimum never rejects a stat the site didn't report. The
 of how many are active, and the panel opens by itself if a filter is still set
 from a previous session.
 
-![Scout's filter panel, with three filters applied](screenshots/scout-filters.png)
+![Scout's filter panel with four filters applied: healers, EU, M+ 2700 and above, and at most 6 mythic kills](screenshots/scout-filters.png)
 
 In a narrow window the table drops its sticky header rather than tearing it
 away from the rows beneath — all eleven columns stay readable and the page

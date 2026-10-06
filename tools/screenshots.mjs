@@ -279,13 +279,16 @@ await shot('options-wowprogress.png', `file://${ROOT}/src/options/options.html`,
         prep: async (page) => {
             await page.click('#toggleFilters');
             await page.waitForTimeout(200);
-            // Three filters, matching the caption in docs/scout.md. The chip's
+            // Four filters — including a mythic-kill cap — matching the caption
+            // in docs/scout.md. The chip's
             // checkbox is visually hidden by design (only the box is restyled),
             // so click the label — which is what a user clicks too.
             await page.click('#filterRoles .filter-chip:has(input[value="healer"])');
             await page.click('#filterRegions .filter-chip:has(input[value="eu"])');
             await page.fill('#filterMinMplus', '2700');
             await page.dispatchEvent('#filterMinMplus', 'input');
+            await page.fill('#filterMaxMythic', '6');
+            await page.dispatchEvent('#filterMaxMythic', 'input');
             await page.waitForTimeout(300);
         },
     });
