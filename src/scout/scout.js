@@ -15,7 +15,7 @@ import {
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency, classIconUrl,
     formatMythicProgress, formatListedAge,
     matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS, summarizeScoreErrors,
-    absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS,
+    absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS, realmLabel,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS, isNewestFirst } from './sources.js';
 import { fetchProfileFields, applyEnrichment, ENRICH_ORIGIN } from './enrich.js';
@@ -107,6 +107,7 @@ const el = {
     minIlvl:      document.getElementById('filterMinIlvl'),
     minMplus:     document.getElementById('filterMinMplus'),
     minMythic:    document.getElementById('filterMinMythic'),
+    maxMythic:    document.getElementById('filterMaxMythic'),
     maxAge:       document.getElementById('filterMaxAge'),
     loadMore:     document.getElementById('loadMore'),
     loadMoreBtn:  document.getElementById('loadMoreBtn'),
@@ -746,12 +747,13 @@ function wclBadgeFor(candidate) {
 // glitch, and overwriting the pill silently would throw it away.
 function roleCellHtml(candidate) {
     if (!candidate.role) return '<span class="muted">—</span>';
+    const label = ROLE_LABELS[candidate.role] || candidate.role;
     if (!candidate.listedRole) {
-        return `<span class="role-pill role-${escapeHtml(candidate.role)}">${escapeHtml(candidate.role)}</span>`;
+        return `<span class="role-pill role-${escapeHtml(candidate.role)}">${escapeHtml(label)}</span>`;
     }
     const title = `Listed as ${candidate.listedRole} — WarcraftLogs ranks them as ${candidate.role}`;
     return `<span class="role-pill role-${escapeHtml(candidate.role)} role-pill--resolved" `
-         + `title="${escapeHtml(title)}">${escapeHtml(candidate.role)}</span>`;
+         + `title="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
 }
 
 // The class cell carries Blizzard's class icon ahead of the name. The icon is
@@ -813,10 +815,14 @@ function buildRow(candidate) {
 
     const links = profileLinks(candidate);
 
+    // Realm and region sit under the name rather than in two columns of their
+    // own: they identify the character rather than describe them, and folding
+    // them in gave the stat columns room to breathe.
     tr.innerHTML = `
-        <td class="name-cell"><span class="char-name class-${escapeHtml(candidate.playerClass || '')}">${escapeHtml(candidate.name)}</span></td>
-        <td>${escapeHtml(candidate.realm)}</td>
-        <td>${escapeHtml(candidate.region.toUpperCase())}</td>
+        <td class="name-cell">
+            <span class="char-name class-${escapeHtml(candidate.playerClass || '')}">${escapeHtml(candidate.name)}</span>
+            <span class="char-realm">${escapeHtml(realmLabel(candidate.realm))}<span class="region-tag">${escapeHtml(candidate.region.toUpperCase())}</span></span>
+        </td>
         <td class="class-col">${classCellHtml(candidate)}</td>
         <td class="role-cell">${roleCellHtml(candidate)}</td>
         <td class="num ilvl-cell">${numCell(candidate.ilvl)}</td>
@@ -826,9 +832,9 @@ function buildRow(candidate) {
         <td class="num listed-cell">${listedCell(candidate)}</td>
         <td class="sources-cell">${sourcesCellHtml(candidate)}</td>
         <td class="row-links">
-            <a href="${escapeHtml(links.warcraftlogs)}" target="_blank" rel="noreferrer">WCL</a>
-            <a href="${escapeHtml(links.raiderio)}" target="_blank" rel="noreferrer">RIO</a>
-            ${links.wowprogress ? `<a href="${escapeHtml(links.wowprogress)}" target="_blank" rel="noreferrer">WP</a>` : ''}
+            <a href="${escapeHtml(links.warcraftlogs)}" target="_blank" rel="noreferrer" title="WarcraftLogs profile">WCL</a>
+            <a href="${escapeHtml(links.raiderio)}" target="_blank" rel="noreferrer" title="Raider.IO profile">RIO</a>
+            ${links.wowprogress ? `<a href="${escapeHtml(links.wowprogress)}" target="_blank" rel="noreferrer" title="WoWProgress profile">WP</a>` : ''}
         </td>`;
 
     tr.querySelector('.wcl-cell').appendChild(wclBadgeFor(candidate));
@@ -963,6 +969,7 @@ function syncFilterControls() {
     el.minIlvl.value   = f.minIlvl   || '';
     el.minMplus.value  = f.minMplus  || '';
     el.minMythic.value = f.minMythic || '';
+    el.maxMythic.value = f.maxMythic || '';
     // A remembered value that is not an offered choice would leave the select
     // blank while still filtering, so it is shown as the nearest thing: added.
     const age = f.maxAgeDays ? String(f.maxAgeDays) : '';
@@ -986,6 +993,7 @@ function readFilterControls() {
         minIlvl:     parseFloat(el.minIlvl.value),
         minMplus:    parseFloat(el.minMplus.value),
         minMythic:   parseFloat(el.minMythic.value),
+        maxMythic:   parseFloat(el.maxMythic.value),
         maxAgeDays:  parseInt(el.maxAge.value, 10),
     });
 }

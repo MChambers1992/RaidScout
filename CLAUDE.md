@@ -181,6 +181,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `wclSearchProactive` | boolean | `false` | Also apply the proactive API scoring flow (role-aware thresholds + inline badges) to recruitment search results, on top of the flat `wclSearchParseThreshold` filter above. Requires API credentials |
 | `wclSelectedRegions` | string[] | `[]` | Filter recruitment search by region — empty shows all |
 | `wclMinMythicKills` | number | `0` | Min mythic kills for recruitment search (0 = no minimum) |
+| `wclMaxMythicKills` | number | `0` | Max mythic kills for recruitment search (0 = no maximum; quirk 63) |
 | `wclSelectedClasses` | string[] | `[]` | Filter recruitment search by class — empty shows all |
 | `wclClientId` | string | `""` | WarcraftLogs v2 API client ID (for proactive scoring) — stored in sync |
 | `wclCacheTtlHours` | number | `6` | Score cache TTL in hours — stored in sync |
@@ -226,6 +227,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `guildsofwowEnabled` | boolean | `true` | Enable/disable all Guilds of WoW features |
 | `gowMinIlvl` | number | `0` | Minimum item level (0 = no minimum) |
 | `gowMinMythicKills` | number | `0` | Minimum current-tier mythic kills (0 = no minimum) |
+| `gowMaxMythicKills` | number | `0` | Maximum current-tier mythic kills (0 = no maximum; quirk 63) |
 | `gowMinMythicPlusScore` | number | `0` | Minimum M+ score (0 = no minimum) |
 | `gowMaxListedDays` | number | `0` | Hide recruit cards listed longer ago than N days (0 = any age; quirk 61) |
 | `gowSelectedClasses` | string[] | `[]` | Allowed classes — empty array shows all |
@@ -245,7 +247,7 @@ All stored in `chrome.storage.sync`. Defaults shown are what the extension uses 
 | `scoutUrlWowprogress` | string | `""` | Listing URL override — blank uses `DEFAULT_SOURCE_URLS` |
 | `scoutUrlRaiderio` | string | `""` | Listing URL override |
 | `scoutUrlGuildsofwow` | string | `""` | Listing URL override |
-| `scoutFilters` | object | all empty | Remembered Scout table filters: `{roles, classes, regions, sources, minIlvl, minMplus, minMythic, maxAgeDays, multiSource}`. Empty lists and zero minimums mean "no opinion" — see quirk 36 |
+| `scoutFilters` | object | all empty | Remembered Scout table filters: `{roles, classes, regions, sources, minIlvl, minMplus, minMythic, maxMythic, maxAgeDays, multiSource}`. Empty lists and zero minimums mean "no opinion" — see quirk 36 |
 | `scoutSortKey` | string | `"wclMedian"` | Remembered Scout sort column; ignored unless it matches a `th[data-sort]` |
 | `scoutSortDir` | string | `"desc"` | Remembered Scout sort direction (`"asc"` / `"desc"`) |
 
@@ -432,3 +434,7 @@ RaidScout/
 61. **"Listed within" keeps what it cannot date.** The age filter exists in Scout (`scoutFilters.maxAgeDays`) and per site (`wpMaxListedDays`, `rioMaxListedDays`, `gowMaxListedDays`), and every one of them keeps a row whose date is unreadable — the WoWProgress and GoW date markup is unverified (quirk 59), so "unknown" treated as "too old" would empty a source the day a selector drifts. The same rule as quirk 36's minimums. Content scripts cannot import `scout-core.js`, so `common.js` carries copies of `parseListedDate()` and `isListedWithin()`; `tests/common.test.js` runs both over one input table and asserts they agree. The choices offered (1/3/7/14/30/90 days) are `LISTED_AGE_OPTIONS`; the options page and popup spell them out in HTML, with `""` for "any age" like `wclDifficulty`.
 
 62. **Scout's "Load more" pages each source, and trusts nothing about the page parameter it cannot verify.** `harvestRound()` in `scout.js` serves both the first run (page 0 everywhere) and Load more; `state.paging[source]` carries `{ nextPage, exhausted, ageLimit, seen, found }`, and `pageUrl()` in `sources.js` builds the URL — WoWProgress's known `next_page`, and a plain `page` parameter for Raider.IO and GoW that could not be checked against the live sites. So the loop defends itself: a page whose rows this source already returned is skipped once (absorbing a 0- vs 1-based guess), a second repeat ends the source with "its page parameter may not work", a page with no rows at all (`rowsSeen`, now part of every harvest response) ends it, and a tab page that fails to render past page one is read as the end of the listing rather than raised as a failure. On a newest-first listing (`isNewestFirst()`, read from the URL's own sort) one row older than the "listed within" filter proves every later page is older still, so paging stops there — and `reopenAgeLimitedSources()` undoes that if the filter is widened. New rows are folded in by `absorbCandidates()` in `scout-core.js`, which updates known candidates *in place* (the row index and both scoring passes hold them by reference) and never lets a later page overwrite a role WarcraftLogs already resolved (quirk 33). The per-run cap applies per batch; candidates over it wait in `state.overflow` and are served first, since they cost no further harvest. It is a button rather than infinite scroll because each new candidate is an API call.
+
+63. **Mythic kills can be capped, not just floored.** A raider already at 8/8 is unlikely to join a guild on 4/8, while a 5/8 one might, so Scout (`scoutFilters.maxMythic`), Guilds of WoW (`gowMaxMythicKills`) and the WCL recruitment search (`wclMaxMythicKills`) take a maximum alongside the minimum. `passesMaximum()` in `scout-core.js` mirrors `passesMinimum()`: 0 means no cap, the bound is inclusive, and an unreported kill count is kept — the same rule as quirk 36, since a missing number is not evidence of being over the cap. The WCL recruitment reader returns `0` for an unreadable progress bar, which also passes any cap.
+
+64. **Scout's table is one card on shared tokens.** `scout.css` reads every colour from `shared.css` and sizes every header/toolbar/filter control from `--control-h`, so mixed buttons, selects and inputs share a baseline. Realm and region moved under the character name (`realmLabel()` in `scout-core.js` turns the slug back into "Tarren Mill" for display only; keys and links still use the slug), which dropped two columns, so the `realm`/`region` sort keys no longer have headers — a stored `scoutSortKey` naming either falls back to the default through `restoreFilters()`'s header check. The table draws its own rounded border with `border-collapse: separate` rather than sitting in an `overflow: hidden` wrapper, because a wrapper with overflow becomes the scroll container and breaks the sticky header (quirk 34).

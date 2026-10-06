@@ -592,6 +592,7 @@ export const DEFAULT_FILTERS = {
     minIlvl:     0,
     minMplus:    0,
     minMythic:   0,
+    maxMythic:   0,    // cap on mythic kills; 0 = no cap
     maxAgeDays:  0,    // listed within N days; 0 = any age
     multiSource: false,
 };
@@ -617,6 +618,7 @@ export function normalizeFilters(raw) {
         minIlvl:     num(input.minIlvl),
         minMplus:    num(input.minMplus),
         minMythic:   num(input.minMythic),
+        maxMythic:   num(input.maxMythic),
         maxAgeDays:  num(input.maxAgeDays),
         multiSource: input.multiSource === true,
     };
@@ -631,6 +633,7 @@ export function activeFilterCount(filters) {
          + (f.minIlvl   > 0 ? 1 : 0)
          + (f.minMplus  > 0 ? 1 : 0)
          + (f.minMythic > 0 ? 1 : 0)
+         + (f.maxMythic > 0 ? 1 : 0)
          + (f.maxAgeDays > 0 ? 1 : 0)
          + (f.multiSource ? 1 : 0);
 }
@@ -646,6 +649,15 @@ export function hasActiveFilters(filters) {
 function passesMinimum(value, minimum) {
     if (!(minimum > 0)) return true;
     return value === null || value === undefined || value >= minimum;
+}
+
+// The mirror image, for the one stat worth capping: an 8/8 raider is unlikely to
+// join a guild on 4/8, while a 5/8 one might, so an officer can exclude the
+// overqualified. Same rule for a missing value — an unreported kill count is not
+// proof of being over the cap.
+function passesMaximum(value, maximum) {
+    if (!(maximum > 0)) return true;
+    return value === null || value === undefined || value <= maximum;
 }
 
 export function matchesFilters(candidate, filters, now = Date.now()) {
@@ -666,6 +678,7 @@ export function matchesFilters(candidate, filters, now = Date.now()) {
     if (!passesMinimum(candidate.ilvl,        f.minIlvl))   return false;
     if (!passesMinimum(candidate.mplusScore,  f.minMplus))  return false;
     if (!passesMinimum(candidate.mythicKills, f.minMythic)) return false;
+    if (!passesMaximum(candidate.mythicKills, f.maxMythic)) return false;
     if (!isListedWithin(candidate.listedAt, f.maxAgeDays, now)) return false;
 
     return true;
@@ -711,6 +724,17 @@ export function reachedAgeLimit(candidates, maxDays, now = Date.now()) {
     if (!(maxDays > 0)) return false;
     return candidates.some(c => c?.listedAt !== null && c?.listedAt !== undefined &&
                                 now - c.listedAt > maxDays * DAY_MS);
+}
+
+// "tarren-mill" → "Tarren Mill" for display. The slug is what keys, links and
+// de-duplication use (quirk 25); this is only the label under a name. Apostrophes
+// were dropped by slugging and are not guessed back.
+export function realmLabel(slug) {
+    return String(slug || '')
+        .split('-')
+        .filter(Boolean)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
 }
 
 export function profileLinks(candidate) {

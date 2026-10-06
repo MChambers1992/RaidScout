@@ -10,8 +10,11 @@
 <body>
     <header class="scout-header">
         <div class="scout-title">
-            <h1>Scout</h1>
-            <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+            <img class="scout-logo" src="../../img/logo-48.png" alt="" width="36" height="36">
+            <div>
+                <h1>Scout</h1>
+                <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+            </div>
         </div>
         <div class="scout-actions">
             <button id="runScout" class="primary">🔎 Run scout</button>
@@ -29,8 +32,10 @@
     </header>
 
     <section class="scout-progress" id="scoutProgress">
-        <div class="source-chips" id="sourceChips"></div>
-        <div class="progress-line" id="progressLine" role="status" aria-live="polite">Ready.</div>
+        <div class="progress-row">
+            <div class="source-chips" id="sourceChips"></div>
+            <div class="progress-line" id="progressLine" role="status" aria-live="polite">Ready.</div>
+        </div>
         <!-- Opened from the Notices button in the header. aria-live is kept so a
              screen reader still hears a new notice arrive even while collapsed;
              the count on the button is the visual equivalent. -->
@@ -38,8 +43,9 @@
     </section>
 
     <section class="scout-toolbar" id="scoutToolbar" hidden>
+        <div class="toolbar-group">
         <input type="search" id="searchBox" aria-label="Filter candidates by name, realm or class"
-               placeholder="Filter by name, realm, class…" autocomplete="off">
+               placeholder="Search name, realm, class…" autocomplete="off">
         <label class="inline-check" title="Hides candidates whose parse is below your thresholds, and candidates WarcraftLogs has no logs for. Candidates that could not be scored are always shown.">
             <input type="checkbox" id="hideBelowThresholds">
             Hide below thresholds &amp; no logs
@@ -52,13 +58,16 @@
                 <option value="5">Mythic only</option>
             </select>
         </label>
-        <span class="result-count" id="resultCount" role="status" aria-live="polite"></span>
+        </div>
         <span class="spacer"></span>
+        <div class="toolbar-group">
+        <span class="result-count" id="resultCount" role="status" aria-live="polite"></span>
         <button id="toggleFilters" class="ghost" aria-expanded="false" aria-controls="scoutFilters">
             ⛃ Filters<span class="filter-count" id="filterCount" hidden></span>
         </button>
         <button id="copyNames"  class="ghost" title="Copy Name-Realm for every visible row">📋 Copy names</button>
         <button id="exportCsv"  class="ghost">⬇ CSV</button>
+        </div>
     </section>
 
     <!-- Structured filters. Persisted, so they survive a reload and the next
@@ -91,17 +100,25 @@
             </fieldset>
 
             <fieldset class="filter-group">
-                <legend>Minimums</legend>
+                <legend>Stats</legend>
                 <div class="filter-numbers">
-                    <label>Item level
+                    <label>Min item level
                         <input type="number" id="filterMinIlvl" min="0" step="1" placeholder="any">
                     </label>
-                    <label>M+ score
+                    <label>Min M+ score
                         <input type="number" id="filterMinMplus" min="0" step="10" placeholder="any">
                     </label>
-                    <label>Mythic kills
-                        <input type="number" id="filterMinMythic" min="0" step="1" placeholder="any">
-                    </label>
+                    <!-- A range, not just a minimum: an 8/8 raider is unlikely to
+                         join a 4/8 guild, so an officer can cap the kill count
+                         at what their own progress can hold. -->
+                    <div class="filter-range" role="group" aria-labelledby="mythicRangeLabel">
+                        <span id="mythicRangeLabel">Mythic kills</span>
+                        <div class="range-pair">
+                            <input type="number" id="filterMinMythic" min="0" max="99" step="1" placeholder="min" aria-label="Minimum mythic kills">
+                            <span class="range-sep" aria-hidden="true">–</span>
+                            <input type="number" id="filterMaxMythic" min="0" max="99" step="1" placeholder="max" aria-label="Maximum mythic kills">
+                        </div>
+                    </div>
                 </div>
                 <p class="filter-note">A candidate is kept when the site never reported that stat.</p>
             </fieldset>
@@ -120,12 +137,11 @@
     </section>
 
     <section class="scout-results">
+        <div class="table-card">
         <table id="resultsTable" aria-label="Scouted candidates" hidden>
             <thead>
                 <tr>
                     <th data-sort="name" tabindex="0" role="columnheader" aria-sort="none">Character</th>
-                    <th data-sort="realm" tabindex="0" role="columnheader" aria-sort="none">Realm</th>
-                    <th data-sort="region" tabindex="0" role="columnheader" aria-sort="none">Region</th>
                     <th data-sort="playerClass" tabindex="0" role="columnheader" aria-sort="none">Class</th>
                     <th data-sort="role" tabindex="0" role="columnheader" aria-sort="none">Role</th>
                     <th data-sort="ilvl" class="num" tabindex="0" role="columnheader" aria-sort="none">ilvl</th>
@@ -134,11 +150,12 @@
                     <th data-sort="wclMedian" class="num" tabindex="0" role="columnheader" aria-sort="none" title="Sorts mythic parses first, then heroic, each by median parse — the two are not on one scale. M / H on a badge says which difficulty it shows.">WCL parse</th>
                     <th data-sort="listedAt" class="num" tabindex="0" role="columnheader" aria-sort="none" title="When they posted or last bumped their looking-for-guild listing (the most recent across sites)">Listed</th>
                     <th data-sort="sources" tabindex="0" role="columnheader" aria-sort="none" title="Which recruitment sites this player is advertising on">Advertising on</th>
-                    <th>Links</th>
+                    <th>Profiles</th>
                 </tr>
             </thead>
             <tbody id="resultsBody"></tbody>
         </table>
+        </div>
         <div class="empty-state" id="emptyState" hidden></div>
         <!-- Sits at the end of the table, where an officer who has read every
              row arrives. A button, not infinite scroll: each new candidate is a

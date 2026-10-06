@@ -136,7 +136,9 @@ your behalf any more.
 ## Narrowing the results
 
 The **Filters** button opens role, class, region and source filters, minimums
-for item level, M+ score and mythic kills, and **Listed within** — hide anyone
+for item level and M+ score, a **mythic kills** range — set a maximum to leave
+out raiders already further than your guild, since an 8/8 player is unlikely to
+join a 4/8 team but a 5/8 one might — and **Listed within** — hide anyone
 whose listing is older than 24 hours to 90 days. A listing with no readable date
 is kept, the same way a minimum never rejects a stat the site didn't report. The button carries a count
 of how many are active, and the panel opens by itself if a filter is still set

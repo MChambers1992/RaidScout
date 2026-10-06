@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
     slugRealm, makeCandidateKey, normalizeCandidate, mergeCandidate, mergeCandidates,
     passesWowProgressFilters, sortCandidates, matchesQuery, profileLinks,
-    toCsv, toWhisperList, runWithConcurrency, hasNoLogs, isScored, classLabel,
+    toCsv, toWhisperList, realmLabel, runWithConcurrency, hasNoLogs, isScored, classLabel,
     matchesFilters, normalizeFilters, activeFilterCount, hasActiveFilters, DEFAULT_FILTERS,
     normalizeClassKey, roleFromClass, classIconUrl, DPS_ONLY_CLASSES,
     describeScoreError, summarizeScoreErrors, SOURCE_IDS, RETIRED_SOURCE_IDS, SOURCE_META,
@@ -524,6 +524,24 @@ describe('matchesFilters', () => {
         expect(matchesFilters(noStats, { minMplus: 3000, minMythic: 9, minIlvl: 700 })).toBe(true);
     });
 
+    it('caps mythic kills, inclusive, and keeps an unreported count', () => {
+        // An 8/8 raider is unlikely to join a 4/8 guild; a 5/8 one might.
+        expect(matchesFilters(candidate({ mythicKills: 5 }), { maxMythic: 5 })).toBe(true);
+        expect(matchesFilters(candidate({ mythicKills: 8 }), { maxMythic: 5 })).toBe(false);
+        expect(matchesFilters(candidate({ mythicKills: 0 }), { maxMythic: 5 })).toBe(true);
+        expect(matchesFilters(candidate({ mythicKills: null }), { maxMythic: 5 })).toBe(true);
+        expect(matchesFilters(candidate({ mythicKills: 6 }), { minMythic: 4, maxMythic: 6 })).toBe(true);
+        expect(matchesFilters(candidate({ mythicKills: 3 }), { minMythic: 4, maxMythic: 6 })).toBe(false);
+    });
+
+    it('counts and normalises the mythic cap like any other number', () => {
+        expect(DEFAULT_FILTERS.maxMythic).toBe(0);
+        expect(activeFilterCount({ maxMythic: 6 })).toBe(1);
+        expect(normalizeFilters({ maxMythic: '7' }).maxMythic).toBe(7);
+        expect(normalizeFilters({ maxMythic: -1 }).maxMythic).toBe(0);
+        expect(normalizeFilters({}).maxMythic).toBe(0);
+    });
+
     it('filters by the sources a candidate was seen on', () => {
         expect(matchesFilters(candidate({ source: 'raiderio' }), { sources: ['raiderio'] })).toBe(true);
         expect(matchesFilters(candidate({ source: 'raiderio' }), { sources: ['guildsofwow'] })).toBe(false);
@@ -1013,5 +1031,14 @@ describe('absorbCandidates', () => {
         absorbCandidates([known], [make({ name: 'Thrall', role: 'dps' }, 'wowprogress')]);
         expect(known.role).toBe('healer');
         expect(known.wcl.best).toBe(80);
+    });
+});
+
+describe('realmLabel', () => {
+    it('turns a realm slug back into a readable name', () => {
+        expect(realmLabel('tarren-mill')).toBe('Tarren Mill');
+        expect(realmLabel('kazzak')).toBe('Kazzak');
+        expect(realmLabel('')).toBe('');
+        expect(realmLabel(null)).toBe('');
     });
 });

@@ -136,6 +136,7 @@ function filterRecruitmentResults(options) {
     const wclSelectedRegions = options.wclSelectedRegions  || [];
     const wclSelectedClasses = options.wclSelectedClasses  || [];
     const wclMinMythicKills  = options.wclMinMythicKills   || 0;
+    const wclMaxMythicKills  = options.wclMaxMythicKills   || 0;
 
     document.querySelectorAll('.recruitment-search-result').forEach(card => {
         // WCL-hidden cards stay hidden regardless of the flat threshold filter
@@ -152,6 +153,7 @@ function filterRecruitmentResults(options) {
         if (!hide && wclSelectedRegions.length > 0 && region    && !wclSelectedRegions.includes(region))    hide = true;
         if (!hide && wclSelectedClasses.length > 0 && charClass && !wclSelectedClasses.includes(charClass)) hide = true;
         if (!hide && wclMinMythicKills  > 0 && mythicKills < wclMinMythicKills) hide = true;
+        if (!hide && wclMaxMythicKills  > 0 && mythicKills > wclMaxMythicKills) hide = true;
 
         card.style.display = hide ? 'none' : '';
     });
@@ -239,7 +241,7 @@ function applyProactiveScoring(options) {
 
 function initRecruitmentFiltering() {
     const storageKeys = [
-        'wclSearchParseThreshold', 'wclSelectedRegions', 'wclSelectedClasses', 'wclMinMythicKills',
+        'wclSearchParseThreshold', 'wclSelectedRegions', 'wclSelectedClasses', 'wclMinMythicKills', 'wclMaxMythicKills',
         'wclSearchProactive', ...SHARED_WCL_KEYS,
     ];
 

@@ -176,9 +176,13 @@
                 </div>
             </div>
             <div class="option">
-                <label for="wclMinMythicKills">Min. Mythic Kills</label>
-                <input type="number" id="wclMinMythicKills" min="0" max="99" step="1" placeholder="e.g. 6">
-                <p class="hint">Hides recruits below this current-tier mythic kill count</p>
+                <label for="wclMinMythicKills">Mythic Kills</label>
+                <div class="range-inputs">
+                    <input type="number" id="wclMinMythicKills" min="0" max="99" step="1" placeholder="Min" aria-label="Minimum mythic kills">
+                    <span class="range-sep">–</span>
+                    <input type="number" id="wclMaxMythicKills" min="0" max="99" step="1" placeholder="Max" aria-label="Maximum mythic kills">
+                </div>
+                <p class="hint">Current-tier mythic boss kills. A maximum hides raiders already further than your guild — an 8/8 player is unlikely to join a 4/8 team.</p>
             </div>
             <div class="option-group">
                 <div class="option-group-header">
@@ -396,9 +400,13 @@
                 <input type="number" id="gowMinIlvl" min="0" step="1" placeholder="e.g. 280">
             </div>
             <div class="option">
-                <label for="gowMinMythicKills">Min. Mythic Kills</label>
-                <input type="number" id="gowMinMythicKills" min="0" max="99" step="1" placeholder="e.g. 6">
-                <p class="hint">Hides recruits below this current-tier mythic kill count</p>
+                <label for="gowMinMythicKills">Mythic Kills</label>
+                <div class="range-inputs">
+                    <input type="number" id="gowMinMythicKills" min="0" max="99" step="1" placeholder="Min" aria-label="Minimum mythic kills">
+                    <span class="range-sep">–</span>
+                    <input type="number" id="gowMaxMythicKills" min="0" max="99" step="1" placeholder="Max" aria-label="Maximum mythic kills">
+                </div>
+                <p class="hint">Current-tier mythic boss kills. A maximum hides raiders already further than your guild — an 8/8 player is unlikely to join a 4/8 team.</p>
             </div>
             <div class="option">
                 <label for="gowMinMythicPlusScore">Min. M+ Score</label>
