@@ -23,7 +23,7 @@ create a client.
 
 ## Step 2 — Enter credentials in RaidScout
 
-1. Click the RaidScout icon → **⚙ Full Settings**
+1. Click the RaidScout icon → **Full settings**
 2. Go to the **WarcraftLogs** tab
 3. Paste your **Client ID** and **Client Secret** into the API Credentials fields
 4. Click **Test connection** — you should see "✓ Connected successfully"
@@ -43,7 +43,7 @@ apply everywhere.
 1. Set **Min. Best %** and **Min. Median %** on the **DPS** row
 2. Optionally set separate values for **Healer** and **Tank** — see
    [Per-role thresholds](#per-role-thresholds) below
-3. On each site's tab, toggle on **Enable proactive WCL filtering**
+3. On each site's tab, toggle on **Filter by WarcraftLogs parse**
 4. Click **Save**
 
 ![The WoWProgress tab, with proactive filtering switched on](screenshots/options-wowprogress.png)

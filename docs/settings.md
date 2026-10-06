@@ -2,7 +2,7 @@
 
 [← Back to README](../README.md)
 
-Every setting in **⚙ Full Settings**, by tab. Blank defaults (`—`) mean the
+Every setting in **Full settings**, by tab. Blank defaults (`—`) mean the
 filter is off — a zero minimum excludes nobody.
 
 All settings sync across Chrome devices via Chrome Sync, **except** the
@@ -27,7 +27,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Open scouted tabs in the background | Off | Open WarcraftLogs tabs without switching to them |
 | Recruitment search parse filter | — | Minimum parse % on the WarcraftLogs recruitment search page |
 | Use role-aware API scoring (search) | Off | Also apply the full proactive scoring flow to recruitment search results, on top of the flat minimum above. Requires credentials |
-| Min mythic kills (WCL search) | — | Minimum current-tier mythic kill count on the recruitment search page |
+| Mythic kills (WCL search) | — | Minimum and maximum current-tier mythic kill count on the recruitment search page. A maximum hides raiders already further than your guild — an 8/8 player is unlikely to join a 4/8 team |
 | Region / Class filter (WCL search) | All | Narrow recruitment search results. Leave unchecked to show all |
 | Client ID | — | WarcraftLogs v2 API client ID (synced across devices) |
 | Client Secret | — | WarcraftLogs v2 API client secret (local only, never synced) |
@@ -47,7 +47,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Listed Within | Any age | Hide listings posted or last bumped longer ago than 24 hours / 3 days / a week / 2 weeks / 30 / 90 days. A listing whose date can't be read is kept |
 | Guild Status | Any | Filter by in a guild / not in a guild / any |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold players. Thresholds are set once in the **WarcraftLogs** tab |
+| Filter by WarcraftLogs parse | Off | Look up parse scores and hide below-threshold players. Thresholds are set once in the **WarcraftLogs** tab |
 
 ## Raider.IO tab
 
@@ -61,7 +61,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Region Filter | All | Show only selected regions (uncheck all for any) |
 | Role Filter | All | Show only Tank / Healer / DPS rows (uncheck all for any) |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold rows. Thresholds are set once in the **WarcraftLogs** tab |
+| Filter by WarcraftLogs parse | Off | Look up parse scores and hide below-threshold rows. Thresholds are set once in the **WarcraftLogs** tab |
 
 ## Guilds of WoW tab
 
@@ -69,12 +69,12 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 |---|---|---|
 | Enabled | On | Enable/disable all Guilds of WoW features |
 | Min Item Level | — | Hide recruit cards below this item level |
-| Min Mythic Kills | — | Hide recruits below this current-tier mythic kill count |
+| Mythic Kills | — | Hide recruits below the minimum or above the maximum current-tier mythic kill count. A card that shows no kill count is kept |
 | Min M+ Score | — | Hide recruits below this M+ score |
 | Listed Within | Any age | Hide listings posted or last bumped longer ago than 24 hours / 3 days / a week / 2 weeks / 30 / 90 days. A listing whose date can't be read is kept |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
 | Role Filter | All | Show only Tank / Healer / DPS cards (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold cards. Thresholds are set once in the **WarcraftLogs** tab |
+| Filter by WarcraftLogs parse | Off | Look up parse scores and hide below-threshold cards. Thresholds are set once in the **WarcraftLogs** tab |
 
 ## Scout tab
 
@@ -94,7 +94,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 
 The popup shows the most-used settings per site and **auto-saves** 400ms after
 you change anything — no Save button. Full Settings has everything and saves on
-an explicit **Save** click.
+an explicit **Save changes** click.
 
 The popup writes back every setting it read, including the ones it doesn't
 display (class filters, API keys), so using it never clobbers a selection you

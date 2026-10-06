@@ -112,33 +112,22 @@ await shot('popup.png', `file://${ROOT}/src/popup/popup.html`, { width: 420, hei
 // Options sections are cropped individually: the save bar is position:sticky and
 // would otherwise sit across the middle of a full-page capture.
 await shot('options-thresholds.png', `file://${ROOT}/src/options/options.html`, {
-    width: 900, height: 1400, sel: '#crop',
+    width: 980, height: 1400, sel: '#card-thresholds',
     prep: async (page) => {
         await page.click('.tab-btn[data-tab="warcraftlogs"]');
         await page.waitForTimeout(300);
-        await page.evaluate(() => {
-            const label = [...document.querySelectorAll('.subsection-label')]
-                .find(el => /Proactive Score Filter/i.test(el.textContent));
-            const grid = document.querySelector('.threshold-grid');
-            const crop = document.createElement('div');
-            crop.id = 'crop';
-            crop.style.cssText = 'padding:20px 24px;background:#2a2a2a;display:block;width:820px;box-sizing:border-box';
-            label.parentNode.insertBefore(crop, label);
-            crop.append(label, label.nextElementSibling, grid);
-            document.querySelector('.save-area')?.remove();
-        });
+        await page.evaluate(() => document.querySelector('.save-area')?.remove());
     },
 });
 
+// The whole WoWProgress tab: header, both cards. The sticky action bar is
+// removed so it does not land across the capture.
 await shot('options-wowprogress.png', `file://${ROOT}/src/options/options.html`, {
-    width: 900, height: 1400, sel: '#wowprogress',
+    width: 980, height: 1600, sel: '#wowprogress',
     prep: async (page) => {
         await page.click('.tab-btn[data-tab="wowprogress"]');
         await page.waitForTimeout(300);
-        await page.evaluate(() => {
-            document.querySelector('.save-area')?.remove();
-            document.querySelector('#wowprogress').style.cssText += ';padding:16px 24px 24px;background:#2a2a2a;';
-        });
+        await page.evaluate(() => document.querySelector('.save-area')?.remove());
     },
 });
 
@@ -279,13 +268,16 @@ await shot('options-wowprogress.png', `file://${ROOT}/src/options/options.html`,
         prep: async (page) => {
             await page.click('#toggleFilters');
             await page.waitForTimeout(200);
-            // Three filters, matching the caption in docs/scout.md. The chip's
+            // Four filters — including a mythic-kill cap — matching the caption
+            // in docs/scout.md. The chip's
             // checkbox is visually hidden by design (only the box is restyled),
             // so click the label — which is what a user clicks too.
-            await page.click('#filterRoles .filter-chip:has(input[value="healer"])');
-            await page.click('#filterRegions .filter-chip:has(input[value="eu"])');
+            await page.click('#filterRoles .chip:has(input[value="healer"])');
+            await page.click('#filterRegions .chip:has(input[value="eu"])');
             await page.fill('#filterMinMplus', '2700');
             await page.dispatchEvent('#filterMinMplus', 'input');
+            await page.fill('#filterMaxMythic', '6');
+            await page.dispatchEvent('#filterMaxMythic', 'input');
             await page.waitForTimeout(300);
         },
     });

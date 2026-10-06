@@ -8,13 +8,32 @@
     <link rel="stylesheet" href="scout.css">
 </head>
 <body>
+    <!-- One icon set, drawn as a single stroke family, instead of emoji. Emoji
+         render in each platform's own art style and colour, so a row of buttons
+         looked assembled from parts. Referenced with <use href="#i-…">. -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true">
+        <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+        <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M5 19h14"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.3"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.3"/></symbol>
+        <symbol id="i-more" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+        <symbol id="i-spinner" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 1-9 9"/></symbol>
+    </svg>
+
     <header class="scout-header">
         <div class="scout-title">
-            <h1>Scout</h1>
-            <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+            <img class="scout-logo" src="../../img/logo-48.png" alt="" width="36" height="36">
+            <div>
+                <h1>Scout</h1>
+                <p class="scout-sub">Every configured recruitment site, merged into one list.</p>
+            </div>
         </div>
         <div class="scout-actions">
-            <button id="runScout" class="primary">🔎 Run scout</button>
             <!-- Notices are collapsed behind this button rather than stacked
                  above the table: a run with four things to say used to push the
                  results off the screen, and the one notice that mattered looked
@@ -22,15 +41,23 @@
                  to show, so an uneventful run has no dead control. -->
             <button id="toggleNotices" class="ghost" aria-expanded="false"
                     aria-controls="scoutBanner" hidden>
-                <span id="noticeIcon">⚠</span> Notices<span class="notice-count" id="noticeCount">0</span>
+                <span id="noticeIcon" class="icon-slot"><svg class="icon"><use href="#i-alert"/></svg></span>
+                <span>Notices</span><span class="notice-count" id="noticeCount">0</span>
             </button>
-            <button id="openSettings" class="ghost">⚙ Settings</button>
+            <button id="openSettings" class="ghost">
+                <svg class="icon"><use href="#i-settings"/></svg><span>Settings</span>
+            </button>
+            <button id="runScout" class="primary">
+                <svg class="icon"><use href="#i-scout"/></svg><span class="btn-label">Run scout</span>
+            </button>
         </div>
     </header>
 
     <section class="scout-progress" id="scoutProgress">
-        <div class="source-chips" id="sourceChips"></div>
-        <div class="progress-line" id="progressLine" role="status" aria-live="polite">Ready.</div>
+        <div class="progress-row">
+            <div class="source-chips" id="sourceChips"></div>
+            <div class="progress-line" id="progressLine" role="status" aria-live="polite">Ready.</div>
+        </div>
         <!-- Opened from the Notices button in the header. aria-live is kept so a
              screen reader still hears a new notice arrive even while collapsed;
              the count on the button is the visual equivalent. -->
@@ -38,32 +65,53 @@
     </section>
 
     <section class="scout-toolbar" id="scoutToolbar" hidden>
-        <input type="search" id="searchBox" aria-label="Filter candidates by name, realm or class"
-               placeholder="Filter by name, realm, class…" autocomplete="off">
-        <label class="inline-check" title="Hides candidates whose parse is below your thresholds, and candidates WarcraftLogs has no logs for. Candidates that could not be scored are always shown.">
-            <input type="checkbox" id="hideBelowThresholds">
-            Hide below thresholds &amp; no logs
-        </label>
-        <label class="inline-select" title="Which raid difficulty parses are compared at. WarcraftLogs' default is the hardest difficulty each character has logs on, so one mythic kill switches a character onto mythic parses. Shared with every site.">
-            Parses
-            <select id="wclDifficultySelect">
-                <option value="0">Highest logged</option>
-                <option value="4">Heroic only</option>
-                <option value="5">Mythic only</option>
-            </select>
-        </label>
-        <span class="result-count" id="resultCount" role="status" aria-live="polite"></span>
+        <div class="toolbar-group">
+            <div class="search-field">
+                <svg class="icon"><use href="#i-search"/></svg>
+                <input type="search" id="searchBox" aria-label="Filter candidates by name, realm or class"
+                       placeholder="Search name, realm, class…" autocomplete="off">
+            </div>
+            <label class="inline-select" title="Which raid difficulty parses are compared at. WarcraftLogs' default is the hardest difficulty each character has logs on, so one mythic kill switches a character onto mythic parses. Shared with every site.">
+                <span class="inline-label">Parses</span>
+                <select id="wclDifficultySelect">
+                    <option value="0">Highest logged</option>
+                    <option value="4">Heroic only</option>
+                    <option value="5">Mythic only</option>
+                </select>
+            </label>
+            <!-- A switch, not a checkbox: it changes what the table shows the
+                 moment it is flipped, which is what a switch promises. Still a
+                 real checkbox underneath for keyboard and screen readers. -->
+            <label class="switch" title="Hides candidates whose parse is below your thresholds, and candidates WarcraftLogs has no logs for. Candidates that could not be scored are always shown.">
+                <input type="checkbox" id="hideBelowThresholds" role="switch">
+                <span class="switch-track" aria-hidden="true"></span>
+                <span>Hide below thresholds</span>
+            </label>
+        </div>
         <span class="spacer"></span>
-        <button id="toggleFilters" class="ghost" aria-expanded="false" aria-controls="scoutFilters">
-            ⛃ Filters<span class="filter-count" id="filterCount" hidden></span>
-        </button>
-        <button id="copyNames"  class="ghost" title="Copy Name-Realm for every visible row">📋 Copy names</button>
-        <button id="exportCsv"  class="ghost">⬇ CSV</button>
+        <div class="toolbar-group">
+            <span class="result-count" id="resultCount" role="status" aria-live="polite"></span>
+            <button id="toggleFilters" class="ghost" aria-expanded="false" aria-controls="scoutFilters">
+                <svg class="icon"><use href="#i-filter"/></svg><span>Filters</span><span class="filter-count" id="filterCount" hidden></span>
+            </button>
+            <div class="button-group" role="group" aria-label="Export">
+                <button id="copyNames" class="ghost" title="Copy Name-Realm for every visible row, ready to paste as whispers">
+                    <svg class="icon"><use href="#i-copy"/></svg><span class="btn-label">Copy names</span>
+                </button>
+                <button id="exportCsv" class="ghost" title="Download the visible rows as a CSV file">
+                    <svg class="icon"><use href="#i-download"/></svg><span>CSV</span>
+                </button>
+            </div>
+        </div>
     </section>
 
     <!-- Structured filters. Persisted, so they survive a reload and the next
          run; the count on the button above and the Clear control below exist so
-         a short list is never mistaken for a bad harvest. -->
+         a short list is never mistaken for a bad harvest.
+
+         Laid out as a grid of three rows — who (role, region, site), class, and
+         the numeric limits — so every label in a row sits on one line and every
+         control below it on the next. -->
     <section class="scout-filters" id="scoutFilters" hidden>
         <div class="filter-grid">
             <fieldset class="filter-group">
@@ -76,83 +124,99 @@
                 <div class="filter-chips" id="filterRegions"></div>
             </fieldset>
 
+            <fieldset class="filter-group">
+                <legend>Advertising on</legend>
+                <div class="filter-chips">
+                    <div class="filter-chips" id="filterSources"></div>
+                    <label class="chip filter-chip--toggle" title="Only players advertising on more than one site — the ones actively looking">
+                        <input type="checkbox" id="filterMultiSource">
+                        <span>2+ sites</span>
+                    </label>
+                </div>
+            </fieldset>
+
             <fieldset class="filter-group filter-group--wide">
                 <legend>Class</legend>
                 <div class="filter-chips" id="filterClasses"></div>
             </fieldset>
 
-            <fieldset class="filter-group">
-                <legend>Advertising on</legend>
-                <div class="filter-chips" id="filterSources"></div>
-                <label class="inline-check">
-                    <input type="checkbox" id="filterMultiSource">
-                    On more than one site
-                </label>
-            </fieldset>
-
-            <fieldset class="filter-group">
-                <legend>Minimums</legend>
-                <div class="filter-numbers">
-                    <label>Item level
-                        <input type="number" id="filterMinIlvl" min="0" step="1" placeholder="any">
+            <fieldset class="filter-group filter-group--wide">
+                <legend>Limits</legend>
+                <div class="filter-fields">
+                    <label class="field">
+                        <span class="field-label">Min item level</span>
+                        <input type="number" id="filterMinIlvl" min="0" step="1" placeholder="Any">
                     </label>
-                    <label>M+ score
-                        <input type="number" id="filterMinMplus" min="0" step="10" placeholder="any">
+                    <label class="field">
+                        <span class="field-label">Min M+ score</span>
+                        <input type="number" id="filterMinMplus" min="0" step="10" placeholder="Any">
                     </label>
-                    <label>Mythic kills
-                        <input type="number" id="filterMinMythic" min="0" step="1" placeholder="any">
+                    <!-- A range, not just a minimum: an 8/8 raider is unlikely to
+                         join a 4/8 guild, so an officer can cap the kill count
+                         at what their own progress can hold. -->
+                    <div class="field" role="group" aria-labelledby="mythicRangeLabel">
+                        <span class="field-label" id="mythicRangeLabel">Mythic kills</span>
+                        <div class="range-pair">
+                            <input type="number" id="filterMinMythic" min="0" max="99" step="1" placeholder="Min" aria-label="Minimum mythic kills">
+                            <span class="range-sep" aria-hidden="true">to</span>
+                            <input type="number" id="filterMaxMythic" min="0" max="99" step="1" placeholder="Max" aria-label="Maximum mythic kills">
+                        </div>
+                    </div>
+                    <label class="field">
+                        <span class="field-label">Listed within</span>
+                        <select id="filterMaxAge" aria-label="Only show listings posted or bumped within"></select>
                     </label>
                 </div>
-                <p class="filter-note">A candidate is kept when the site never reported that stat.</p>
-            </fieldset>
-
-            <fieldset class="filter-group">
-                <legend>Listed within</legend>
-                <select id="filterMaxAge" aria-label="Only show listings posted or bumped within"></select>
-                <p class="filter-note">Kept when the site gave no readable date.</p>
             </fieldset>
         </div>
 
         <div class="filter-actions">
-            <button id="clearFilters" class="ghost">Clear filters</button>
+            <p class="filter-note">
+                <svg class="icon"><use href="#i-info"/></svg>
+                A candidate is kept when a site didn't report that stat or a readable listing date.
+            </p>
+            <span class="spacer"></span>
             <span class="filter-summary" id="filterSummary" role="status" aria-live="polite"></span>
+            <button id="clearFilters" class="ghost">Clear filters</button>
         </div>
     </section>
 
     <section class="scout-results">
+        <div class="table-card">
         <table id="resultsTable" aria-label="Scouted candidates" hidden>
             <thead>
                 <tr>
                     <th data-sort="name" tabindex="0" role="columnheader" aria-sort="none">Character</th>
-                    <th data-sort="realm" tabindex="0" role="columnheader" aria-sort="none">Realm</th>
-                    <th data-sort="region" tabindex="0" role="columnheader" aria-sort="none">Region</th>
                     <th data-sort="playerClass" tabindex="0" role="columnheader" aria-sort="none">Class</th>
                     <th data-sort="role" tabindex="0" role="columnheader" aria-sort="none">Role</th>
                     <th data-sort="ilvl" class="num" tabindex="0" role="columnheader" aria-sort="none">ilvl</th>
                     <th data-sort="mplusScore" class="num" tabindex="0" role="columnheader" aria-sort="none">M+</th>
                     <th data-sort="mythicKills" class="num" tabindex="0" role="columnheader" aria-sort="none">Mythic</th>
-                    <th data-sort="wclMedian" class="num" tabindex="0" role="columnheader" aria-sort="none" title="Sorts mythic parses first, then heroic, each by median parse — the two are not on one scale. M / H on a badge says which difficulty it shows.">WCL parse</th>
+                    <th data-sort="wclMedian" class="num" tabindex="0" role="columnheader" aria-sort="none" title="Best and median WarcraftLogs parse, coloured on WarcraftLogs' own scale. Sorts mythic parses first, then heroic, each by median — the two are not on one scale. M / H says which difficulty it shows.">Parse <span class="th-sub">best · med</span></th>
                     <th data-sort="listedAt" class="num" tabindex="0" role="columnheader" aria-sort="none" title="When they posted or last bumped their looking-for-guild listing (the most recent across sites)">Listed</th>
                     <th data-sort="sources" tabindex="0" role="columnheader" aria-sort="none" title="Which recruitment sites this player is advertising on">Advertising on</th>
-                    <th>Links</th>
+                    <th>Profiles</th>
                 </tr>
             </thead>
             <tbody id="resultsBody"></tbody>
         </table>
+        </div>
         <div class="empty-state" id="emptyState" hidden></div>
         <!-- Sits at the end of the table, where an officer who has read every
              row arrives. A button, not infinite scroll: each new candidate is a
              WarcraftLogs API call. -->
         <div class="load-more" id="loadMore" hidden>
-            <button id="loadMoreBtn" class="ghost">⬇ Load more</button>
+            <button id="loadMoreBtn" class="ghost">
+                <svg class="icon"><use href="#i-more"/></svg><span class="btn-label">Load more</span>
+            </button>
             <p class="load-more-note" id="loadMoreNote" role="status" aria-live="polite"></p>
         </div>
     </section>
 
     <footer class="scout-footer">
         <span class="footer-note">RaidScout is free and open source.</span>
-        <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">☕ Support development</a>
-        <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">▶ YouTube</a>
+        <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">Support development</a>
+        <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">YouTube</a>
     </footer>
 
     <!-- common.js is a classic script: it defines requestWclScore, buildWclSettings,

@@ -1,357 +1,399 @@
-/* scout.css — Scout aggregator page. Palette matches options.css. */
+/* scout.css — Scout aggregator page.
+ *
+ * Every colour comes from the tokens in shared.css or the few page tokens
+ * below, and every control in the header, toolbar and filter panel is
+ * --control-h tall with the same radius, so a row of mixed buttons, selects and
+ * inputs lines up on one baseline instead of each element sizing itself.
+ * Spacing steps are 4 / 8 / 12 / 16 / 24 px; nothing else. */
+
+:root {
+    --gutter: 32px;   /* everything else comes from shared.css */
+}
 
 * { box-sizing: border-box; }
 
 body {
     margin: 0;
-    padding: 0 24px 48px;
-    background-color: #1e1e1e;
-    color: #e8e8e8;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 0 var(--gutter) 48px;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font);
     font-size: 14px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
 }
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+/* Buttons, inputs, selects, the switch and chips come from shared.css. */
+
+.icon-slot { display: inline-flex; }
+
+/* Copy and CSV are one decision — "take these rows somewhere" — so they read
+   as one control. */
+.button-group { display: inline-flex; }
+.button-group button { border-radius: 0; }
+.button-group button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.button-group button:last-child  { border-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px; }
+.button-group button:hover { position: relative; z-index: 1; }
+
+/* The hide-below switch sits in the toolbar at control height. */
+.switch { height: var(--control-h); }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .scout-header {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 24px 0 16px;
-    border-bottom: 1px solid #333;
+    padding: 20px 0 16px;
+    border-bottom: 1px solid var(--line-soft);
     position: sticky;
     top: 0;
-    background: #1e1e1e;
+    background: color-mix(in srgb, var(--bg-page) 94%, transparent);
+    backdrop-filter: blur(8px);
     z-index: 5;
 }
 
-.scout-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
-.scout-sub { margin: 4px 0 0; color: #888; font-size: 13px; }
-.scout-actions { display: flex; gap: 8px; }
-
-button {
-    font-family: inherit;
-    font-size: 13px;
-    padding: 8px 14px;
-    border-radius: 4px;
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: background-color 0.15s, border-color 0.15s;
-}
-button:disabled { opacity: 0.5; cursor: default; }
-button.primary { background-color: #007bff; color: #fff; }
-button.primary:hover:not(:disabled) { background-color: #0056b3; }
-button.ghost { background-color: #3a3a3a; color: #ccc; border-color: #4a4a4a; }
-button.ghost:hover:not(:disabled) { background-color: #4a4a4a; color: #fff; }
-
-/* Any rule that sets `display` outranks the user-agent's `[hidden]{display:none}`,
-   so an element toggled with el.hidden stays on screen. That is how the Filters
-   badge came to show a blue "0" for no active filters — `.filter-count` sets
-   `display: inline-block`. Fixed once here rather than per selector, since every
-   panel and counter on this page is toggled the same way. */
-[hidden] { display: none !important; }
+.scout-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.scout-logo { flex: none; border-radius: 9px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.scout-header h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.015em; }
+.scout-sub { margin: 2px 0 0; color: var(--text-muted); font-size: 13px; }
+.scout-actions { display: flex; align-items: center; gap: 8px; }
 
 /* ── Progress ───────────────────────────────────────────────────────────── */
 
-.scout-progress { padding: 16px 0; }
+.scout-progress { padding: 16px 0 0; }
 
-.source-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+/* Source chips and the running status share one line: the status describes
+   the chips, and stacking them spent a row on a sentence. */
+.progress-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+}
+
+.source-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .source-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 10px;
-    border-radius: 14px;
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    border-left: 3px solid var(--source-colour, #555);
+    gap: 8px;
+    height: 28px;
+    padding: 0 12px 0 10px;
+    border-radius: 999px;
+    background: var(--surface-1);
+    border: 1px solid var(--line);
     font-size: 12px;
-    color: #bbb;
+    font-weight: 550;
+    color: var(--text-secondary);
 }
-.source-chip .chip-state { color: #777; }
-.source-chip.is-running { border-color: #4a90d9; }
-.source-chip.is-running .chip-state { color: #4a90d9; }
-.source-chip.is-done    .chip-state { color: #4caf50; }
+/* A dot in the site's colour rather than a coloured left border: the border
+   bent around the pill's curve and read as a rendering fault. */
+.source-chip::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--source-colour, #555);
+    flex: none;
+}
+.source-chip .chip-state { color: var(--text-faint); font-weight: 600; font-variant-numeric: tabular-nums; }
+.source-chip.is-running { border-color: color-mix(in srgb, var(--focus) 55%, transparent); }
+.source-chip.is-running .chip-state { color: var(--focus); }
+.source-chip.is-done    .chip-state { color: var(--success); }
 /* Rendered, but matched nobody — a different outcome from a successful
    harvest, and the banner says so too. */
 .source-chip.is-empty   .chip-state { color: #c9a227; }
-.source-chip.is-failed  { border-color: #7a2020; }
-.source-chip.is-failed  .chip-state { color: #f04040; }
-.source-chip.is-skipped { opacity: 0.5; }
+.source-chip.is-failed  { border-color: #6a2424; }
+.source-chip.is-failed  .chip-state { color: var(--danger); }
+.source-chip.is-skipped { opacity: 0.45; }
 
-.progress-line { font-size: 13px; color: #aaa; min-height: 18px; }
+.progress-line { font-size: 13px; color: var(--text-muted); min-height: 18px; }
 
 /* The notices panel, opened from the counted button in the header. Neutral
-   ground rather than the old all-amber block: severity now belongs to each
-   notice, so painting the whole panel one colour would make a routine note look
-   like a failure and a failure look routine. */
+   ground rather than an all-amber block: severity belongs to each notice, so
+   painting the whole panel one colour would make a routine note look like a
+   failure and a failure look routine. */
 .scout-banner {
     margin-top: 12px;
-    padding: 10px 12px 10px 4px;
-    border-radius: 4px;
+    padding: 12px 16px 12px 8px;
+    border-radius: var(--radius-lg);
     font-size: 13px;
-    line-height: 1.5;
-    background: #1c1c1c;
-    border: 1px solid #3a3a3a;
-    color: #ccc;
+    line-height: 1.55;
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    color: var(--text-secondary);
 }
-.scout-banner ul { margin: 0; padding-left: 18px; list-style: none; }
+.scout-banner ul { margin: 0; padding-left: 8px; list-style: none; }
 .scout-banner code { color: #ddd; font-size: 12px; }
 
 .notice {
     margin: 4px 0;
-    padding: 4px 0 4px 10px;
-    border-left: 3px solid var(--notice-colour, #555);
+    padding: 2px 0 2px 12px;
+    border-left: 2px solid var(--notice-colour, #555);
 }
 .notice strong { color: #eee; }
-.notice--warn  { --notice-colour: #f0b060; color: #d8bc96; }
+.notice--warn  { --notice-colour: var(--warning); color: #d8bc96; }
 .notice--error { --notice-colour: #d9534f; color: #e8a9a6; }
 
 /* ── Notices button ─────────────────────────────────────────────────────── */
 
-#toggleNotices.has-errors {
-    border-color: #a03a36;
-    color: #e8a9a6;
-}
+#toggleNotices { color: #e0c48f; }
+#toggleNotices.has-errors { border-color: #6a2b28; color: #f0a8a3; }
 
-.notice-count {
-    display: inline-block;
-    margin-left: 6px;
-    min-width: 16px;
-    padding: 0 6px;
-    border-radius: 9px;
-    background: #6a5020;
-    color: #f5d9a8;
+.notice-count,
+.filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
     font-size: 11px;
-    font-weight: 600;
-    text-align: center;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
-#toggleNotices.has-errors .notice-count { background: #8c2f2b; color: #ffdedc; }
+.notice-count { background: #5a4420; color: #f5d9a8; }
+#toggleNotices.has-errors .notice-count { background: #7a2a27; color: #ffdedc; }
+.filter-count { background: var(--accent); color: var(--text-strong); }
 
 /* ── Toolbar ────────────────────────────────────────────────────────────── */
 
 .scout-toolbar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 0;
-    border-top: 1px solid #333;
     flex-wrap: wrap;
+    gap: 12px 16px;
+    padding: 20px 0 12px;
 }
 .scout-toolbar .spacer { flex: 1; }
 
-#searchBox {
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #eee;
-    padding: 7px 10px;
-    font-size: 13px;
-    min-width: 260px;
-    font-family: inherit;
-}
-#searchBox:focus { outline: none; border-color: #007bff; }
+/* Two clusters — what to show on the left, what to do with it on the right —
+   each holding its controls on one baseline. */
+.toolbar-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
 
-/* Every interactive control needs a visible focus ring; only the search box
-   had one, which left keyboard users unable to see where they were. */
-:where(button, a, input, select, th[data-sort]):focus-visible {
-    outline: 2px solid #4a90d9;
-    outline-offset: 2px;
-    border-radius: 3px;
+.search-field { position: relative; display: flex; align-items: center; }
+.search-field .icon {
+    position: absolute;
+    left: 11px;
+    color: #777;
+    pointer-events: none;
 }
+.search-field input { width: 280px; padding-left: 34px; }
+.search-field:focus-within .icon { color: var(--focus); }
 
-.inline-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; cursor: pointer; }
-.inline-select { display: inline-flex; align-items: center; gap: 6px; color: #ccc; font-size: 13px; }
-.inline-select select {
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #eee;
-    padding: 6px 8px;
-    font: inherit;
-}
-.inline-select select:disabled { opacity: 0.6; }
-.result-count { color: #888; font-size: 12px; }
+.inline-select { display: inline-flex; align-items: center; gap: 8px; }
+.inline-label { color: var(--text-muted); font-size: 13px; }
+
+.result-count { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 /* ── Filters ────────────────────────────────────────────────────────────── */
 
-.filter-count {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 0 6px;
-    border-radius: 9px;
-    background: #007bff;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-}
-
 .scout-filters {
-    padding: 14px 0 16px;
-    border-top: 1px solid #333;
+    margin-bottom: 16px;
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
-/* Flex rather than an auto-fit grid: fixed track widths left half of the first
-   row empty while squeezing the four source chips onto three lines. Groups size
-   to their content and wrap when they run out of room. */
+/* Three rows: who (role · region · site), class, and the numeric limits. Each
+   row's legends share one line and its controls the next, which is what the
+   earlier free-flowing layout could not guarantee — "Listed within" sat a
+   label-row higher than the inputs beside it. */
 .filter-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px 28px;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 20px 40px;
+    padding: 20px 24px 22px;
 }
-/* Thirteen class chips get a row to themselves. */
-.filter-group--wide { flex: 1 1 100%; }
+.filter-group--wide { grid-column: 1 / -1; }
 
-.filter-group {
-    margin: 0;
-    padding: 0;
-    border: 0;
-    min-width: 0;
-}
+.filter-group { margin: 0; padding: 0; border: 0; min-width: 0; }
 .filter-group legend {
-    padding: 0 0 6px;
-    color: #888;
+    padding: 0;
+    margin-bottom: 10px;
+    color: var(--text-muted);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 650;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.07em;
 }
 
 .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* The site chips are rebuilt from data into their own container; displaying it
+   as contents lets them wrap in one row with the "2+ sites" toggle after them. */
+#filterSources { display: contents; }
 
-/* A real checkbox inside a label: keyboard and screen-reader behaviour comes
-   free, and only the box itself is visually replaced by the chip. */
-.filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 9px;
-    border-radius: 12px;
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    font-size: 12px;
-    color: #bbb;
-    cursor: pointer;
-    user-select: none;
-    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-}
-.filter-chip:hover { background: #333; color: #eee; }
-.filter-chip input { position: absolute; opacity: 0; width: 0; height: 0; }
-.filter-chip:has(input:checked) {
-    background: #223449;
-    border-color: #4a90d9;
-    color: #eaf2fb;
-}
-.filter-chip:has(input:focus-visible) { outline: 2px solid #4a90d9; outline-offset: 2px; }
+/* Chips are the shared `.chip` (shared.css). */
+/* The cross-posting toggle is a different kind of filter from the site chips
+   beside it, so it is set apart by a dashed edge until it is switched on. */
+.chip.filter-chip--toggle { border-style: dashed; margin-left: 4px; }
+.chip.filter-chip--toggle:has(input:checked) { border-style: solid; }
 
-/* The swatch carries the class or source colour, so a checked chip is not
-   identified by its blue tint alone. */
-.chip-swatch {
-    width: 8px;
-    height: 8px;
-    border-radius: 2px;
-    background: var(--chip-colour, #666);
-    flex: none;
-}
-
-.filter-numbers { display: flex; flex-wrap: wrap; gap: 8px 10px; }
-.filter-numbers label {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    font-size: 11px;
-    color: #999;
-}
-.filter-numbers input {
-    width: 84px;
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #eee;
-    padding: 5px 7px;
-    font-size: 13px;
-    font-family: inherit;
-}
-.filter-numbers input:focus { outline: none; border-color: #007bff; }
-
-.filter-note { margin: 7px 0 0; font-size: 11px; color: #6a6a6a; }
-
-#filterMaxAge {
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #eee;
-    padding: 5px 7px;
-    font-size: 13px;
-    font-family: inherit;
-}
-#filterMaxAge:focus { outline: none; border-color: #007bff; }
+/* Labelled fields on one line: label row above, controls below, all controls
+   the same height. "Listed within" is a field like the rest, so it aligns. */
+.filter-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 12px; color: var(--text-muted); line-height: 16px; }
+.field input { width: 112px; }
+.range-pair { display: flex; align-items: center; gap: 8px; }
+.range-pair input { width: 72px; }
+.range-sep { color: var(--text-faint); font-size: 12px; }
+#filterMaxAge { min-width: 168px; }
 
 .filter-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-top: 14px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 12px 24px;
+    border-top: 1px solid var(--line-soft);
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
-.filter-summary { font-size: 12px; color: #888; }
+.filter-actions .spacer { flex: 1; }
+.filter-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-faint);
+}
+.filter-note .icon { width: 14px; height: 14px; }
+.filter-summary { font-size: 12px; color: var(--text-muted); }
 
 /* ── Table ──────────────────────────────────────────────────────────────── */
 
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* The card's border and radius are drawn on the table itself (via
+   border-collapse: separate) rather than on a wrapper with overflow: hidden,
+   because an overflow wrapper becomes the scroll container and breaks the
+   sticky header — see the narrow-viewport note below. */
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
 
 thead th {
     position: sticky;
     /* Set from the header's measured height by trackHeaderHeight() in scout.js.
-       The literal 88px this replaced was a guess at a box whose height changes
-       with viewport width, so the header either overlapped the first row or
-       left a gap that rows slid through. The fallback matches the default
-       desktop height for the moment before the first measurement. */
-    top: var(--header-h, 88px);
-    background: #242424;
+       The fallback matches the default desktop height for the moment before
+       the first measurement. */
+    top: var(--header-h, 76px);
+    z-index: 2;
+    background: var(--surface-2);
     text-align: left;
-    padding: 9px 10px;
-    font-weight: 600;
-    font-size: 12px;
-    color: #aaa;
-    border-bottom: 1px solid #383838;
+    padding: 0 12px;
+    height: 40px;
+    font-weight: 650;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--line);
     white-space: nowrap;
     user-select: none;
 }
-thead th[data-sort] { cursor: pointer; }
-thead th[data-sort]:hover { color: #fff; }
+thead th:first-child { border-top-left-radius: var(--radius-lg); padding-left: 20px; }
+thead th:last-child  { border-top-right-radius: var(--radius-lg); padding-right: 20px; }
+thead th[data-sort] { cursor: pointer; transition: color 0.15s; }
+thead th[data-sort]:hover { color: var(--text-strong); }
 thead th.num { text-align: right; }
-thead th.sorted-asc::after  { content: ' ▲'; color: #007bff; }
-thead th.sorted-desc::after { content: ' ▼'; color: #007bff; }
+thead th.sorted-asc,
+thead th.sorted-desc { color: var(--text-primary); }
+thead th.sorted-asc::after  { content: '▲'; margin-left: 5px; color: var(--accent); font-size: 8px; vertical-align: 1px; }
+thead th.sorted-desc::after { content: '▼'; margin-left: 5px; color: var(--accent); font-size: 8px; vertical-align: 1px; }
+.th-sub {
+    margin-left: 4px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-faint);
+}
 
-tbody td { padding: 7px 10px; border-bottom: 1px solid #2c2c2c; vertical-align: middle; }
+tbody td {
+    height: 56px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: middle;
+}
+tbody td:first-child { padding-left: 20px; }
+tbody td:last-child  { padding-right: 20px; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:last-child td:first-child { border-bottom-left-radius: var(--radius-lg); }
+tbody tr:last-child td:last-child  { border-bottom-right-radius: var(--radius-lg); }
 tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
-/* Eleven columns over a hundred-odd rows: a faint stripe is what keeps the eye
-   on one candidate all the way across. Kept below the hover tint so hover still
-   reads as the stronger signal. */
-tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.018); }
-tbody tr:hover { background: #2c2c2c; }
-/* Dimmed, not erased: unticking the hide box is a request to read these rows,
-   so they keep enough contrast to actually be read. The left edge marks them
-   without relying on the dimming alone. */
-tbody tr.below-threshold { opacity: 0.62; }
-tbody tr.below-threshold td:first-child { box-shadow: inset 2px 0 0 #6a4a2a; }
+/* Inline-flex boxes sit on the text baseline by default, which left class
+   names and mythic fractions a few pixels above the pills beside them. Centre
+   every composite cell on the row's middle instead. */
+tbody td > :is(.class-cell, .role-pill, .mythic, .parse, .parse-state, .parse-pending, .source-tags) {
+    vertical-align: middle;
+}
+tbody tr { transition: background-color 0.1s; }
+tbody tr:hover { background: #292929; }
+/* Dimmed, not erased: unticking the hide switch is a request to read these
+   rows, so they keep enough contrast to actually be read. The left edge marks
+   them without relying on the dimming alone. */
+tbody tr.below-threshold { opacity: 0.55; }
+tbody tr.below-threshold td:first-child { box-shadow: inset 3px 0 0 #7a4a24; }
 tbody tr.below-threshold:hover { opacity: 0.85; }
 
-.char-name { font-weight: 600; color: var(--class-color, #e8e8e8); }
+/* Name on top, realm and region beneath — the two lines identify one person. */
+.name-cell { min-width: 160px; }
+.char-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--class-color, var(--text-primary));
+}
+.char-realm {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.region-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    line-height: 15px;
+    padding: 0 4px;
+    border-radius: 3px;
+    color: #9a9a9a;
+    background: var(--surface-3);
+}
 
 /* Blizzard's class icon ahead of the class name. Rounded and slightly dimmed so
    thirteen of them down a column read as a texture rather than thirteen competing
    focal points; full opacity on row hover when the officer is reading that row. */
-.class-cell { display: inline-flex; align-items: center; gap: 7px; color: var(--class-color, #e8e8e8); }
+.class-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    line-height: 22px;
+    color: var(--class-color, var(--text-primary));
+    white-space: nowrap;
+}
 .class-icon {
-    width: 18px; height: 18px;
-    border-radius: 4px;
+    display: block;
+    width: 22px; height: 22px;
+    border-radius: 6px;
     flex: none;
-    opacity: 0.88;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+    opacity: 0.9;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 tbody tr:hover .class-icon { opacity: 1; }
 
@@ -369,47 +411,167 @@ tbody tr:hover .class-icon { opacity: 1; }
 .class-demon_hunter { --class-color: var(--wow-demonhunter); }
 .class-evoker       { --class-color: var(--wow-evoker); }
 
+/* A tinted pill in the role colour, matching the source tags beside it. */
 .role-pill {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 999px;
     font-size: 11px;
-    background: #2f2f2f;
-    border-left: 3px solid var(--role-color, #555);
+    font-weight: 650;
+    color: color-mix(in srgb, var(--role-color, #888) 70%, white);
+    background: color-mix(in srgb, var(--role-color, #555) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--role-color, #555) 35%, transparent);
 }
-.role-pill--resolved { border-bottom: 1px dotted #888; cursor: help; }
+.role-pill--resolved { border-style: dashed; cursor: help; }
 .role-tank   { --role-color: var(--role-tank); }
 .role-healer { --role-color: var(--role-healer); }
 .role-dps    { --role-color: var(--role-dps); }
+
+/* Mythic progress: the fraction, with a hairline bar under it so 6/8 and 6/12
+   differ at a glance. A full clear is drawn in the legendary colour. */
+.mythic { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.mythic-total { color: var(--text-faint); }
+.mythic-bar {
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #8f8f8f var(--fill), #3a3a3a var(--fill));
+}
+.mythic-bar.is-full { background: var(--tier-legendary); }
+
+/* ── Parse cell ─────────────────────────────────────────────────────────── */
+
+/* Best · median in WarcraftLogs' own colour bands, behind a difficulty tag. The
+   threshold verdict is a small dot; a failing row is already dimmed and edged,
+   so a red box around the numbers as well would be the third signal for one
+   fact. */
+.parse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+    cursor: default;
+}
+.parse::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: transparent;
+    flex: none;
+}
+.parse--warn::before { background: var(--warning); }
+.parse--fail::before { background: var(--danger); }
+
+.diff-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 750;
+    color: #bdbdbd;
+    border: 1px solid #484848;
+}
+.diff-tag--M { background: #3a3a3a; color: #f0f0f0; border-color: #555; }
+
+.parse-num { display: inline-block; min-width: 2ch; font-size: 14px; font-weight: 700; text-align: right; }
+.parse-num--median { font-weight: 600; opacity: 0.88; }
+.parse-sep { color: #555; font-weight: 700; }
+
+.tier-artifact   { color: var(--tier-artifact); }
+.tier-astounding { color: var(--tier-astounding); }
+.tier-legendary  { color: var(--tier-legendary); }
+.tier-epic       { color: var(--tier-epic); }
+.tier-rare       { color: var(--tier-rare); }
+.tier-uncommon   { color: var(--tier-uncommon); }
+.tier-common     { color: var(--tier-common); }
+
+/* Not a score: plain words, coloured by how much they say about the player. */
+.parse-state {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--text-muted);
+    background: var(--surface-3);
+    cursor: help;
+}
+.parse-state--no-logs      { color: #d6b65a; background: rgba(214, 182, 90, 0.12); }
+.parse-state--error        { color: #e88a85; background: rgba(217, 83, 79, 0.14); }
+.parse-state--rate-limited,
+.parse-state--blocked      { color: #e8a25a; background: rgba(232, 162, 90, 0.12); }
+
+/* Waiting for a score: a shimmering placeholder the width of a real one, so the
+   column does not jump when the numbers arrive. */
+.parse-pending {
+    display: inline-block;
+    width: 64px;
+    height: 12px;
+    border-radius: 6px;
+    vertical-align: middle;
+    background: linear-gradient(90deg, #2c2c2c 0%, #3a3a3a 50%, #2c2c2c 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 
 /* Named tags rather than colour dots: the dots required learning a key, and the
    number of sites a candidate is advertising on is one of the more useful things
    in the table. */
 .source-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .source-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.03em;
-    padding: 2px 5px;
-    border-radius: 4px;
-    color: var(--source-colour, #999);
-    background: color-mix(in srgb, var(--source-colour, #555) 16%, transparent);
-    border: 1px solid color-mix(in srgb, var(--source-colour, #555) 45%, transparent);
+    letter-spacing: 0.04em;
+    padding: 0 6px;
+    border-radius: var(--radius-sm);
+    color: color-mix(in srgb, var(--source-colour, #999) 80%, white);
+    background: color-mix(in srgb, var(--source-colour, #555) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--source-colour, #555) 35%, transparent);
     white-space: nowrap;
 }
 
-/* Three short links that were wrapping onto three lines on a narrow window,
-   tripling the height of every row. */
+/* Profile links as small outlined buttons: three bare words read as body text
+   and gave no hint they were the way out to each site. */
 .row-links { white-space: nowrap; }
-.row-links a { color: #6aa9e0; text-decoration: none; font-size: 12px; margin-right: 8px; }
-.row-links a:hover { text-decoration: underline; }
+.row-links a {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding: 0 9px;
+    margin-right: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: #9cc3ea;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.row-links a:last-child { margin-right: 0; }
+.row-links a:hover { background: var(--surface-3); border-color: var(--border-strong); color: var(--text-strong); }
 
-.muted { color: #5a5a5a; }
+.muted { color: #555; }
 
 .empty-state {
-    padding: 48px 0;
+    padding: 64px 0;
     text-align: center;
-    color: #777;
+    color: var(--text-muted);
     font-size: 14px;
     line-height: 1.6;
 }
@@ -421,12 +583,13 @@ tbody tr:hover .class-icon { opacity: 1; }
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 20px 0 28px;
+    padding: 24px 0 32px;
 }
+.load-more button { min-width: 160px; border-radius: 999px; }
 .load-more-note {
     margin: 0;
     font-size: 12px;
-    color: #777;
+    color: var(--text-muted);
     text-align: center;
     max-width: 720px;
     line-height: 1.5;
@@ -437,39 +600,45 @@ tbody tr:hover .class-icon { opacity: 1; }
 .scout-footer {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     flex-wrap: wrap;
     margin-top: 32px;
-    padding: 14px 0 4px;
-    border-top: 1px solid #2c2c2c;
+    padding: 16px 0 4px;
+    border-top: 1px solid var(--line-soft);
     font-size: 12px;
 }
 
-.footer-note { color: #666; }
+.footer-note { color: var(--text-faint); }
 
 .support-link {
     color: #8a8a8a;
     text-decoration: none;
     transition: color 0.15s;
 }
-.support-link:hover { color: #f0b060; text-decoration: underline; }
+.support-link:hover { color: var(--warning); }
 
 /* ── Narrow viewports ───────────────────────────────────────────────────── */
 
-@media (max-width: 900px) {
-    body { padding: 0 12px 32px; }
+@media (max-width: 1100px) {
+    /* Three columns of chips stop fitting side by side; stack them. */
+    .filter-grid { grid-template-columns: minmax(0, 1fr); }
+}
 
-    /* Eleven columns cannot fit, so the page scrolls sideways — and a sticky
-       box does not scroll with it, tearing the header off the table below.
-       Static positioning keeps them together. (An overflow-x wrapper would be
-       the other fix, but it becomes the scrollport and breaks the sticky
-       header outright, which is worse.) */
+@media (max-width: 900px) {
+    :root { --gutter: 16px; }
+
+    /* The columns cannot fit, so the page scrolls sideways — and a sticky box
+       does not scroll with it, tearing the header off the table below. Static
+       positioning keeps them together. (An overflow-x wrapper would be the
+       other fix, but it becomes the scrollport and breaks the sticky header
+       outright, which is worse.) */
     .scout-header, thead th { position: static; }
 
     .scout-header { align-items: flex-start; flex-wrap: wrap; }
-    .scout-toolbar #searchBox { min-width: 0; flex: 1 1 100%; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
+    .scout-toolbar .spacer { display: none; }
+    .toolbar-group { width: 100%; }
+    .search-field { flex: 1 1 100%; }
+    .search-field input { width: 100%; }
+    .filter-grid { padding: 16px; }
+    .filter-actions { padding: 12px 16px; }
 }

@@ -15,7 +15,7 @@ import {
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency, classIconUrl,
     formatMythicProgress, formatListedAge,
     matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS, summarizeScoreErrors,
-    absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS,
+    absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS, realmLabel, parseTier,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS, isNewestFirst } from './sources.js';
 import { fetchProfileFields, applyEnrichment, ENRICH_ORIGIN } from './enrich.js';
@@ -107,6 +107,7 @@ const el = {
     minIlvl:      document.getElementById('filterMinIlvl'),
     minMplus:     document.getElementById('filterMinMplus'),
     minMythic:    document.getElementById('filterMinMythic'),
+    maxMythic:    document.getElementById('filterMaxMythic'),
     maxAge:       document.getElementById('filterMaxAge'),
     loadMore:     document.getElementById('loadMore'),
     loadMoreBtn:  document.getElementById('loadMoreBtn'),
@@ -192,7 +193,7 @@ function renderNotices() {
     if (count === 0) { setNoticesOpen(false); el.banner.innerHTML = ''; return; }
 
     el.toggleNotices.classList.toggle('has-errors', errors > 0);
-    el.noticeIcon.textContent  = errors > 0 ? '⚠' : 'ℹ';
+    el.noticeIcon.innerHTML    = iconSvg(errors > 0 ? 'alert' : 'info');
     el.noticeCount.textContent = String(count);
     el.toggleNotices.title = errors > 0
         ? `${errors} of ${count} ${count === 1 ? 'notice' : 'notices'} ${errors === 1 ? 'is' : 'are'} a failure — click to read`
@@ -254,7 +255,7 @@ async function runScout() {
     el.run.disabled = true;
     // Changing difficulty mid-run would leave half the table scored at each.
     el.difficulty.disabled = true;
-    el.run.textContent = '⏳ Scouting…';
+    setButtonState(el.run, 'Scouting…', 'spinner');
     renderNotices();
     el.table.hidden = true;
     el.toolbar.hidden = true;
@@ -479,7 +480,7 @@ async function loadMore() {
     state.running = true;
     el.run.disabled = true;
     el.difficulty.disabled = true;
-    el.loadMoreBtn.textContent = '⏳ Loading…';
+    setButtonState(el.loadMoreBtn, 'Loading…', 'spinner');
     renderLoadMore();
 
     try {
@@ -521,7 +522,7 @@ async function loadMore() {
         state.running = false;
         el.run.disabled = false;
         el.difficulty.disabled = false;
-        el.loadMoreBtn.textContent = '⬇ Load more';
+        setButtonState(el.loadMoreBtn, 'Load more', 'more');
         renderLoadMore();
     }
 }
@@ -530,7 +531,7 @@ function finishRun(emptyMessage) {
     state.running = false;
     el.run.disabled = false;
     el.difficulty.disabled = false;
-    el.run.textContent = '🔎 Run scout';
+    setButtonState(el.run, 'Run scout', 'scout');
     renderLoadMore();
     if (emptyMessage) {
         el.empty.hidden = false;
@@ -630,7 +631,13 @@ async function scoreCandidates(candidates) {
     setProgress(`Scoring 0/${candidates.length}…`);
 
     await runWithConcurrency(candidates, async (candidate) => {
-        if (rateLimited) return;
+        if (rateLimited) {
+            // Skipped, not still loading: without this the row kept its
+            // shimmering placeholder forever after the run had stopped.
+            candidate.scoreSkipped = true;
+            updateRow(candidate);
+            return;
+        }
 
         const score = await requestWclScore({
             region: candidate.region,
@@ -645,6 +652,7 @@ async function scoreCandidates(candidates) {
         });
 
         candidate.wcl = score;
+        candidate.scoreSkipped = false;
 
         // An 'auto' lookup resolves the role from the spec WarcraftLogs actually
         // ranked them as, and effectiveRole() already judges the thresholds by
@@ -703,6 +711,19 @@ function reportScoreErrors(candidates) {
 
 // ─── Render ────────────────────────────────────────────────────────────────────
 
+function iconSvg(name) {
+    return `<svg class="icon${name === 'spinner' ? ' icon--spin' : ''}"><use href="#i-${name}"/></svg>`;
+}
+
+// Buttons carry an icon and a label; changing only the label's text keeps the
+// icon, and the icon is swapped alongside it for busy and done states.
+function setButtonState(button, label, icon) {
+    const labelEl = button.querySelector('.btn-label');
+    if (labelEl) labelEl.textContent = label; else button.textContent = label;
+    const svg = button.querySelector('svg.icon');
+    if (svg && icon) svg.outerHTML = iconSvg(icon);
+}
+
 function escapeHtml(text) {
     return String(text ?? '').replace(/[&<>"']/g, ch =>
         ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -731,13 +752,76 @@ function isBelowThreshold(candidate) {
                               effectiveRole(candidate.wcl, candidate.role));
 }
 
+// Plain words for the states that are not a score; the shared badge's emoji
+// prefixes suit an injected marker on someone else's site, not this table.
+const PARSE_STATE_LABELS = {
+    'no-logs':      'No logs',
+    'error':        'Lookup failed',
+    'rate-limited': 'Rate limited',
+    'blocked':      'Cloudflare check',
+};
+
+const DIFFICULTY_TAGS = { 3: 'N', 4: 'H', 5: 'M' };
+
+// The decision (state, threshold verdict, tooltip) still comes from the shared
+// makeBadge(), so Scout judges a parse exactly as the sites do; only the drawing
+// is Scout's own. A score is two numbers in WarcraftLogs' colour bands behind a
+// difficulty tag, with the threshold verdict as a small marker rather than a
+// red or green box around the whole cell.
 function wclBadgeFor(candidate) {
     const score = candidate.wcl;
-    if (!score) return makeBadge('pending', null, state.wclSettings, candidate.role);
+    if (!score && candidate.scoreSkipped) {
+        const tag = document.createElement('span');
+        tag.className = 'parse-state parse-state--skipped';
+        tag.title = 'Not looked up: scoring stopped when WarcraftLogs rate-limited the run. Re-run to fill these in.';
+        tag.textContent = 'Not scored';
+        return tag;
+    }
+    if (!score) {
+        const pending = document.createElement('span');
+        pending.className = 'parse-pending';
+        pending.title = 'Fetching WarcraftLogs parses…';
+        return pending;
+    }
     // badgeStateForScore is the shared ladder every site uses; reusing it also
-    // picks up the Cloudflare 'blocked' state, which the copy here had missed
-    // and rendered as a generic error. makeBadge applies effectiveRole itself.
-    return makeBadge(badgeStateForScore(score), score, state.wclSettings, candidate.role);
+    // picks up the Cloudflare 'blocked' state. makeBadge applies effectiveRole.
+    const stateName = badgeStateForScore(score);
+    const badge = makeBadge(stateName, score, state.wclSettings, candidate.role);
+
+    if (stateName !== 'score') {
+        const tag = document.createElement('span');
+        tag.className = `parse-state parse-state--${stateName}`;
+        tag.title = badge.title;
+        tag.textContent = PARSE_STATE_LABELS[stateName] || badge.textContent;
+        return tag;
+    }
+
+    const verdict = badge.classList.contains('rs-badge--fail') ? 'fail'
+                  : badge.classList.contains('rs-badge--warn') ? 'warn' : 'pass';
+    const wrap = document.createElement('span');
+    wrap.className = `parse parse--${verdict}`;
+    wrap.title = badge.title + (verdict === 'fail' ? ' — below your thresholds'
+                              : verdict === 'warn' ? ' — within 10% of your thresholds' : '');
+
+    const diff = DIFFICULTY_TAGS[score.difficulty];
+    if (diff) {
+        const tag = document.createElement('span');
+        tag.className = `diff-tag diff-tag--${diff}`;
+        tag.textContent = diff;
+        wrap.appendChild(tag);
+    }
+    const value = (number, kind) => {
+        const span = document.createElement('span');
+        const tier = parseTier(number);
+        span.className = `parse-num parse-num--${kind}` + (tier ? ` tier-${tier}` : '');
+        span.textContent = tier ? String(Math.floor(number)) : '—';
+        return span;
+    };
+    const sep = document.createElement('span');
+    sep.className = 'parse-sep';
+    sep.textContent = '·';
+    wrap.append(value(score.best, 'best'), sep, value(score.median, 'median'));
+    return wrap;
 }
 
 // The role shown is the one the thresholds were applied against. Where that came
@@ -746,12 +830,13 @@ function wclBadgeFor(candidate) {
 // glitch, and overwriting the pill silently would throw it away.
 function roleCellHtml(candidate) {
     if (!candidate.role) return '<span class="muted">—</span>';
+    const label = ROLE_LABELS[candidate.role] || candidate.role;
     if (!candidate.listedRole) {
-        return `<span class="role-pill role-${escapeHtml(candidate.role)}">${escapeHtml(candidate.role)}</span>`;
+        return `<span class="role-pill role-${escapeHtml(candidate.role)}">${escapeHtml(label)}</span>`;
     }
     const title = `Listed as ${candidate.listedRole} — WarcraftLogs ranks them as ${candidate.role}`;
     return `<span class="role-pill role-${escapeHtml(candidate.role)} role-pill--resolved" `
-         + `title="${escapeHtml(title)}">${escapeHtml(candidate.role)}</span>`;
+         + `title="${escapeHtml(title)}">${escapeHtml(label)}</span>`;
 }
 
 // The class cell carries Blizzard's class icon ahead of the name. The icon is
@@ -792,9 +877,14 @@ function mythicCell(candidate) {
     const text = formatMythicProgress(candidate);
     if (text === null) return '<span class="muted">—</span>';
     const [killed, total] = text.split('/');
-    return total
-        ? `${escapeHtml(killed)}<span class="muted">/${escapeHtml(total)}</span>`
-        : escapeHtml(killed);
+    if (!total) return escapeHtml(killed);
+    // A hairline progress bar under the fraction: 6/8 and 6/12 read differently
+    // at a glance, which is the point of showing the denominator at all.
+    const ratio = Math.max(0, Math.min(1, Number(killed) / Number(total))) || 0;
+    return `<span class="mythic">`
+         + `<span>${escapeHtml(killed)}<span class="mythic-total">/${escapeHtml(total)}</span></span>`
+         + `<span class="mythic-bar${ratio === 1 ? ' is-full' : ''}" style="--fill:${(ratio * 100).toFixed(1)}%"></span>`
+         + `</span>`;
 }
 
 // "3d ago", with the exact date on hover. A listing is a signal that decays —
@@ -813,10 +903,14 @@ function buildRow(candidate) {
 
     const links = profileLinks(candidate);
 
+    // Realm and region sit under the name rather than in two columns of their
+    // own: they identify the character rather than describe them, and folding
+    // them in gave the stat columns room to breathe.
     tr.innerHTML = `
-        <td class="name-cell"><span class="char-name class-${escapeHtml(candidate.playerClass || '')}">${escapeHtml(candidate.name)}</span></td>
-        <td>${escapeHtml(candidate.realm)}</td>
-        <td>${escapeHtml(candidate.region.toUpperCase())}</td>
+        <td class="name-cell">
+            <span class="char-name class-${escapeHtml(candidate.playerClass || '')}">${escapeHtml(candidate.name)}</span>
+            <span class="char-realm">${escapeHtml(realmLabel(candidate.realm))}<span class="region-tag">${escapeHtml(candidate.region.toUpperCase())}</span></span>
+        </td>
         <td class="class-col">${classCellHtml(candidate)}</td>
         <td class="role-cell">${roleCellHtml(candidate)}</td>
         <td class="num ilvl-cell">${numCell(candidate.ilvl)}</td>
@@ -826,9 +920,9 @@ function buildRow(candidate) {
         <td class="num listed-cell">${listedCell(candidate)}</td>
         <td class="sources-cell">${sourcesCellHtml(candidate)}</td>
         <td class="row-links">
-            <a href="${escapeHtml(links.warcraftlogs)}" target="_blank" rel="noreferrer">WCL</a>
-            <a href="${escapeHtml(links.raiderio)}" target="_blank" rel="noreferrer">RIO</a>
-            ${links.wowprogress ? `<a href="${escapeHtml(links.wowprogress)}" target="_blank" rel="noreferrer">WP</a>` : ''}
+            <a href="${escapeHtml(links.warcraftlogs)}" target="_blank" rel="noreferrer" title="WarcraftLogs profile">WCL</a>
+            <a href="${escapeHtml(links.raiderio)}" target="_blank" rel="noreferrer" title="Raider.IO profile">RIO</a>
+            ${links.wowprogress ? `<a href="${escapeHtml(links.wowprogress)}" target="_blank" rel="noreferrer" title="WoWProgress profile">WP</a>` : ''}
         </td>`;
 
     tr.querySelector('.wcl-cell').appendChild(wclBadgeFor(candidate));
@@ -860,9 +954,9 @@ function render() {
 
     el.empty.hidden = rows.length > 0;
     if (rows.length === 0 && state.candidates.length > 0) {
-        // Names the checkbox as it is actually labelled in the toolbar.
+        // Names the switch as it is actually labelled in the toolbar.
         el.empty.textContent = 'Every candidate is filtered out by the search box, your parse thresholds, ' +
-            'or having no WarcraftLogs data. Untick “Hide below thresholds & no logs” to see them.';
+            'or having no WarcraftLogs data. Switch off “Hide below thresholds” to see them.';
     } else if (rows.length === 0 && !el.empty.textContent) {
         // The box is unhidden whenever there are no rows, so it must never be
         // shown blank — finishRun() supplies its own message on the paths it owns.
@@ -906,9 +1000,9 @@ function updateRow(candidate) {
 // screen-reader announcement all come free, and only the box is restyled.
 function buildChips(container, items, groupName) {
     container.innerHTML = '';
-    for (const { value, label, colour } of items) {
+    for (const { value, label, colour, icon } of items) {
         const chip = document.createElement('label');
-        chip.className = 'filter-chip';
+        chip.className = 'chip';
         if (colour) chip.style.setProperty('--chip-colour', colour);
 
         const input = document.createElement('input');
@@ -922,7 +1016,17 @@ function buildChips(container, items, groupName) {
         const text = document.createElement('span');
         text.textContent = label;
 
-        chip.append(input, ...(colour ? [swatch] : []), text);
+        // A class chip shows the class icon in place of the colour swatch; the
+        // colour still rings the icon once the chip is chosen.
+        let marker = colour ? swatch : null;
+        if (icon) {
+            marker = document.createElement('img');
+            marker.className = 'chip-icon';
+            marker.src = icon;
+            marker.alt = '';
+            marker.width = marker.height = 18;
+        }
+        chip.append(input, ...(marker ? [marker] : []), text);
         container.appendChild(chip);
     }
 }
@@ -937,7 +1041,8 @@ function buildFilterControls() {
     // WOW_CLASS_NAMES is a common.js global; classLabel spells the two
     // irregular names ('deathknight' → 'Death Knight') correctly.
     buildChips(el.filterClasses, WOW_CLASS_NAMES
-        .map(value => ({ value, label: classLabel(value), colour: `var(--wow-${value.replace('_', '')})` })), 'classes');
+        .map(value => ({ value, label: classLabel(value), colour: `var(--wow-${value.replace('_', '')})`,
+                         icon: classIconUrl(value) })), 'classes');
 
     el.maxAge.innerHTML = '<option value="">Any age</option>' + LISTED_AGE_OPTIONS
         .map(days => `<option value="${days}">${listedAgeLabel(days)}</option>`).join('');
@@ -963,6 +1068,7 @@ function syncFilterControls() {
     el.minIlvl.value   = f.minIlvl   || '';
     el.minMplus.value  = f.minMplus  || '';
     el.minMythic.value = f.minMythic || '';
+    el.maxMythic.value = f.maxMythic || '';
     // A remembered value that is not an offered choice would leave the select
     // blank while still filtering, so it is shown as the nearest thing: added.
     const age = f.maxAgeDays ? String(f.maxAgeDays) : '';
@@ -986,6 +1092,7 @@ function readFilterControls() {
         minIlvl:     parseFloat(el.minIlvl.value),
         minMplus:    parseFloat(el.minMplus.value),
         minMythic:   parseFloat(el.minMythic.value),
+        maxMythic:   parseFloat(el.maxMythic.value),
         maxAgeDays:  parseInt(el.maxAge.value, 10),
     });
 }
@@ -1100,7 +1207,7 @@ el.difficulty.addEventListener('change', async () => {
     el.run.disabled = true;
     el.difficulty.disabled = true;
     try {
-        for (const candidate of state.candidates) candidate.wcl = null;
+        for (const candidate of state.candidates) { candidate.wcl = null; candidate.scoreSkipped = false; }
         render();
         await scoreCandidates(state.candidates);
         render();
@@ -1158,12 +1265,11 @@ el.copyNames.addEventListener('click', async () => {
     const text = toWhisperList(visibleCandidates());
     try {
         await navigator.clipboard.writeText(text);
-        el.copyNames.textContent = '✓ Copied';
-        setTimeout(() => { el.copyNames.textContent = '📋 Copy names'; }, 1500);
+        setButtonState(el.copyNames, 'Copied', 'check');
     } catch {
-        el.copyNames.textContent = '✗ Copy failed';
-        setTimeout(() => { el.copyNames.textContent = '📋 Copy names'; }, 1500);
+        setButtonState(el.copyNames, 'Copy failed', 'alert');
     }
+    setTimeout(() => setButtonState(el.copyNames, 'Copy names', 'copy'), 1500);
 });
 
 el.exportCsv.addEventListener('click', () => {

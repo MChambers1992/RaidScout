@@ -7,110 +7,140 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true">
+        <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></symbol>
+        <symbol id="i-skip" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 18 12-12"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5M12 17.2v.3"/></symbol>
+    </svg>
 
-    <div class="popup-header">
-        <span class="popup-title">RaidScout</span>
-        <div class="badge-area" id="badgeArea">
-            <span id="badgeCount"></span>
-            <span class="badge-label">skipped</span>
-            <button id="clearBadge" title="Reset counter">×</button>
+    <header class="popup-header">
+        <div class="brand">
+            <img src="../../img/logo-48.png" alt="" width="24" height="24">
+            <span class="popup-title">RaidScout</span>
         </div>
-    </div>
+        <div class="header-right">
+            <span class="saved-indicator" id="savedIndicator" role="status" aria-live="polite"></span>
+            <!-- Candidates the pre-flight check skipped this session. -->
+            <div class="badge-area" id="badgeArea" title="Candidates skipped for being below your thresholds">
+                <svg class="icon"><use href="#i-skip"/></svg>
+                <span id="badgeCount"></span>
+                <span class="badge-label">skipped</span>
+                <button id="clearBadge" title="Reset counter" aria-label="Reset skipped counter">
+                    <svg class="icon"><use href="#i-close"/></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Status lines from the background: an API back-off countdown and the
+         most recent pre-flight skip. popup.js shows and hides them. -->
+    <div class="status-line status-line--warn" id="wclStatusBar" style="display:none"></div>
+    <div class="status-line" id="lastSkipBar" style="display:none"></div>
+
+    <main class="panels">
 
     <!-- WarcraftLogs -->
-    <div class="site-panel wcl" id="panel-warcraftlogs">
+    <section class="site-panel wcl" id="panel-warcraftlogs">
         <div class="panel-header">
-            <div class="panel-header-left">
-                <span class="site-dot"></span>
-                <span class="panel-title">WarcraftLogs</span>
-            </div>
-            <label class="toggle-switch">
-                <input type="checkbox" id="q-warcraftlogsEnabled">
+            <svg class="icon chevron"><use href="#i-chevron"/></svg>
+            <span class="site-dot"></span>
+            <span class="panel-title">WarcraftLogs</span>
+            <label class="toggle-switch" title="Enable WarcraftLogs features">
+                <input type="checkbox" id="q-warcraftlogsEnabled" aria-label="Enable WarcraftLogs features">
                 <span class="toggle-slider"></span>
             </label>
         </div>
         <div class="panel-body">
             <div class="panel-body-content">
-                <div class="quick-row">
-                    <div class="quick-field">
-                        <label for="q-parseThreshold">Median parse %</label>
-                        <input type="number" id="q-parseThreshold" min="0" max="100" step="1">
-                    </div>
-                    <div class="quick-field">
-                        <label for="q-bestParseThreshold">Best parse %</label>
+                <div class="group-label">DPS parse thresholds</div>
+                <div class="field-row">
+                    <label class="field">
+                        <span class="field-label">Min best %</span>
                         <input type="number" id="q-bestParseThreshold" min="0" max="100" step="1">
-                    </div>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Min median %</span>
+                        <input type="number" id="q-parseThreshold" min="0" max="100" step="1">
+                    </label>
                 </div>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-scoutPreflight">
-                    Check parses before opening a tab
+                <label class="setting-row">
+                    <span>Check parses before opening a tab</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-scoutPreflight"><span class="toggle-slider"></span></span>
                 </label>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-scoutOpenInBackground">
-                    Open scouted tabs in background
+                <label class="setting-row">
+                    <span>Open scouted tabs in the background</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-scoutOpenInBackground"><span class="toggle-slider"></span></span>
                 </label>
-                <div class="quick-label">Recruit search region</div>
-                <div class="quick-regions">
-                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="EU"> EU</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="US"> US</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="OC"> OC</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="KR"> KR</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-wclRegionFilter" value="TW"> TW</label>
+
+                <div class="group-label">Recruitment search</div>
+                <div class="chip-group">
+                    <label class="chip"><input type="checkbox" class="q-wclRegionFilter" value="EU"><span>EU</span></label>
+                    <label class="chip"><input type="checkbox" class="q-wclRegionFilter" value="US"><span>US</span></label>
+                    <label class="chip"><input type="checkbox" class="q-wclRegionFilter" value="OC"><span>OC</span></label>
+                    <label class="chip"><input type="checkbox" class="q-wclRegionFilter" value="KR"><span>KR</span></label>
+                    <label class="chip"><input type="checkbox" class="q-wclRegionFilter" value="TW"><span>TW</span></label>
                 </div>
-                <div class="quick-row">
-                    <div class="quick-field">
-                        <label for="q-wclSearchParseThreshold">Min search parse %</label>
-                        <input type="number" id="q-wclSearchParseThreshold" min="0" max="100" placeholder="—">
-                    </div>
-                    <div class="quick-field">
-                        <label for="q-wclMinMythicKills">Min mythic kills</label>
-                        <input type="number" id="q-wclMinMythicKills" min="0" max="99" placeholder="—">
+                <div class="field-row">
+                    <label class="field">
+                        <span class="field-label">Min parse %</span>
+                        <input type="number" id="q-wclSearchParseThreshold" min="0" max="100" placeholder="Any">
+                    </label>
+                    <div class="field" role="group" aria-labelledby="q-wclMythicLabel">
+                        <span class="field-label" id="q-wclMythicLabel">Mythic kills</span>
+                        <div class="range-pair">
+                            <input type="number" id="q-wclMinMythicKills" min="0" max="99" placeholder="Min" aria-label="Minimum mythic kills">
+                            <span class="range-sep" aria-hidden="true">–</span>
+                            <input type="number" id="q-wclMaxMythicKills" min="0" max="99" placeholder="Max" aria-label="Maximum mythic kills">
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- WoWProgress -->
-    <div class="site-panel wowp" id="panel-wowprogress">
+    <section class="site-panel wowp" id="panel-wowprogress">
         <div class="panel-header">
-            <div class="panel-header-left">
-                <span class="site-dot"></span>
-                <span class="panel-title">WoWProgress</span>
-            </div>
-            <label class="toggle-switch">
-                <input type="checkbox" id="q-wowprogressEnabled">
+            <svg class="icon chevron"><use href="#i-chevron"/></svg>
+            <span class="site-dot"></span>
+            <span class="panel-title">WoWProgress</span>
+            <label class="toggle-switch" title="Enable WoWProgress features">
+                <input type="checkbox" id="q-wowprogressEnabled" aria-label="Enable WoWProgress features">
                 <span class="toggle-slider"></span>
             </label>
         </div>
         <div class="panel-body">
             <div class="panel-body-content">
-                <div class="quick-row">
-                    <div class="quick-field">
-                        <label for="q-minIlvl">Min ilvl</label>
-                        <input type="number" id="q-minIlvl" min="0" step="0.01" placeholder="—">
-                    </div>
-                    <div class="quick-field">
-                        <label for="q-maxIlvl">Max ilvl</label>
-                        <input type="number" id="q-maxIlvl" min="0" step="0.01" placeholder="—">
+                <div class="chip-group">
+                    <label class="chip"><input type="checkbox" class="q-regionFilter" value="EU"><span>EU</span></label>
+                    <label class="chip"><input type="checkbox" class="q-regionFilter" value="US"><span>US</span></label>
+                    <label class="chip"><input type="checkbox" class="q-regionFilter" value="OC"><span>OC</span></label>
+                </div>
+                <div class="field-row">
+                    <div class="field" role="group" aria-labelledby="q-wpIlvlLabel">
+                        <span class="field-label" id="q-wpIlvlLabel">Item level</span>
+                        <div class="range-pair">
+                            <input type="number" id="q-minIlvl" min="0" step="0.01" placeholder="Min" aria-label="Minimum item level">
+                            <span class="range-sep" aria-hidden="true">–</span>
+                            <input type="number" id="q-maxIlvl" min="0" step="0.01" placeholder="Max" aria-label="Maximum item level">
+                        </div>
                     </div>
                 </div>
-                <div class="quick-regions">
-                    <label class="quick-inline"><input type="checkbox" class="q-regionFilter" value="EU"> EU</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-regionFilter" value="US"> US</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-regionFilter" value="OC"> OC</label>
-                </div>
-                <div class="quick-row">
-                    <div class="quick-field">
-                        <label for="q-guildFilter">Guild status</label>
+                <div class="field-row">
+                    <label class="field">
+                        <span class="field-label">Guild status</span>
                         <select id="q-guildFilter">
                             <option value="any">Any</option>
                             <option value="in">In a guild</option>
                             <option value="out">Not in a guild</option>
                         </select>
-                    </div>
-                    <div class="quick-field">
-                        <label for="q-wpMaxListedDays">Listed within</label>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Listed within</span>
                         <select id="q-wpMaxListedDays">
                             <option value="">Any age</option>
                             <option value="1">Last 24 hours</option>
@@ -120,49 +150,50 @@
                             <option value="30">Last 30 days</option>
                             <option value="90">Last 90 days</option>
                         </select>
-                    </div>
+                    </label>
                 </div>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-openWarcraftLogsTab">
-                    Auto-open WarcraftLogs on character visit
+                <label class="setting-row">
+                    <span>Auto-open WarcraftLogs on character visit</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-openWarcraftLogsTab"><span class="toggle-slider"></span></span>
                 </label>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-wpWclEnabled">
-                    Proactive WCL parse filter
+                <label class="setting-row">
+                    <span>Filter by WarcraftLogs parse</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-wpWclEnabled"><span class="toggle-slider"></span></span>
                 </label>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- Raider.IO -->
-    <div class="site-panel rio" id="panel-raiderio">
+    <section class="site-panel rio" id="panel-raiderio">
         <div class="panel-header">
-            <div class="panel-header-left">
-                <span class="site-dot"></span>
-                <span class="panel-title">Raider.IO</span>
-            </div>
-            <label class="toggle-switch">
-                <input type="checkbox" id="q-raiderioEnabled">
+            <svg class="icon chevron"><use href="#i-chevron"/></svg>
+            <span class="site-dot"></span>
+            <span class="panel-title">Raider.IO</span>
+            <label class="toggle-switch" title="Enable Raider.IO features">
+                <input type="checkbox" id="q-raiderioEnabled" aria-label="Enable Raider.IO features">
                 <span class="toggle-slider"></span>
             </label>
         </div>
         <div class="panel-body">
             <div class="panel-body-content">
-                <label class="quick-check">
-                    <input type="checkbox" id="q-openWarcraftLogsFromRaiderIO">
-                    Auto-open WarcraftLogs on character visit
-                </label>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-hideRaiderIoAds">
-                    Remove ads
-                </label>
-                <div class="quick-row">
-                    <div class="quick-field">
-                        <label for="q-rioMinIlvl">Min ilvl</label>
-                        <input type="number" id="q-rioMinIlvl" min="0" step="0.01" placeholder="—">
-                    </div>
-                    <div class="quick-field">
-                        <label for="q-rioMaxListedDays">Listed within</label>
+                <div class="chip-group">
+                    <label class="chip"><input type="checkbox" class="q-rioRegionFilter" value="EU"><span>EU</span></label>
+                    <label class="chip"><input type="checkbox" class="q-rioRegionFilter" value="US"><span>US</span></label>
+                    <label class="chip"><input type="checkbox" class="q-rioRegionFilter" value="OC"><span>OC</span></label>
+                </div>
+                <div class="chip-group">
+                    <label class="chip role-tank"><input type="checkbox" class="q-rioRoleFilter" value="tank"><span class="chip-swatch"></span><span>Tank</span></label>
+                    <label class="chip role-healer"><input type="checkbox" class="q-rioRoleFilter" value="healer"><span class="chip-swatch"></span><span>Healer</span></label>
+                    <label class="chip role-dps"><input type="checkbox" class="q-rioRoleFilter" value="dps"><span class="chip-swatch"></span><span>DPS</span></label>
+                </div>
+                <div class="field-row">
+                    <label class="field">
+                        <span class="field-label">Min item level</span>
+                        <input type="number" id="q-rioMinIlvl" min="0" step="0.01" placeholder="Any">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Listed within</span>
                         <select id="q-rioMaxListedDays">
                             <option value="">Any age</option>
                             <option value="1">Last 24 hours</option>
@@ -172,59 +203,63 @@
                             <option value="30">Last 30 days</option>
                             <option value="90">Last 90 days</option>
                         </select>
-                    </div>
+                    </label>
                 </div>
-                <div class="quick-label">Region filter</div>
-                <div class="quick-regions">
-                    <label class="quick-inline"><input type="checkbox" class="q-rioRegionFilter" value="EU"> EU</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-rioRegionFilter" value="US"> US</label>
-                    <label class="quick-inline"><input type="checkbox" class="q-rioRegionFilter" value="OC"> OC</label>
-                </div>
-                <div class="quick-label">Role filter</div>
-                <div class="quick-regions">
-                    <label class="quick-inline role-tank"><input type="checkbox" class="q-rioRoleFilter" value="tank"> Tank</label>
-                    <label class="quick-inline role-healer"><input type="checkbox" class="q-rioRoleFilter" value="healer"> Healer</label>
-                    <label class="quick-inline role-dps"><input type="checkbox" class="q-rioRoleFilter" value="dps"> DPS</label>
-                </div>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-rioWclEnabled">
-                    Proactive WCL parse filter
+                <label class="setting-row">
+                    <span>Auto-open WarcraftLogs on character visit</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-openWarcraftLogsFromRaiderIO"><span class="toggle-slider"></span></span>
+                </label>
+                <label class="setting-row">
+                    <span>Remove ads</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-hideRaiderIoAds"><span class="toggle-slider"></span></span>
+                </label>
+                <label class="setting-row">
+                    <span>Filter by WarcraftLogs parse</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-rioWclEnabled"><span class="toggle-slider"></span></span>
                 </label>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- Guilds of WoW -->
-    <div class="site-panel gow" id="panel-guildsofwow">
+    <section class="site-panel gow" id="panel-guildsofwow">
         <div class="panel-header">
-            <div class="panel-header-left">
-                <span class="site-dot"></span>
-                <span class="panel-title">Guilds of WoW</span>
-            </div>
-            <label class="toggle-switch">
-                <input type="checkbox" id="q-guildsofwowEnabled">
+            <svg class="icon chevron"><use href="#i-chevron"/></svg>
+            <span class="site-dot"></span>
+            <span class="panel-title">Guilds of WoW</span>
+            <label class="toggle-switch" title="Enable Guilds of WoW features">
+                <input type="checkbox" id="q-guildsofwowEnabled" aria-label="Enable Guilds of WoW features">
                 <span class="toggle-slider"></span>
             </label>
         </div>
         <div class="panel-body">
             <div class="panel-body-content">
-                <div class="quick-row">
-                    <div class="quick-field">
-                        <label for="q-gowMinIlvl">Min ilvl</label>
-                        <input type="number" id="q-gowMinIlvl" min="0" placeholder="—">
-                    </div>
-                    <div class="quick-field">
-                        <label for="q-gowMinMythicPlusScore">Min M+ score</label>
-                        <input type="number" id="q-gowMinMythicPlusScore" min="0" placeholder="—">
-                    </div>
+                <div class="chip-group">
+                    <label class="chip role-tank"><input type="checkbox" class="q-roleFilter" value="tank"><span class="chip-swatch"></span><span>Tank</span></label>
+                    <label class="chip role-healer"><input type="checkbox" class="q-roleFilter" value="healer"><span class="chip-swatch"></span><span>Healer</span></label>
+                    <label class="chip role-dps"><input type="checkbox" class="q-roleFilter" value="dps"><span class="chip-swatch"></span><span>DPS</span></label>
                 </div>
-                <div class="quick-row">
-                    <div class="quick-field">
-                        <label for="q-gowMinMythicKills">Min mythic kills</label>
-                        <input type="number" id="q-gowMinMythicKills" min="0" max="99" placeholder="—">
+                <div class="field-row">
+                    <label class="field">
+                        <span class="field-label">Min item level</span>
+                        <input type="number" id="q-gowMinIlvl" min="0" placeholder="Any">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Min M+ score</span>
+                        <input type="number" id="q-gowMinMythicPlusScore" min="0" placeholder="Any">
+                    </label>
+                </div>
+                <div class="field-row">
+                    <div class="field" role="group" aria-labelledby="q-gowMythicLabel">
+                        <span class="field-label" id="q-gowMythicLabel">Mythic kills</span>
+                        <div class="range-pair">
+                            <input type="number" id="q-gowMinMythicKills" min="0" max="99" placeholder="Min" aria-label="Minimum mythic kills">
+                            <span class="range-sep" aria-hidden="true">–</span>
+                            <input type="number" id="q-gowMaxMythicKills" min="0" max="99" placeholder="Max" aria-label="Maximum mythic kills">
+                        </div>
                     </div>
-                    <div class="quick-field">
-                        <label for="q-gowMaxListedDays">Listed within</label>
+                    <label class="field">
+                        <span class="field-label">Listed within</span>
                         <select id="q-gowMaxListedDays">
                             <option value="">Any age</option>
                             <option value="1">Last 24 hours</option>
@@ -234,34 +269,31 @@
                             <option value="30">Last 30 days</option>
                             <option value="90">Last 90 days</option>
                         </select>
-                    </div>
+                    </label>
                 </div>
-                <div class="quick-label">Role filter</div>
-                <div class="quick-regions">
-                    <label class="quick-inline role-tank"><input type="checkbox" class="q-roleFilter" value="tank"> Tank</label>
-                    <label class="quick-inline role-healer"><input type="checkbox" class="q-roleFilter" value="healer"> Healer</label>
-                    <label class="quick-inline role-dps"><input type="checkbox" class="q-roleFilter" value="dps"> DPS</label>
-                </div>
-                <label class="quick-check">
-                    <input type="checkbox" id="q-gowWclEnabled">
-                    Proactive WCL parse filter
+                <label class="setting-row">
+                    <span>Filter by WarcraftLogs parse</span>
+                    <span class="toggle-switch"><input type="checkbox" id="q-gowWclEnabled"><span class="toggle-slider"></span></span>
                 </label>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="popup-footer">
-        <button id="openScout">🔎 Scout all sites</button>
-        <button id="openSettings">⚙ Full Settings</button>
-        <div class="saved-indicator" id="savedIndicator"></div>
-        <div id="wclStatusBar" style="font-size:11px;color:#f09020;padding:4px 8px;display:none;"></div>
-        <div id="lastSkipBar" style="font-size:11px;color:#888;padding:0 8px 4px;display:none;"></div>
+    </main>
+
+    <footer class="popup-footer">
+        <button id="openScout" class="primary">
+            <svg class="icon"><use href="#i-scout"/></svg><span>Scout all sites</span>
+        </button>
+        <button id="openSettings" class="ghost">
+            <svg class="icon"><use href="#i-settings"/></svg><span>Full settings</span>
+        </button>
         <div class="support-row">
-            <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">☕ Support</a>
-            <span class="support-sep">·</span>
-            <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">▶ YouTube</a>
+            <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">Support</a>
+            <span class="support-sep" aria-hidden="true">·</span>
+            <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">YouTube</a>
         </div>
-    </div>
+    </footer>
 
     <script src="../links.js"></script>
     <script src="popup.js"></script>

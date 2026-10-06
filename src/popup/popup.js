@@ -1,12 +1,12 @@
 const SETTINGS_KEYS = [
-    'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills',
+    'warcraftlogsEnabled', 'parseThreshold', 'bestParseThreshold', 'wclSearchParseThreshold', 'wclSelectedRegions', 'wclMinMythicKills', 'wclMaxMythicKills',
     'scoutPreflight', 'scoutOpenInBackground',
     'wowprogressEnabled', 'openWarcraftLogsTab', 'minIlvl', 'maxIlvl', 'selectedRegions', 'guildFilter',
     'wpMaxListedDays', 'wpWclEnabled',
     'raiderioEnabled', 'openWarcraftLogsFromRaiderIO', 'hideRaiderIoAds',
     'rioMinIlvl', 'rioSelectedRegions', 'rioSelectedRoles', 'rioMaxListedDays',
     'rioWclEnabled',
-    'guildsofwowEnabled', 'gowMinIlvl', 'gowMinMythicKills', 'gowMinMythicPlusScore', 'gowSelectedRoles',
+    'guildsofwowEnabled', 'gowMinIlvl', 'gowMinMythicKills', 'gowMaxMythicKills', 'gowMinMythicPlusScore', 'gowSelectedRoles',
     'gowMaxListedDays', 'gowWclEnabled',
 ];
 
@@ -55,6 +55,7 @@ function applySettings(data) {
         cb.checked = savedWclRegions.includes(cb.value);
     });
     document.getElementById('q-wclMinMythicKills').value = data.wclMinMythicKills || '';
+    document.getElementById('q-wclMaxMythicKills').value = data.wclMaxMythicKills || '';
 
     document.getElementById('q-wowprogressEnabled').checked = data.wowprogressEnabled !== false;
     document.getElementById('q-minIlvl').value = data.minIlvl || '';
@@ -90,6 +91,7 @@ function applySettings(data) {
     document.getElementById('q-gowWclEnabled').checked = !!data.gowWclEnabled;
     document.getElementById('q-gowMinIlvl').value = data.gowMinIlvl || '';
     document.getElementById('q-gowMinMythicKills').value = data.gowMinMythicKills || '';
+    document.getElementById('q-gowMaxMythicKills').value = data.gowMaxMythicKills || '';
     document.getElementById('q-gowMinMythicPlusScore').value = data.gowMinMythicPlusScore || '';
     setListedDays('q-gowMaxListedDays', data.gowMaxListedDays);
 
@@ -137,6 +139,7 @@ function saveAll() {
         wclSearchParseThreshold: parseInt(document.getElementById('q-wclSearchParseThreshold').value) || 0,
         wclSelectedRegions,
         wclMinMythicKills: parseInt(document.getElementById('q-wclMinMythicKills').value) || 0,
+        wclMaxMythicKills: parseInt(document.getElementById('q-wclMaxMythicKills').value) || 0,
         scoutPreflight: document.getElementById('q-scoutPreflight').checked,
         scoutOpenInBackground: document.getElementById('q-scoutOpenInBackground').checked,
 
@@ -161,6 +164,7 @@ function saveAll() {
         guildsofwowEnabled: document.getElementById('q-guildsofwowEnabled').checked,
         gowMinIlvl: parseFloat(document.getElementById('q-gowMinIlvl').value) || 0,
         gowMinMythicKills: parseInt(document.getElementById('q-gowMinMythicKills').value) || 0,
+        gowMaxMythicKills: parseInt(document.getElementById('q-gowMaxMythicKills').value) || 0,
         gowMinMythicPlusScore: parseInt(document.getElementById('q-gowMinMythicPlusScore').value) || 0,
         gowSelectedRoles,
         gowMaxListedDays: parseInt(document.getElementById('q-gowMaxListedDays').value) || 0,
@@ -173,8 +177,8 @@ let backoffTimer = null;
 function startBackoffCountdown(bar, state, remainingMs) {
     clearInterval(backoffTimer);
     const label = state === 'cloudflare'
-        ? '☁ WarcraftLogs Cloudflare check — open warcraftlogs.com to clear it'
-        : '🚦 WCL rate limited';
+        ? 'WarcraftLogs Cloudflare check — open warcraftlogs.com to clear it'
+        : 'WarcraftLogs API rate limited';
     let secs = Math.ceil(remainingMs / 1000);
     const render = () => { bar.textContent = `${label} — ${secs}s`; };
     render();
@@ -203,7 +207,7 @@ function renderLastSkip(skip) {
 
 function showSaved() {
     const indicator = document.getElementById('savedIndicator');
-    indicator.textContent = '✓ Saved';
+    indicator.innerHTML = '<svg class="icon"><use href="#i-check"/></svg>Saved';
     indicator.classList.add('visible');
     clearTimeout(savedFadeTimer);
     savedFadeTimer = setTimeout(() => indicator.classList.remove('visible'), 1600);
