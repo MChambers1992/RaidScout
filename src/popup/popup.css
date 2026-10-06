@@ -200,8 +200,6 @@ body {
 .range-pair input { flex: 1; min-width: 0; }
 .range-sep { color: var(--text-faint); }
 
-.chip-divider { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--line); }
-
 /* Label left, switch right: the whole row is the hit area. */
 .setting-row {
     display: flex;

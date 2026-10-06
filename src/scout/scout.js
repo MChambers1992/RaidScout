@@ -631,7 +631,13 @@ async function scoreCandidates(candidates) {
     setProgress(`Scoring 0/${candidates.length}…`);
 
     await runWithConcurrency(candidates, async (candidate) => {
-        if (rateLimited) return;
+        if (rateLimited) {
+            // Skipped, not still loading: without this the row kept its
+            // shimmering placeholder forever after the run had stopped.
+            candidate.scoreSkipped = true;
+            updateRow(candidate);
+            return;
+        }
 
         const score = await requestWclScore({
             region: candidate.region,
@@ -646,6 +652,7 @@ async function scoreCandidates(candidates) {
         });
 
         candidate.wcl = score;
+        candidate.scoreSkipped = false;
 
         // An 'auto' lookup resolves the role from the spec WarcraftLogs actually
         // ranked them as, and effectiveRole() already judges the thresholds by
@@ -763,6 +770,13 @@ const DIFFICULTY_TAGS = { 3: 'N', 4: 'H', 5: 'M' };
 // red or green box around the whole cell.
 function wclBadgeFor(candidate) {
     const score = candidate.wcl;
+    if (!score && candidate.scoreSkipped) {
+        const tag = document.createElement('span');
+        tag.className = 'parse-state parse-state--skipped';
+        tag.title = 'Not looked up: scoring stopped when WarcraftLogs rate-limited the run. Re-run to fill these in.';
+        tag.textContent = 'Not scored';
+        return tag;
+    }
     if (!score) {
         const pending = document.createElement('span');
         pending.className = 'parse-pending';
@@ -986,7 +1000,7 @@ function updateRow(candidate) {
 // screen-reader announcement all come free, and only the box is restyled.
 function buildChips(container, items, groupName) {
     container.innerHTML = '';
-    for (const { value, label, colour } of items) {
+    for (const { value, label, colour, icon } of items) {
         const chip = document.createElement('label');
         chip.className = 'chip';
         if (colour) chip.style.setProperty('--chip-colour', colour);
@@ -1002,7 +1016,17 @@ function buildChips(container, items, groupName) {
         const text = document.createElement('span');
         text.textContent = label;
 
-        chip.append(input, ...(colour ? [swatch] : []), text);
+        // A class chip shows the class icon in place of the colour swatch; the
+        // colour still rings the icon once the chip is chosen.
+        let marker = colour ? swatch : null;
+        if (icon) {
+            marker = document.createElement('img');
+            marker.className = 'chip-icon';
+            marker.src = icon;
+            marker.alt = '';
+            marker.width = marker.height = 18;
+        }
+        chip.append(input, ...(marker ? [marker] : []), text);
         container.appendChild(chip);
     }
 }
@@ -1017,7 +1041,8 @@ function buildFilterControls() {
     // WOW_CLASS_NAMES is a common.js global; classLabel spells the two
     // irregular names ('deathknight' → 'Death Knight') correctly.
     buildChips(el.filterClasses, WOW_CLASS_NAMES
-        .map(value => ({ value, label: classLabel(value), colour: `var(--wow-${value.replace('_', '')})` })), 'classes');
+        .map(value => ({ value, label: classLabel(value), colour: `var(--wow-${value.replace('_', '')})`,
+                         icon: classIconUrl(value) })), 'classes');
 
     el.maxAge.innerHTML = '<option value="">Any age</option>' + LISTED_AGE_OPTIONS
         .map(days => `<option value="${days}">${listedAgeLabel(days)}</option>`).join('');
@@ -1182,7 +1207,7 @@ el.difficulty.addEventListener('change', async () => {
     el.run.disabled = true;
     el.difficulty.disabled = true;
     try {
-        for (const candidate of state.candidates) candidate.wcl = null;
+        for (const candidate of state.candidates) { candidate.wcl = null; candidate.scoreSkipped = false; }
         render();
         await scoreCandidates(state.candidates);
         render();

@@ -91,7 +91,7 @@ number does. A small **M** or **H** in front says which difficulty the parses
 come from. A dot before the numbers marks the threshold verdict: amber when a
 parse is within 10% of your minimum, red when it is below it. Hover the cell for
 the exact figures and the metric (DPS or HPS). Cells that aren't a score say so
-in words: *No logs*, *Lookup failed*, *Rate limited* or *Cloudflare check*.
+in words: *No logs*, *Lookup failed*, *Rate limited* or *Cloudflare check*. If WarcraftLogs rate-limits a run, Scout stops scoring and marks the rest *Not scored* — run again in a minute to fill them in (scores already fetched are cached).
 
 ### Heroic vs. mythic parses
 

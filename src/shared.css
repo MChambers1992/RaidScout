@@ -336,3 +336,20 @@ select option { background: #2a2a2a; color: var(--text-primary); }
 @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
 }
+
+/* A class chip carries Blizzard's class icon in place of the swatch: the icon
+   is what players recognise a class by, faster than its colour. Slightly dimmed
+   until chosen, so a row of thirteen reads as a set rather than as noise. */
+.chip-icon {
+    width: 18px;
+    height: 18px;
+    margin-left: -5px;
+    border-radius: 50%;
+    flex: none;
+    opacity: 0.85;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    transition: opacity 0.15s;
+}
+.chip:hover .chip-icon,
+.chip:has(input:checked) .chip-icon { opacity: 1; }
+.chip:has(input:checked) .chip-icon { box-shadow: 0 0 0 1.5px var(--chip-colour, #3f7fc6); }

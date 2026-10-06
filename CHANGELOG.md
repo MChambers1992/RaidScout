@@ -21,7 +21,10 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 - **Redesigned popup and settings page** — Both now match Scout: one type face, control size, switch, chip and icon set across all three. The popup's sites are cards with a chevron and a tinted border when open; region and role pickers are chips, toggles are label-and-switch rows, and min/max pairs are single range fields. Full Settings has a proper header, tabs marked with each site's colour, and each tab's settings grouped into titled cards laid out in two columns; every region, role, class and source picker is a chip, every on/off is a switch, and Save sits in a sticky bar with Export and Import. The per-site toggle is now labelled **Filter by WarcraftLogs parse**.
 
+- **Class filters show class icons** — Scout's filter panel and every class picker in Full Settings show Blizzard's class icon on each chip, ringed in the class colour once chosen.
+
 ### Fixed
+- **Scout showed skipped candidates as still loading** — When WarcraftLogs rate-limited a run, scoring stopped but the candidates it skipped kept their loading placeholder indefinitely. They now read *Not scored*.
 - **A WarcraftLogs tab you opened yourself could be closed** — The below-threshold check runs on every WarcraftLogs character page, and the extension closed whichever tab reported, plus every WoWProgress tab showing that character. It now closes only tabs RaidScout opened, and only while they still show the character they were opened for.
 - **Duplicate WarcraftLogs tabs from one WoWProgress visit** — WoWProgress's Cloudflare check reloads the page once it passes, and each load opened a tab; so did a refresh. One visit now opens one tab (repeats for the same character from the same tab within 30 seconds are ignored).
 - **Raider.IO only opened WarcraftLogs for the first character you viewed** — Raider.IO switches pages without reloading, and the "already opened" flag was never reset. It now tracks which character it opened, so each new character gets their tab.
