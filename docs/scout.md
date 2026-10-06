@@ -82,12 +82,23 @@ than one site shows their most recent listing. Rows whose site printed no
 readable date show "—" and always sort to the bottom, whichever direction you
 sort in — a missing date is never guessed as "now".
 
+### Reading the parse column
+
+Each candidate's **Parse** cell shows their best and median parse — `81 · 72` —
+coloured on WarcraftLogs' own scale (grey below 25, then green, blue, purple,
+orange from 95, pink at 99 and gold at 100), so the colour reads before the
+number does. A small **M** or **H** in front says which difficulty the parses
+come from. A dot before the numbers marks the threshold verdict: amber when a
+parse is within 10% of your minimum, red when it is below it. Hover the cell for
+the exact figures and the metric (DPS or HPS). Cells that aren't a score say so
+in words: *No logs*, *Lookup failed*, *Rate limited* or *Cloudflare check*.
+
 ### Heroic vs. mythic parses
 
 Mythic and heroic parses are not on one scale — the mythic field is stronger,
 so a mythic 60% can be the better player than a heroic 80%. Sorting by **WCL
 parse** therefore groups them: every mythic parse first, highest to lowest, then
-every heroic parse, then normal. Each badge is tagged **M** or **H** so you can
+every heroic parse, then normal. Each parse is tagged **M** or **H** so you can
 see where one group ends. (A score cached before this was recorded has no
 difficulty and sorts after the known ones until the cache refreshes — six hours
 by default, or clear it in Settings → WarcraftLogs.) The same grouping applies
@@ -97,13 +108,13 @@ By default WarcraftLogs reports each character's parses from the hardest
 difficulty they have logs on, so a raider with a single mythic kill is ranked
 on mythic parses while everyone else is ranked on heroic — not a like-for-like
 comparison. The **Parses** picker in the toolbar pins scoring to **Heroic only**
-(or **Mythic only**) and re-scores the table on the spot; badges then read
-`WCL H 85% / 70%`. It is the same setting as **Compare parses from** in
+(or **Mythic only**) and re-scores the table on the spot; every parse is then
+tagged **H** (or **M**). It is the same setting as **Compare parses from** in
 Settings → WarcraftLogs, so the sites and Scout always agree. Scores are cached
 per difficulty, so switching back and forth costs each character one lookup
 per setting. Note that someone with no logs at the chosen difficulty counts as
-*no logs* and is hidden with the others when "Hide below thresholds & no logs"
-is on.
+*no logs* and is hidden with the others when **Hide below thresholds** is
+on.
 
 ---
 
@@ -172,11 +183,11 @@ hidden on WoWProgress is hidden in Scout for the same reason.
 
 Candidates who *couldn't be scored* are never hidden: no API credentials,
 scoring switched off, a rate limit part-way through a run, or a failed lookup
-all leave the candidate visible with an explanatory badge. Those say nothing
+all leave the candidate visible, with the reason written in the Parse cell. Those say nothing
 about the player, and hiding on them would empty the whole list on a
 misconfiguration. The counter above the table breaks the two apart —
-`12 below thresholds · 5 with no logs` — and unticking **Hide below thresholds
-& no logs** brings both back.
+`12 below thresholds · 5 with no logs` — and switching off **Hide below
+thresholds** brings both back.
 
 ---
 

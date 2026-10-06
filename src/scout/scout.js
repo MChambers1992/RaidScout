@@ -15,7 +15,7 @@ import {
     sortCandidates, matchesQuery, profileLinks, toCsv, toWhisperList, runWithConcurrency, classIconUrl,
     formatMythicProgress, formatListedAge,
     matchesFilters, normalizeFilters, activeFilterCount, DEFAULT_FILTERS, summarizeScoreErrors,
-    absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS, realmLabel,
+    absorbCandidates, reachedAgeLimit, LISTED_AGE_OPTIONS, realmLabel, parseTier,
 } from './scout-core.js';
 import { adapterFor, DEFAULT_SOURCE_URLS, SITE_ENABLED_KEYS, isNewestFirst } from './sources.js';
 import { fetchProfileFields, applyEnrichment, ENRICH_ORIGIN } from './enrich.js';
@@ -193,7 +193,7 @@ function renderNotices() {
     if (count === 0) { setNoticesOpen(false); el.banner.innerHTML = ''; return; }
 
     el.toggleNotices.classList.toggle('has-errors', errors > 0);
-    el.noticeIcon.textContent  = errors > 0 ? '⚠' : 'ℹ';
+    el.noticeIcon.innerHTML    = iconSvg(errors > 0 ? 'alert' : 'info');
     el.noticeCount.textContent = String(count);
     el.toggleNotices.title = errors > 0
         ? `${errors} of ${count} ${count === 1 ? 'notice' : 'notices'} ${errors === 1 ? 'is' : 'are'} a failure — click to read`
@@ -255,7 +255,7 @@ async function runScout() {
     el.run.disabled = true;
     // Changing difficulty mid-run would leave half the table scored at each.
     el.difficulty.disabled = true;
-    el.run.textContent = '⏳ Scouting…';
+    setButtonState(el.run, 'Scouting…', 'spinner');
     renderNotices();
     el.table.hidden = true;
     el.toolbar.hidden = true;
@@ -480,7 +480,7 @@ async function loadMore() {
     state.running = true;
     el.run.disabled = true;
     el.difficulty.disabled = true;
-    el.loadMoreBtn.textContent = '⏳ Loading…';
+    setButtonState(el.loadMoreBtn, 'Loading…', 'spinner');
     renderLoadMore();
 
     try {
@@ -522,7 +522,7 @@ async function loadMore() {
         state.running = false;
         el.run.disabled = false;
         el.difficulty.disabled = false;
-        el.loadMoreBtn.textContent = '⬇ Load more';
+        setButtonState(el.loadMoreBtn, 'Load more', 'more');
         renderLoadMore();
     }
 }
@@ -531,7 +531,7 @@ function finishRun(emptyMessage) {
     state.running = false;
     el.run.disabled = false;
     el.difficulty.disabled = false;
-    el.run.textContent = '🔎 Run scout';
+    setButtonState(el.run, 'Run scout', 'scout');
     renderLoadMore();
     if (emptyMessage) {
         el.empty.hidden = false;
@@ -704,6 +704,19 @@ function reportScoreErrors(candidates) {
 
 // ─── Render ────────────────────────────────────────────────────────────────────
 
+function iconSvg(name) {
+    return `<svg class="icon${name === 'spinner' ? ' icon--spin' : ''}"><use href="#i-${name}"/></svg>`;
+}
+
+// Buttons carry an icon and a label; changing only the label's text keeps the
+// icon, and the icon is swapped alongside it for busy and done states.
+function setButtonState(button, label, icon) {
+    const labelEl = button.querySelector('.btn-label');
+    if (labelEl) labelEl.textContent = label; else button.textContent = label;
+    const svg = button.querySelector('svg.icon');
+    if (svg && icon) svg.outerHTML = iconSvg(icon);
+}
+
 function escapeHtml(text) {
     return String(text ?? '').replace(/[&<>"']/g, ch =>
         ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -732,13 +745,69 @@ function isBelowThreshold(candidate) {
                               effectiveRole(candidate.wcl, candidate.role));
 }
 
+// Plain words for the states that are not a score; the shared badge's emoji
+// prefixes suit an injected marker on someone else's site, not this table.
+const PARSE_STATE_LABELS = {
+    'no-logs':      'No logs',
+    'error':        'Lookup failed',
+    'rate-limited': 'Rate limited',
+    'blocked':      'Cloudflare check',
+};
+
+const DIFFICULTY_TAGS = { 3: 'N', 4: 'H', 5: 'M' };
+
+// The decision (state, threshold verdict, tooltip) still comes from the shared
+// makeBadge(), so Scout judges a parse exactly as the sites do; only the drawing
+// is Scout's own. A score is two numbers in WarcraftLogs' colour bands behind a
+// difficulty tag, with the threshold verdict as a small marker rather than a
+// red or green box around the whole cell.
 function wclBadgeFor(candidate) {
     const score = candidate.wcl;
-    if (!score) return makeBadge('pending', null, state.wclSettings, candidate.role);
+    if (!score) {
+        const pending = document.createElement('span');
+        pending.className = 'parse-pending';
+        pending.title = 'Fetching WarcraftLogs parses…';
+        return pending;
+    }
     // badgeStateForScore is the shared ladder every site uses; reusing it also
-    // picks up the Cloudflare 'blocked' state, which the copy here had missed
-    // and rendered as a generic error. makeBadge applies effectiveRole itself.
-    return makeBadge(badgeStateForScore(score), score, state.wclSettings, candidate.role);
+    // picks up the Cloudflare 'blocked' state. makeBadge applies effectiveRole.
+    const stateName = badgeStateForScore(score);
+    const badge = makeBadge(stateName, score, state.wclSettings, candidate.role);
+
+    if (stateName !== 'score') {
+        const tag = document.createElement('span');
+        tag.className = `parse-state parse-state--${stateName}`;
+        tag.title = badge.title;
+        tag.textContent = PARSE_STATE_LABELS[stateName] || badge.textContent;
+        return tag;
+    }
+
+    const verdict = badge.classList.contains('rs-badge--fail') ? 'fail'
+                  : badge.classList.contains('rs-badge--warn') ? 'warn' : 'pass';
+    const wrap = document.createElement('span');
+    wrap.className = `parse parse--${verdict}`;
+    wrap.title = badge.title + (verdict === 'fail' ? ' — below your thresholds'
+                              : verdict === 'warn' ? ' — within 10% of your thresholds' : '');
+
+    const diff = DIFFICULTY_TAGS[score.difficulty];
+    if (diff) {
+        const tag = document.createElement('span');
+        tag.className = `diff-tag diff-tag--${diff}`;
+        tag.textContent = diff;
+        wrap.appendChild(tag);
+    }
+    const value = (number, kind) => {
+        const span = document.createElement('span');
+        const tier = parseTier(number);
+        span.className = `parse-num parse-num--${kind}` + (tier ? ` tier-${tier}` : '');
+        span.textContent = tier ? String(Math.floor(number)) : '—';
+        return span;
+    };
+    const sep = document.createElement('span');
+    sep.className = 'parse-sep';
+    sep.textContent = '·';
+    wrap.append(value(score.best, 'best'), sep, value(score.median, 'median'));
+    return wrap;
 }
 
 // The role shown is the one the thresholds were applied against. Where that came
@@ -794,9 +863,14 @@ function mythicCell(candidate) {
     const text = formatMythicProgress(candidate);
     if (text === null) return '<span class="muted">—</span>';
     const [killed, total] = text.split('/');
-    return total
-        ? `${escapeHtml(killed)}<span class="muted">/${escapeHtml(total)}</span>`
-        : escapeHtml(killed);
+    if (!total) return escapeHtml(killed);
+    // A hairline progress bar under the fraction: 6/8 and 6/12 read differently
+    // at a glance, which is the point of showing the denominator at all.
+    const ratio = Math.max(0, Math.min(1, Number(killed) / Number(total))) || 0;
+    return `<span class="mythic">`
+         + `<span>${escapeHtml(killed)}<span class="mythic-total">/${escapeHtml(total)}</span></span>`
+         + `<span class="mythic-bar${ratio === 1 ? ' is-full' : ''}" style="--fill:${(ratio * 100).toFixed(1)}%"></span>`
+         + `</span>`;
 }
 
 // "3d ago", with the exact date on hover. A listing is a signal that decays —
@@ -866,9 +940,9 @@ function render() {
 
     el.empty.hidden = rows.length > 0;
     if (rows.length === 0 && state.candidates.length > 0) {
-        // Names the checkbox as it is actually labelled in the toolbar.
+        // Names the switch as it is actually labelled in the toolbar.
         el.empty.textContent = 'Every candidate is filtered out by the search box, your parse thresholds, ' +
-            'or having no WarcraftLogs data. Untick “Hide below thresholds & no logs” to see them.';
+            'or having no WarcraftLogs data. Switch off “Hide below thresholds” to see them.';
     } else if (rows.length === 0 && !el.empty.textContent) {
         // The box is unhidden whenever there are no rows, so it must never be
         // shown blank — finishRun() supplies its own message on the paths it owns.
@@ -1166,12 +1240,11 @@ el.copyNames.addEventListener('click', async () => {
     const text = toWhisperList(visibleCandidates());
     try {
         await navigator.clipboard.writeText(text);
-        el.copyNames.textContent = '✓ Copied';
-        setTimeout(() => { el.copyNames.textContent = '📋 Copy names'; }, 1500);
+        setButtonState(el.copyNames, 'Copied', 'check');
     } catch {
-        el.copyNames.textContent = '✗ Copy failed';
-        setTimeout(() => { el.copyNames.textContent = '📋 Copy names'; }, 1500);
+        setButtonState(el.copyNames, 'Copy failed', 'alert');
     }
+    setTimeout(() => setButtonState(el.copyNames, 'Copy names', 'copy'), 1500);
 });
 
 el.exportCsv.addEventListener('click', () => {

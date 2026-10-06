@@ -25,14 +25,14 @@
 
 ## Badges and the API
 
-**Parse badges show "⚠ WCL err"**
+**Parse badges show "⚠ WCL err" (or "Lookup failed" in Scout)**
 - A transient lookup failure — the character stays visible, because filtering always fails open
 - **Hover the badge**: its tooltip carries the actual error, which is what tells you which of the causes below you have
 - On the **Scout** page you don't need to hover — a run that fails to score names the cause behind the **Notices** button, with the fix that applies
 - Common causes: a wrong or revoked Client ID/Secret (use **Test connection** in Full Settings), WarcraftLogs being slow or down, or their API rejecting the query outright — the last one reads `WCL GraphQL error: …` and needs an extension update, not a settings change
 - For the full picture, check the service worker console: `chrome://extensions/` → RaidScout → **Service worker** → **inspect**. Look for `[RaidScout WCL]` lines (turn on debug logging in Full Settings for more detail)
 
-**"☁ Cloudflare check" in the popup, or `☁ CF check` badges on rows**
+**"☁ Cloudflare check" in the popup, `☁ CF check` badges on rows, or "Cloudflare check" in Scout's Parse column**
 - WarcraftLogs is challenging RaidScout's API requests. This is not a credentials problem
 - Open **warcraftlogs.com** in a tab and complete the check. RaidScout retries as soon as a real WarcraftLogs page loads — you don't need to wait out the countdown
 - While it's active nothing is filtered out: scouting falls back to opening tabs, and list filtering leaves everyone visible
@@ -66,7 +66,7 @@
 - If it says the credentials were rejected, use **Test connection** in Full Settings → WarcraftLogs; if it mentions Cloudflare, open warcraftlogs.com in a tab and complete the check
 
 **Scout is hiding people who look fine on the site**
-- Candidates with no WarcraftLogs parses are hidden by **Hide below thresholds & no logs**. The counter above the table shows how many; untick it to see them
+- Candidates with no WarcraftLogs parses are hidden by the **Hide below thresholds** switch. The counter above the table shows how many; switch it off to see them
 - Check the **Filters** button — a filter from a previous session may still be active. The count sits on the button, and **Clear filters** resets them
 
 **Scout found fewer candidates than the sites show**

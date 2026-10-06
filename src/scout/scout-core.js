@@ -371,6 +371,22 @@ export function mergeCandidates(candidates) {
 // tier's boss count — 6/8 is most of a tier, 6/12 is a third of one, and the
 // denominator changes with every raid. Falls back to the bare number when only a
 // listing supplied the kills and nothing supplied the total.
+// WarcraftLogs' own colour bands for a parse percentile, named after the item
+// qualities they borrow. Officers read these colours on WarcraftLogs every day,
+// so a purple 80 means something before the number is even read. Returns null
+// for a missing value so the caller can render a dash.
+export function parseTier(percent) {
+    if (percent === null || percent === undefined || !Number.isFinite(percent)) return null;
+    const p = Math.floor(percent);
+    if (p >= 100) return 'artifact';
+    if (p >= 99)  return 'astounding';
+    if (p >= 95)  return 'legendary';
+    if (p >= 75)  return 'epic';
+    if (p >= 50)  return 'rare';
+    if (p >= 25)  return 'uncommon';
+    return 'common';
+}
+
 export function formatMythicProgress(candidate) {
     const killed = candidate?.mythicKills;
     if (killed === null || killed === undefined) return null;

@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
     slugRealm, makeCandidateKey, normalizeCandidate, mergeCandidate, mergeCandidates,
     passesWowProgressFilters, sortCandidates, matchesQuery, profileLinks,
-    toCsv, toWhisperList, realmLabel, runWithConcurrency, hasNoLogs, isScored, classLabel,
+    toCsv, toWhisperList, realmLabel, parseTier, runWithConcurrency, hasNoLogs, isScored, classLabel,
     matchesFilters, normalizeFilters, activeFilterCount, hasActiveFilters, DEFAULT_FILTERS,
     normalizeClassKey, roleFromClass, classIconUrl, DPS_ONLY_CLASSES,
     describeScoreError, summarizeScoreErrors, SOURCE_IDS, RETIRED_SOURCE_IDS, SOURCE_META,
@@ -1040,5 +1040,25 @@ describe('realmLabel', () => {
         expect(realmLabel('kazzak')).toBe('Kazzak');
         expect(realmLabel('')).toBe('');
         expect(realmLabel(null)).toBe('');
+    });
+});
+
+describe('parseTier', () => {
+    it('uses WarcraftLogs\' colour bands', () => {
+        expect(parseTier(100)).toBe('artifact');
+        expect(parseTier(99.4)).toBe('astounding');
+        expect(parseTier(95)).toBe('legendary');
+        expect(parseTier(94.9)).toBe('epic');
+        expect(parseTier(75)).toBe('epic');
+        expect(parseTier(50)).toBe('rare');
+        expect(parseTier(25)).toBe('uncommon');
+        expect(parseTier(24.9)).toBe('common');
+        expect(parseTier(0)).toBe('common');
+    });
+
+    it('returns null for a missing value', () => {
+        expect(parseTier(null)).toBeNull();
+        expect(parseTier(undefined)).toBeNull();
+        expect(parseTier(NaN)).toBeNull();
     });
 });
