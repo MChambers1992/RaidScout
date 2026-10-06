@@ -1,537 +1,319 @@
+/* options.css — Full Settings page.
+ *
+ * Built on the components in shared.css (buttons, inputs, select chevron,
+ * switch, chips, icons). Each tab is a header followed by titled cards; inside
+ * a card, settings sit in a two-column grid once there is room, and anything
+ * whose meaning depends on full width (chip groups, the threshold table,
+ * explanatory notes) opts out with .option--wide. */
+
+* { box-sizing: border-box; }
+
 body {
-    font-family: Arial, sans-serif;
-    background-color: #1e1e1e;
-    color: #ffffff;
     margin: 0;
-    padding: 16px 0 24px;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    min-height: 100vh;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* The options page opens as a full browser tab, but this was pinned to 400px,
-   so 51 settings stacked into one endless column and the tab labels truncated.
-   It grows to a comfortable reading width now and falls back to full width in
-   the narrow embedded-options panel. */
+/* The options page opens as a full browser tab, but it was once pinned to
+   400px, so 51 settings stacked into one endless column and the tab labels
+   truncated. It grows to a comfortable reading width and falls back to full
+   width in the narrow embedded-options panel. */
 .container {
     width: 100%;
-    max-width: 860px;
+    max-width: 920px;
     margin: 0 auto;
-    padding: 20px 24px 0;
-    background-color: var(--bg-panel);
-    border-radius: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    padding: 32px 24px 24px;
 }
 
-h1 {
-    text-align: center;
-    font-size: 20px;
-    margin: 0 0 16px;
-    color: #e0e0e0;
-    letter-spacing: 0.5px;
-}
+/* ── Page header ────────────────────────────────────────────────────────── */
 
-/* ── Tab navigation ── */
+.page-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.page-logo { border-radius: 10px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06); flex: none; }
+h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.015em; color: var(--text-strong); }
+.page-sub { margin: 2px 0 0; font-size: 13px; color: var(--text-muted); }
+
+/* ── Tabs ───────────────────────────────────────────────────────────────── */
+
+/* A segmented bar: each tab carries its site's dot, so the colour that marks a
+   site in the popup and in Scout marks it here too. */
 .tabs {
     display: flex;
-    gap: 2px;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #3a3a3a;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 24px;
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    position: sticky;
+    top: 12px;
+    z-index: 4;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .tab-btn {
+    --site: #777;
     flex: 1;
-    padding: 8px 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 10px;
     background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: #777;
-    font-size: 12px;
-    font-family: Arial, sans-serif;
-    cursor: pointer;
-    margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    border: 0;
+    border-radius: 7px;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 550;
     white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
 }
+.tab-btn:hover { color: var(--text-strong); background: rgba(255, 255, 255, 0.04); }
+.tab-btn.active { color: var(--text-strong); background: var(--surface-3); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
 
-.tab-btn:hover {
-    color: #ccc;
-    background-color: #333;
-    border-radius: 4px 4px 0 0;
+.tab-btn[data-tab="warcraftlogs"] { --site: var(--site-warcraftlogs); }
+.tab-btn[data-tab="wowprogress"]  { --site: var(--site-wowprogress); }
+.tab-btn[data-tab="raiderio"]     { --site: var(--site-raiderio); }
+.tab-btn[data-tab="guildsofwow"]  { --site: var(--site-guildsofwow); }
+.tab-btn[data-tab="scout"]        { --site: var(--site-scout); }
+
+.tab-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--site);
+    opacity: 0.55;
+    transition: opacity 0.15s, box-shadow 0.15s;
 }
+.tab-btn.active .tab-dot { opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--site) 22%, transparent); }
 
-/* Per-site active tab accent colours */
-.tab-btn[data-tab="warcraftlogs"].active { color: #fff; border-bottom-color: var(--site-warcraftlogs); }
-.tab-btn[data-tab="wowprogress"].active  { color: #fff; border-bottom-color: var(--site-wowprogress); }
-.tab-btn[data-tab="raiderio"].active     { color: #fff; border-bottom-color: var(--site-raiderio); }
-.tab-btn[data-tab="guildsofwow"].active  { color: #fff; border-bottom-color: var(--site-guildsofwow); }
-.tab-btn[data-tab="scout"].active        { color: #fff; border-bottom-color: var(--site-scout); }
+/* ── Category ───────────────────────────────────────────────────────────── */
 
-/* ── Section header with enable toggle ── */
+/* Toggled with a class, not an inline display, so the layout below stays in
+   charge of how the active category is laid out (quirk 31). */
+.category-content { display: none; }
+.category-content.is-active { display: flex; flex-direction: column; gap: 16px; }
+
 .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 18px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #3a3a3a;
+    gap: 24px;
+    padding: 0 4px 4px;
 }
+.section-header h2 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; color: var(--text-strong); }
+.section-desc { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); max-width: 60ch; }
 
-.section-header h2 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 700;
-    color: #e8e8e8;
-    letter-spacing: 0.3px;
-}
+.toggle-switch--lg .toggle-slider { width: 38px; height: 22px; }
+.toggle-switch--lg .toggle-slider::after { width: 18px; height: 18px; }
+.toggle-switch--lg input:checked + .toggle-slider::after { transform: translateX(16px); }
 
 /* ── Disabled section state ── */
-/* Applied by options.js when a site's enable toggle is off. Everything except
-   the section header (which carries that toggle) greys out, including the bare
-   subsection labels and hints between the option blocks. */
+/* Applied by options.js when a site's enable toggle is off. Every card greys
+   out; the section header, which carries that toggle, stays live. */
 .category-content.section-disabled > *:not(.section-header) {
-    opacity: 0.35;
+    opacity: 0.4;
     pointer-events: none;
     user-select: none;
+    filter: grayscale(0.6);
 }
 
-/* ── Toggle switch ── */
-.toggle-switch {
-    position: relative;
-    width: 38px;
-    height: 22px;
-    display: inline-block;
-    flex-shrink: 0;
-    cursor: pointer;
-}
+/* ── Cards ──────────────────────────────────────────────────────────────── */
 
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-    position: absolute;
+.card {
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px 22px;
 }
+.card-title { margin: 0; font-size: 14px; font-weight: 650; color: var(--text-strong); }
+.card-desc { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); max-width: 72ch; }
+.card-desc em { color: var(--text-secondary); font-style: normal; }
 
-.toggle-slider {
-    position: absolute;
-    inset: 0;
-    background-color: #555;
-    border-radius: 22px;
-    transition: background-color 0.2s;
-}
-
-.toggle-slider::before {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    left: 3px;
-    top: 3px;
-    background-color: #fff;
-    border-radius: 50%;
-    transition: transform 0.2s;
-}
-
-.toggle-switch input:checked + .toggle-slider {
-    background-color: #007bff;
-}
-
-.toggle-switch input:checked + .toggle-slider::before {
-    transform: translateX(16px);
-}
-
-/* ── Form options ── */
-.option {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    margin-bottom: 16px;
-}
-
-.option:has(input[type="checkbox"]) {
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-}
-
-.option input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    margin: 0;
-    flex-shrink: 0;
-    cursor: pointer;
-}
-
-/* Inherit font-family for all buttons */
-button {
-    font-family: Arial, sans-serif;
-}
-
-label {
-    font-size: 13px;
-    color: #c8c8c8;
-    cursor: default;
-}
-
-.option:has(input[type="checkbox"]) label {
-    cursor: pointer;
-    margin: 0;
-}
-
-input[type="number"],
-input[type="text"],
-select {
-    width: 100%;
-    padding: 7px 9px;
-    background: #333;
-    color: #fff;
-    border: 1px solid #4a4a4a;
-    border-radius: 5px;
-    font-size: 13px;
-    box-sizing: border-box;
-}
-
-input[type="number"]:focus,
-select:focus {
-    outline: none;
-    border-color: #007bff;
-}
-
-/* ── Range inputs (min/max ilvl) ── */
-.range-inputs {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.range-inputs input {
-    flex: 1;
-    min-width: 0;
-    width: auto;
-}
-
-.range-sep {
-    color: #666;
-    flex-shrink: 0;
-    font-size: 13px;
-}
-
-/* ── Option groups (region, class filter) ── */
-.option-group {
-    background: #242424;
-    border: 1px solid #333;
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-bottom: 16px;
-}
-
-.option-group-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
-    font-size: 13px;
-    color: #ccc;
-}
-
-.option-group-header button {
-    width: auto;
-    padding: 2px 8px;
-    font-size: 11px;
-    margin-top: 0;
-    background-color: #444;
-    border-radius: 4px;
-    color: #aaa;
-}
-
-.option-group-header button:hover {
-    background-color: #555;
-    color: #fff;
-}
-
-.hint {
-    font-size: 11px;
-    color: #6a6a6a;
-    margin: 0 0 8px;
-    line-height: 1.4;
-}
-
-/* ── Region checkboxes ── */
-.region-checks {
-    display: flex;
-    flex-wrap: wrap;      /* long labels overflowed the column without this */
-    gap: 8px 20px;
-    align-items: center;
-}
-
-.inline-check {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: #ccc;
-    cursor: pointer;
-    margin: 0;
-}
-
-.inline-check input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
-    margin: 0;
-    flex-shrink: 0;
-    cursor: pointer;
-}
-
-/* ── Class filter grid with WoW class colours ── */
-.class-grid {
+.card-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px 10px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px 28px;
+    align-items: start;
+    margin-top: 18px;
 }
+.card-grid > .option--wide,
+.card-grid > .threshold-grid { grid-column: 1 / -1; }
 
-.class-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: #ccc;
-    cursor: pointer;
-    margin: 0;
-    padding: 3px 6px;
-    border-left: 3px solid var(--class-color, #555);
-    border-radius: 2px;
-}
+/* ── Options ────────────────────────────────────────────────────────────── */
 
-.class-label input[type="checkbox"] {
-    width: 13px;
-    height: 13px;
-    margin: 0;
-    flex-shrink: 0;
-    cursor: pointer;
-}
+.option { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.option > label:first-child,
+.group-title { font-size: 13px; font-weight: 550; color: var(--text-secondary); }
+.option input:not([type="checkbox"]),
+.option select { width: 100%; }
 
-.class-label.warrior      { --class-color: var(--wow-warrior); }
-.class-label.paladin      { --class-color: var(--wow-paladin); }
-.class-label.hunter       { --class-color: var(--wow-hunter); }
-.class-label.rogue        { --class-color: var(--wow-rogue); }
-.class-label.priest       { --class-color: var(--wow-priest); }
-.class-label.shaman       { --class-color: var(--wow-shaman); }
-.class-label.mage         { --class-color: var(--wow-mage); }
-.class-label.warlock      { --class-color: var(--wow-warlock); }
-.class-label.monk         { --class-color: var(--wow-monk); }
-.class-label.druid        { --class-color: var(--wow-druid); }
-.class-label.deathknight  { --class-color: var(--wow-deathknight); }
-.class-label.demon_hunter { --class-color: var(--wow-demonhunter); }
-.class-label.evoker       { --class-color: var(--wow-evoker); }
-
-/* ── Role filter colours (Guilds of WoW tab) ── */
-.inline-check.role-tank,
-.inline-check.role-healer,
-.inline-check.role-dps {
-    padding: 3px 6px;
-    border-left: 3px solid var(--role-color, #555);
-    border-radius: 2px;
-}
-
-.role-tank   { --role-color: var(--role-tank); }
-.role-healer { --role-color: var(--role-healer); }
-.role-dps    { --role-color: var(--role-dps); }
-
-/* ── Subsection label (e.g. "Recruitment Search" within WarcraftLogs) ── */
-.subsection-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin: 20px 0 12px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #333;
-}
-
-/* Inline label + toggle switch (proactive WCL enable rows) */
+/* A boolean: its label and switch on one line, the explanation beneath. */
 .option.toggle-inline {
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
-    column-gap: 12px;
+    align-content: start;
+    column-gap: 16px;
+    row-gap: 4px;
 }
-.option.toggle-inline > label:first-child {
-    margin: 0;
-}
-.option.toggle-inline > .hint {
-    grid-column: 1 / -1;
-    margin-top: 4px;
-}
+.option.toggle-inline > label:first-child { cursor: pointer; }
+.option.toggle-inline > .hint { grid-column: 1 / -1; }
 
-/* ── Sticky save area ── */
+.option--actions { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.option--actions > .hint { flex-basis: 100%; }
+
+.hint { margin: 0; font-size: 12.5px; color: var(--text-faint); line-height: 1.5; }
+.hint strong { color: var(--text-muted); font-weight: 600; }
+.hint em { font-style: normal; color: var(--text-muted); }
+.hint--warn { color: #e8a25a; }
+
+.inline-status { font-size: 12.5px; color: var(--text-muted); }
+.inline-status--warn { color: #e8a25a; }
+
+.range-inputs { display: flex; align-items: center; gap: 8px; }
+.range-inputs input { flex: 1; min-width: 0; width: auto; }
+.range-sep { color: var(--text-faint); flex: none; }
+
+/* ── Chip groups (region, role, class, source) ── */
+
+.option-group { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.group-head { display: flex; align-items: baseline; gap: 10px; }
+.group-hint { font-size: 12px; color: var(--text-faint); }
+.group-head .link-btn { margin-left: auto; }
+
+/* ── Role threshold table ───────────────────────────────────────────────── */
+
+/* Six stacked inputs became a 3x2 table: the role/metric relationship is the
+   point, and a grid shows it at a glance. */
+.threshold-grid {
+    display: grid;
+    /* Two-digit percentages: wide inputs made the numbers look lost. */
+    grid-template-columns: 110px repeat(2, minmax(0, 200px));
+    gap: 10px 16px;
+    align-items: center;
+}
+.threshold-grid .tg-head {
+    font-size: 11px;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+}
+.threshold-grid .tg-role {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--text-secondary);
+}
+.threshold-grid .tg-role::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--role-color, #555);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--role-color, #555) 20%, transparent);
+}
+.tg-role.role-tank   { --role-color: var(--role-tank); }
+.tg-role.role-healer { --role-color: var(--role-healer); }
+.tg-role.role-dps    { --role-color: var(--role-dps); }
+
+/* ── Disclosure cards ───────────────────────────────────────────────────── */
+
+/* Settings most people never touch stay available but stop competing with
+   the ones they do. Same card, with the title as its toggle. */
+details.advanced { padding: 0; }
+details.advanced > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 24px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    border-radius: var(--radius-lg);
+}
+details.advanced > summary::-webkit-details-marker { display: none; }
+details.advanced > summary::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    flex: none;
+    background: currentColor;
+    color: var(--text-faint);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: transform 0.18s ease;
+}
+details.advanced[open] > summary::before { transform: rotate(90deg); }
+details.advanced > summary:hover { background: rgba(255, 255, 255, 0.02); }
+.summary-desc { font-size: 13px; color: var(--text-muted); }
+details.advanced > .card-grid { margin: 0; padding: 4px 24px 22px; }
+
+/* ── Sticky action bar ──────────────────────────────────────────────────── */
+
 .save-area {
     position: sticky;
     bottom: 0;
-    padding: 12px 0 16px;
-    background-color: #2a2a2a;
+    z-index: 5;
     margin-top: 8px;
-    border-top: 1px solid #333;
+    background: color-mix(in srgb, var(--bg-page) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line-soft);
 }
-
-button#saveButton {
-    width: 100%;
-    padding: 10px;
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-    border-radius: 5px;
+.save-inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 14px 24px;
 }
-
-button#saveButton:hover {
-    background-color: #0056b3;
-}
+.save-inner .spacer { flex: 1; }
+#saveButton { min-width: 140px; }
 
 #statusMessage {
-    height: 18px;
-    margin: 6px 0 0;
-    font-size: 12px;
-    color: #4caf50;
-    text-align: center;
+    margin: 0;
+    min-height: 18px;
+    font-size: 13px;
+    color: var(--success);
 }
 
-.settings-tools {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-}
+.settings-tools { display: flex; gap: 8px; }
 
-.settings-tools button {
-    flex: 1;
-    padding: 7px;
-    background-color: #3a3a3a;
-    color: #aaa;
-    border: 1px solid #4a4a4a;
-    border-radius: 5px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: background-color 0.15s, color 0.15s;
-}
-
-.settings-tools button:hover {
-    background-color: #4a4a4a;
-    color: #fff;
-}
-
-/* ── Support links ── */
 .support-row {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 14px;
+    gap: 16px;
     flex-wrap: wrap;
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid #333;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 24px 14px;
     font-size: 12px;
 }
+.support-row .footer-note { color: var(--text-faint); }
+.support-row .support-link { color: #8a8a8a; text-decoration: none; transition: color 0.15s; }
+.support-row .support-link:hover { color: var(--warning); }
 
-.support-row .footer-note { color: #666; }
+/* ── Narrow (the embedded options panel, small windows) ─────────────────── */
 
-.support-row .support-link {
-    color: #8a8a8a;
-    text-decoration: none;
-    transition: color 0.15s;
+@media (max-width: 720px) {
+    .container { padding: 20px 16px 16px; }
+    .tabs { overflow-x: auto; position: static; }
+    .tab-btn { flex: none; }
+    .card { padding: 16px; }
+    .card-grid { grid-template-columns: minmax(0, 1fr); }
+    .threshold-grid { grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr); }
+    details.advanced > summary { padding: 14px 16px; }
+    details.advanced > .card-grid { padding: 4px 16px 16px; }
+    .save-inner { padding: 12px 16px; flex-wrap: wrap; }
 }
-.support-row .support-link:hover { color: #f0b060; text-decoration: underline; }
-
-
-/* ── Wide-viewport layout ───────────────────────────────────────────────────
-   Two columns of settings once there's room, so a long tab stops being an
-   endless scroll. Anything that must stay full width (grids, notes, disclosure
-   panels) opts out with .option--wide. */
-
-.category-content { display: none; }
-.category-content.is-active { display: block; }
-
-@media (min-width: 720px) {
-    .category-content.is-active {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        column-gap: 24px;
-        align-items: start;
-    }
-    /* Anything whose meaning depends on full width opts out of the columns. */
-    .category-content > .section-header,
-    .category-content > .subsection-label,
-    .category-content > details,
-    .category-content > .threshold-grid,
-    .category-content > .option--wide {
-        grid-column: 1 / -1;
-    }
-    /* A block that is nothing but explanatory text belongs across both columns:
-       stranded in one, it reads as a caption for whatever field landed beside
-       it rather than for the section it introduces. */
-    .category-content > .option:has(> .hint:only-child) {
-        grid-column: 1 / -1;
-        max-width: 72ch;
-    }
-}
-
-/* ── Role threshold grid ────────────────────────────────────────────────────
-   Six stacked inputs, each with its own hint paragraph, became a 3x2 table:
-   the role/metric relationship is the point, and a grid shows it at a glance. */
-
-.threshold-grid {
-    display: grid;
-    grid-template-columns: minmax(70px, 110px) 1fr 1fr;
-    gap: 8px 12px;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.threshold-grid .tg-head {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-muted);
-    font-weight: 600;
-}
-
-.threshold-grid .tg-role {
-    font-size: 13px;
-    color: var(--text-secondary);
-    border-left: 3px solid var(--role-color, #555);
-    padding-left: 8px;
-}
-.threshold-grid .tg-role.role-tank   { --role-color: var(--role-tank); }
-.threshold-grid .tg-role.role-healer { --role-color: var(--role-healer); }
-.threshold-grid .tg-role.role-dps    { --role-color: var(--role-dps); }
-
-.threshold-grid input[type="number"] { margin: 0; }
-
-/* ── Disclosure panels ──────────────────────────────────────────────────────
-   Settings most people never touch (cache TTL, debug, concurrency, per-source
-   listing URLs) stay available but stop competing with the ones they do. */
-
-details.advanced {
-    margin: 4px 0 18px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: #262626;
-}
-
-details.advanced > summary {
-    cursor: pointer;
-    padding: 9px 12px;
-    font-size: 12px;
-    color: var(--text-secondary);
-    user-select: none;
-    list-style: none;
-}
-details.advanced > summary::-webkit-details-marker { display: none; }
-details.advanced > summary::before {
-    content: '▸ ';
-    color: var(--text-muted);
-}
-details.advanced[open] > summary::before { content: '▾ '; }
-details.advanced > summary:hover { color: var(--text-strong); }
-details.advanced .details-body { padding: 4px 12px 8px; }

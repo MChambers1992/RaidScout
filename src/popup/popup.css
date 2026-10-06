@@ -1,369 +1,239 @@
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+/* popup.css — the toolbar popup.
+ *
+ * Built on the components in shared.css (buttons, inputs, select chevron,
+ * switch, chips, icons) at a denser size: the popup is 340px wide, so controls
+ * are 30px rather than 34px and chips 26px. */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --control-h: 30px;
+    --chip-h:    26px;
 }
 
 body {
-    font-family: Arial, sans-serif;
-    background: #1e1e1e;
-    color: #ddd;
-    width: 320px;
+    width: 340px;
+    font-family: var(--font);
     font-size: 13px;
+    line-height: 1.35;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
 }
 
-/* ── Header ── */
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
 .popup-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 11px 14px 10px;
-    background: #252525;
-    border-bottom: 1px solid #333;
+    gap: 8px;
+    height: 52px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--line-soft);
 }
 
-.popup-title {
-    font-size: 12px;
-    font-weight: bold;
-    color: #e0e0e0;
-    letter-spacing: 0.4px;
-}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { border-radius: 6px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.popup-title { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
 
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+/* Skipped counter: a quiet pill, red-tinted because each one is a candidate
+   you did not have to look at. */
 .badge-area {
     display: none;
     align-items: center;
-    gap: 4px;
-    background: #2d1515;
-    border: 1px solid #7a2020;
-    border-radius: 4px;
-    padding: 2px 6px 2px 8px;
-    font-size: 11px;
+    gap: 5px;
+    height: 26px;
+    padding: 0 4px 0 9px;
+    border-radius: 999px;
+    background: rgba(217, 83, 79, 0.12);
+    border: 1px solid rgba(217, 83, 79, 0.35);
+    color: #f0a8a3;
+    font-size: 12px;
 }
-
-.badge-area.visible {
-    display: flex;
-}
-
-#badgeCount {
-    color: #e07070;
-    font-weight: bold;
-}
-
-.badge-label {
-    color: #777;
-}
+.badge-area.visible { display: inline-flex; }
+.badge-area > .icon { width: 13px; height: 13px; }
+#badgeCount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.badge-label { color: #c98f8b; }
 
 #clearBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 0;
+    border-radius: 50%;
     background: none;
-    border: none;
-    color: #666;
+    color: #b07a76;
     cursor: pointer;
-    font-size: 15px;
-    line-height: 1;
-    padding: 0 0 0 3px;
-    font-family: Arial, sans-serif;
 }
+#clearBadge .icon { width: 12px; height: 12px; }
+#clearBadge:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 
-#clearBadge:hover {
-    color: #ccc;
+.saved-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--success);
+    opacity: 0;
+    transition: opacity 0.3s;
 }
+.saved-indicator .icon { width: 13px; height: 13px; }
+.saved-indicator.visible { opacity: 1; }
 
-/* ── Site panels ── */
+/* ── Status lines ───────────────────────────────────────────────────────── */
+
+.status-line {
+    padding: 8px 16px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-muted);
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--line-soft);
+}
+.status-line--warn { color: #e8b07a; background: rgba(232, 162, 90, 0.08); }
+
+/* ── Site panels ────────────────────────────────────────────────────────── */
+
+.panels { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+
 .site-panel {
-    border-left: 2px solid transparent;
-    border-bottom: 1px solid #2a2a2a;
-    transition: border-left-color 0.15s;
+    --site: #555;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: var(--surface-1);
+    transition: border-color 0.15s;
 }
+.site-panel.wcl  { --site: var(--site-warcraftlogs); }
+.site-panel.wowp { --site: var(--site-wowprogress); }
+.site-panel.rio  { --site: var(--site-raiderio); }
+.site-panel.gow  { --site: var(--site-guildsofwow); }
+.site-panel.open { border-color: color-mix(in srgb, var(--site) 35%, var(--line)); }
 
-.site-panel.open.wcl  { border-left-color: #e8670d; }
-.site-panel.open.wowp { border-left-color: #4a90d9; }
-.site-panel.open.rio  { border-left-color: #00b35a; }
-.site-panel.open.gow  { border-left-color: #9B59B6; }
-
-/* ── Panel header ── */
 .panel-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 9px 14px;
+    gap: 9px;
+    height: 44px;
+    padding: 0 12px 0 10px;
     cursor: pointer;
     user-select: none;
-    transition: background 0.1s;
+    border-radius: 10px;
+    transition: background-color 0.15s;
 }
+.panel-header:hover { background: rgba(255, 255, 255, 0.03); }
 
-.panel-header:hover {
-    background: #272727;
-}
-
-.panel-header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.site-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: #444;
-    transition: background 0.15s;
-}
-
-.wcl  .site-dot { background: #e8670d; }
-.wowp .site-dot { background: #4a90d9; }
-.rio  .site-dot { background: #00b35a; }
-.gow  .site-dot { background: #9B59B6; }
-
-.panel-title {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.2px;
-    transition: color 0.15s;
-}
-
-.site-panel:not(.open) .panel-title {
-    color: #777;
-}
-
-.site-panel.open .panel-title {
-    color: #e0e0e0;
-}
-
-/* ── Panel body accordion ── */
-.panel-body {
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height 0.22s ease;
-}
-
-.site-panel.open .panel-body {
-    max-height: 350px;
-}
-
-.panel-body-content {
-    padding: 8px 14px 12px;
-    background: #242424;
-    border-top: 1px solid #2e2e2e;
-}
-
-/* ── Quick form fields ── */
-.quick-row {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-
-.quick-field {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.quick-field label,
-.quick-label {
-    font-size: 11px;
-    color: #666;
-    cursor: default;
-}
-
-.quick-label {
-    margin-bottom: 5px;
-    margin-top: 2px;
-}
-
-input[type="number"],
-input[type="text"],
-select {
-    width: 100%;
-    padding: 5px 8px;
-    background: #2e2e2e;
-    color: #e0e0e0;
-    border: 1px solid #444;
-    border-radius: 4px;
-    font-size: 12px;
-    font-family: Arial, sans-serif;
-}
-
-input[type="number"]:focus,
-select:focus {
-    outline: none;
-    border-color: #007bff;
-}
-
-/* ── Region / role inline checks ── */
-.quick-regions {
-    display: flex;
-    gap: 14px;
-    margin-bottom: 8px;
-}
-
-.quick-inline {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    color: #bbb;
-    cursor: pointer;
-}
-
-.quick-inline input[type="checkbox"] {
-    width: 13px;
-    height: 13px;
-    flex-shrink: 0;
-    margin: 0;
-    cursor: pointer;
-}
-
-.quick-inline.role-tank   { color: #6aabde; }
-.quick-inline.role-healer { color: #6dcc6d; }
-.quick-inline.role-dps    { color: #e07070; }
-
-/* ── Checkbox rows ── */
-.quick-check {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 12px;
-    color: #bbb;
-    cursor: pointer;
-    margin-bottom: 7px;
-    line-height: 1.3;
-}
-
-.quick-check:last-child {
-    margin-bottom: 0;
-}
-
-.quick-check input[type="checkbox"] {
-    width: 13px;
-    height: 13px;
-    flex-shrink: 0;
-    margin: 1px 0 0;
-    cursor: pointer;
-}
-
-/* ── Toggle switch ── */
-.toggle-switch {
-    position: relative;
-    width: 34px;
-    height: 20px;
-    display: inline-block;
-    flex-shrink: 0;
-    cursor: pointer;
-}
-
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-    position: absolute;
-}
-
-.toggle-slider {
-    position: absolute;
-    inset: 0;
-    background: #4a4a4a;
-    border-radius: 20px;
-    transition: background 0.2s;
-}
-
-.toggle-slider::before {
-    content: '';
-    position: absolute;
+/* The chevron says the row opens; it turns when it has. */
+.chevron {
     width: 14px;
     height: 14px;
-    left: 3px;
-    top: 3px;
-    background: #aaa;
+    color: var(--text-faint);
+    transition: transform 0.18s ease, color 0.15s;
+}
+.site-panel.open .chevron { transform: rotate(90deg); color: var(--text-muted); }
+
+.site-dot {
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    transition: transform 0.2s, background 0.2s;
+    flex: none;
+    background: var(--site);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--site) 18%, transparent);
 }
 
-.toggle-switch input:checked + .toggle-slider {
-    background: #007bff;
+.panel-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: color 0.15s;
+}
+.site-panel.open .panel-title,
+.panel-header:hover .panel-title { color: var(--text-strong); }
+
+/* A site switched off reads as off from the collapsed row. */
+.site-panel:has(.panel-header input:not(:checked)) :is(.site-dot, .panel-title) { opacity: 0.45; }
+
+/* ── Panel body (accordion) ─────────────────────────────────────────────── */
+
+.panel-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s ease;
+}
+.site-panel.open .panel-body { grid-template-rows: 1fr; }
+.panel-body-content {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 12px;
+}
+.site-panel.open .panel-body-content {
+    padding: 4px 12px 12px;
+    border-top: 1px solid var(--line-soft);
+    padding-top: 12px;
 }
 
-.toggle-switch input:checked + .toggle-slider::before {
-    background: #fff;
-    transform: translateX(14px);
+.group-label {
+    font-size: 10.5px;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: -2px;
 }
+.group-label:not(:first-child) { margin-top: 4px; }
 
-/* ── Footer ── */
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-row:has(> .field:only-child) { grid-template-columns: 1fr; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field-label { font-size: 11.5px; color: var(--text-muted); }
+.field input, .field select { width: 100%; }
+
+.range-pair { display: flex; align-items: center; gap: 6px; }
+.range-pair input { flex: 1; min-width: 0; }
+.range-sep { color: var(--text-faint); }
+
+.chip-divider { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--line); }
+
+/* Label left, switch right: the whole row is the hit area. */
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 24px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+.setting-row:hover { color: var(--text-strong); }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
 .popup-footer {
-    padding: 10px 14px 12px;
-    background: #1e1e1e;
-    border-top: 1px solid #2a2a2a;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 4px 8px 10px;
 }
+.popup-footer button { --control-h: 36px; }
 
-#openScout {
-    width: 100%;
-    padding: 9px;
-    margin-bottom: 6px;
-    background: #007bff;
-    color: #fff;
-    border: 1px solid #0069d9;
-    border-radius: 5px;
-    font-size: 12px;
-    font-weight: bold;
-    font-family: Arial, sans-serif;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-#openScout:hover {
-    background: #0056b3;
-}
-
-#openSettings {
-    width: 100%;
-    padding: 8px;
-    background: #2e2e2e;
-    color: #bbb;
-    border: 1px solid #3a3a3a;
-    border-radius: 5px;
-    font-size: 12px;
-    font-family: Arial, sans-serif;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-#openSettings:hover {
-    background: #383838;
-    color: #fff;
-    border-color: #555;
-}
-
-.saved-indicator {
-    height: 14px;
-    margin-top: 5px;
-    font-size: 11px;
-    color: #4caf50;
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.35s;
-}
-
-.saved-indicator.visible {
-    opacity: 1;
-}
-
-/* ── Support links ── */
 .support-row {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 8px 0 2px;
-    font-size: 11px;
+    gap: 8px;
+    padding-top: 4px;
+    font-size: 11.5px;
 }
-
-.support-row .support-link {
-    color: #777;
-    text-decoration: none;
-    transition: color 0.15s;
-}
-.support-row .support-link:hover { color: #f0b060; }
+.support-link { color: #777; text-decoration: none; transition: color 0.15s; }
+.support-link:hover { color: var(--warning); }
 .support-sep { color: #444; }

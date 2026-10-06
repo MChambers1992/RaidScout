@@ -65,3 +65,274 @@
     --role-healer: #56cc56;
     --role-dps:    #e74c3c;
 }
+
+/* ── Design system ─────────────────────────────────────────────────────────
+ *
+ * The components below are shared by the popup, the options page and Scout so
+ * the three surfaces read as one product: one type stack, one control height,
+ * one radius scale, one icon set, one switch, one chip. Each surface sets its
+ * own --control-h / --chip-h where it needs a denser or roomier fit (the popup
+ * is 340px wide). Spacing steps are 4 / 8 / 12 / 16 / 24 px. */
+
+:root {
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+    --control-h:   34px;
+    --chip-h:      30px;
+    --radius-sm:   4px;
+    --radius:      7px;
+    --radius-lg:   12px;
+
+    --surface-1:   #232323;   /* cards */
+    --surface-2:   #2a2a2a;   /* inputs, chips, table head */
+    --surface-3:   #313131;   /* hover */
+    --line:        #333;
+    --line-soft:   #2b2b2b;
+    --focus:       #4a90d9;
+
+    /* WarcraftLogs' parse colour bands, nudged lighter where the originals
+       fall below readable contrast on a dark surface (blue, purple). */
+    --tier-artifact:   #e5cc80;
+    --tier-astounding: #e268a8;
+    --tier-legendary:  #ff8000;
+    --tier-epic:       #b05cf5;
+    --tier-rare:       #3d8bff;
+    --tier-uncommon:   #3fd23f;
+    --tier-common:     #8a8a8a;
+}
+
+/* Any rule that sets `display` outranks the user-agent's `[hidden]{display:none}`,
+   so an element toggled with el.hidden would stay on screen. Fixed once here. */
+[hidden] { display: none !important; }
+
+/* ── Icons ── One stroke family, referenced from each page's inline sprite with
+   <svg class="icon"><use href="#i-…"/></svg>. Emoji render in each platform's
+   own art and colour, so a row of buttons looked assembled from parts. */
+
+.icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.icon--spin { animation: rs-spin 0.9s linear infinite; }
+@keyframes rs-spin { to { transform: rotate(360deg); } }
+
+/* ── Buttons ── */
+
+:is(button, a).primary,
+:is(button, a).ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: var(--control-h);
+    padding: 0 14px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+:is(button.primary, button.ghost):disabled { opacity: 0.55; cursor: default; }
+
+.primary {
+    background-color: var(--accent);
+    color: var(--text-strong);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.primary:hover:not(:disabled) { background-color: #1a86ff; }
+.primary:active:not(:disabled) { background-color: var(--accent-hover); }
+
+.ghost {
+    background-color: var(--surface-2);
+    color: var(--text-secondary);
+    border-color: var(--line);
+}
+.ghost:hover:not(:disabled),
+.ghost[aria-expanded="true"] { background-color: var(--surface-3); border-color: var(--border-strong); color: var(--text-strong); }
+
+/* A quiet text-weight action, for "Clear all" beside a group heading. */
+button.link-btn {
+    padding: 2px 4px;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: #8fb4dc;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+button.link-btn:hover:not(:disabled) { color: var(--text-strong); text-decoration: underline; }
+
+/* ── Text inputs and selects ── */
+
+/* Padding is set per element below rather than here: this :is() outranks a
+   plain `select` rule, and the select needs room on the right for its chevron. */
+:is(input[type="search"], input[type="number"], input[type="text"], input[type="password"], select) {
+    height: var(--control-h);
+    background-color: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    box-sizing: border-box;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+:is(input[type="search"], input[type="number"], input[type="text"], input[type="password"]) { padding: 0 11px; }
+input::placeholder { color: #6e6e6e; }
+:is(input, select):hover:not(:disabled) { border-color: var(--border-strong); }
+:is(input, select):focus { outline: none; border-color: var(--focus); background-color: #262b31; }
+
+/* Spinner arrows are noise on fields that take a two- or three-digit number. */
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* The native select arrow differs per platform and sits flush to the edge;
+   a drawn chevron matches the icon set. */
+select {
+    appearance: none;
+    padding: 0 32px 0 11px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 14px;
+}
+select:disabled { cursor: default; }
+select option { background: #2a2a2a; color: var(--text-primary); }
+
+:where(button, a, input, select, summary, th[data-sort]):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+}
+
+/* ── Switch ── Two markups, one look: Scout's `.switch` (label + track + text)
+   and the settings pages' `.toggle-switch` (a bare switch beside its label).
+   Both are a real checkbox underneath, so keyboard and screen-reader
+   behaviour come from the input. */
+
+.switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+.switch:hover { color: var(--text-strong); }
+
+.switch input,
+.toggle-switch input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+
+.toggle-switch {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    cursor: pointer;
+}
+
+.switch-track,
+.toggle-slider {
+    position: relative;
+    display: block;
+    width: 30px;
+    height: 18px;
+    border-radius: 999px;
+    background: #474747;
+    transition: background-color 0.15s;
+    flex: none;
+}
+.switch-track::after,
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #d6d6d6;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s, background-color 0.15s;
+}
+:is(.switch, .toggle-switch) input:checked + :is(.switch-track, .toggle-slider) { background: var(--accent); }
+:is(.switch, .toggle-switch) input:checked + :is(.switch-track, .toggle-slider)::after { transform: translateX(12px); background: #fff; }
+:is(.switch, .toggle-switch) input:focus-visible + :is(.switch-track, .toggle-slider) { outline: 2px solid var(--focus); outline-offset: 2px; }
+:is(.switch, .toggle-switch) input:disabled + :is(.switch-track, .toggle-slider) { opacity: 0.5; }
+
+/* ── Chip ── A real checkbox inside a label: keyboard and screen-reader
+   behaviour comes free, and only the box itself is replaced by the chip. The
+   swatch carries a class, role or site colour, so a checked chip is not
+   identified by its blue tint alone. */
+
+.chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: var(--chip-h);
+    padding: 0 11px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.chip:hover { background: var(--surface-3); border-color: var(--border-strong); color: #eee; }
+.chip input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.chip:has(input:checked) { background: #1d2f45; border-color: #3f7fc6; color: #eaf2fb; }
+.chip:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.chip:has(input:disabled) { cursor: default; }
+
+.chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip-swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--chip-colour, #666);
+    flex: none;
+}
+
+/* Class, role and site colours for swatches, by the storage key on the chip. */
+.chip.warrior      { --chip-colour: var(--wow-warrior); }
+.chip.paladin      { --chip-colour: var(--wow-paladin); }
+.chip.hunter       { --chip-colour: var(--wow-hunter); }
+.chip.rogue        { --chip-colour: var(--wow-rogue); }
+.chip.priest       { --chip-colour: var(--wow-priest); }
+.chip.shaman       { --chip-colour: var(--wow-shaman); }
+.chip.mage         { --chip-colour: var(--wow-mage); }
+.chip.warlock      { --chip-colour: var(--wow-warlock); }
+.chip.monk         { --chip-colour: var(--wow-monk); }
+.chip.druid        { --chip-colour: var(--wow-druid); }
+.chip.deathknight  { --chip-colour: var(--wow-deathknight); }
+.chip.demon_hunter { --chip-colour: var(--wow-demonhunter); }
+.chip.evoker       { --chip-colour: var(--wow-evoker); }
+.chip.role-tank    { --chip-colour: var(--role-tank); }
+.chip.role-healer  { --chip-colour: var(--role-healer); }
+.chip.role-dps     { --chip-colour: var(--role-dps); }
+.chip.site-wowprogress { --chip-colour: var(--site-wowprogress); }
+.chip.site-raiderio    { --chip-colour: var(--site-raiderio); }
+.chip.site-guildsofwow { --chip-colour: var(--site-guildsofwow); }
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+}

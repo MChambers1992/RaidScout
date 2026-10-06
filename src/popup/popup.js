@@ -177,8 +177,8 @@ let backoffTimer = null;
 function startBackoffCountdown(bar, state, remainingMs) {
     clearInterval(backoffTimer);
     const label = state === 'cloudflare'
-        ? '☁ WarcraftLogs Cloudflare check — open warcraftlogs.com to clear it'
-        : '🚦 WCL rate limited';
+        ? 'WarcraftLogs Cloudflare check — open warcraftlogs.com to clear it'
+        : 'WarcraftLogs API rate limited';
     let secs = Math.ceil(remainingMs / 1000);
     const render = () => { bar.textContent = `${label} — ${secs}s`; };
     render();
@@ -207,7 +207,7 @@ function renderLastSkip(skip) {
 
 function showSaved() {
     const indicator = document.getElementById('savedIndicator');
-    indicator.textContent = '✓ Saved';
+    indicator.innerHTML = '<svg class="icon"><use href="#i-check"/></svg>Saved';
     indicator.classList.add('visible');
     clearTimeout(savedFadeTimer);
     savedFadeTimer = setTimeout(() => indicator.classList.remove('visible'), 1600);

@@ -3,78 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RaidScout</title>
+    <title>RaidScout Settings</title>
     <link rel="stylesheet" href="../shared.css">
     <link rel="stylesheet" href="options.css">
 </head>
 <body>
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon-sprite" aria-hidden="true">
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M5 19h14"/></symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M5 19h14"/></symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    </svg>
+
     <div class="container">
-        <h1>RaidScout</h1>
+        <header class="page-header">
+            <img class="page-logo" src="../../img/logo-48.png" alt="" width="40" height="40">
+            <div>
+                <h1>RaidScout</h1>
+                <p class="page-sub">Settings for every site RaidScout works on. Changes apply when you save.</p>
+            </div>
+        </header>
 
-        <div class="tabs">
-            <button class="tab-btn" data-tab="warcraftlogs">WarcraftLogs</button>
-            <button class="tab-btn" data-tab="wowprogress">WoWProgress</button>
-            <button class="tab-btn" data-tab="raiderio">Raider.IO</button>
-            <button class="tab-btn" data-tab="guildsofwow">Guilds of WoW</button>
-            <button class="tab-btn" data-tab="scout">Scout</button>
-        </div>
+        <nav class="tabs" role="tablist" aria-label="Settings sections">
+            <button class="tab-btn" data-tab="warcraftlogs" role="tab"><span class="tab-dot"></span>WarcraftLogs</button>
+            <button class="tab-btn" data-tab="wowprogress" role="tab"><span class="tab-dot"></span>WoWProgress</button>
+            <button class="tab-btn" data-tab="raiderio" role="tab"><span class="tab-dot"></span>Raider.IO</button>
+            <button class="tab-btn" data-tab="guildsofwow" role="tab"><span class="tab-dot"></span>Guilds of WoW</button>
+            <button class="tab-btn" data-tab="scout" role="tab"><span class="tab-dot"></span>Scout</button>
+        </nav>
 
-        <!-- WarcraftLogs Settings -->
         <div class="category-content" id="warcraftlogs">
             <div class="section-header">
-                <h2>WarcraftLogs</h2>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="warcraftlogsEnabled">
+                <div>
+                    <h2>WarcraftLogs</h2>
+                    <p class="section-desc">Parse thresholds shared by every site, the pre-flight check, and the recruitment search.</p>
+                </div>
+                <label class="toggle-switch toggle-switch--lg" title="Enable WarcraftLogs">
+                    <input type="checkbox" id="warcraftlogsEnabled" aria-label="Enable WarcraftLogs">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
-            <p class="subsection-label">API Credentials (for proactive scoring)</p>
-            <div class="option">
-                <p class="hint">Create a v2 API client at warcraftlogs.com → Settings → "Manage your API clients" (any redirect URL works). Paste the Client ID and Secret below. The <strong>Client ID</strong> syncs across devices; the <strong>Secret</strong> is stored locally only and is never synced by Chrome.</p>
-            </div>
-            <div class="option">
-                <label for="wclClientId">Client ID</label>
-                <input type="text" id="wclClientId" placeholder="WarcraftLogs API client ID" autocomplete="off">
-            </div>
-            <div class="option">
-                <label for="wclClientSecret">Client Secret</label>
-                <input type="password" id="wclClientSecret" placeholder="WarcraftLogs API client secret" autocomplete="off">
-                <p class="hint">Stored in local storage only — never synced across devices.</p>
-            </div>
-            <div class="option" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <button type="button" id="testWclCredentials">Test connection</button>
-                <span id="wclTestStatus" style="font-size:12px;"></span>
-            </div>
-            <p class="subsection-label">Scouting (WoWProgress &amp; Raider.IO auto-open)</p>
-            <div class="option toggle-inline">
-                <label for="scoutPreflight">Check parses before opening a tab</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="scoutPreflight">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Scores the character through the API <em>first</em> and only opens their WarcraftLogs tab if they pass your thresholds &mdash; so rejected candidates never have to get through WarcraftLogs' Cloudflare check just to have their tab closed again. Needs API credentials. If a lookup fails, RaidScout opens the tab and checks again from the WarcraftLogs page; with no credentials at all nothing is checked, so every tab opens and stays open. On by default.</p>
-            </div>
-            <div class="option toggle-inline">
-                <label for="scoutOpenInBackground">Open scouted tabs in the background</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="scoutOpenInBackground">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Opens WarcraftLogs tabs without switching to them, so browsing a recruitment list isn't interrupted.</p>
-            </div>
-            <details class="advanced">
-                <summary>Advanced &mdash; caching, diagnostics and request rate</summary>
-                <div class="details-body">
+            <section class="card">
+                <h3 class="card-title">API credentials</h3>
+                <p class="card-desc">Create a v2 API client at warcraftlogs.com → Settings → <em>Manage your API clients</em> (any redirect URL works), then paste its ID and secret here. Parse scoring everywhere in RaidScout needs these.</p>
+                <div class="card-grid">
                 <div class="option">
-                    <label for="wclCacheTtlHours">Score cache TTL (hours)</label>
-                    <input type="number" id="wclCacheTtlHours" min="0.5" max="48" step="0.5" placeholder="6">
-                    <p class="hint">How long to cache each character's parse score. Default 6 h. Lower = fresher data but more API calls.</p>
+                    <label for="wclClientId">Client ID</label>
+                    <input type="text" id="wclClientId" placeholder="WarcraftLogs API client ID" autocomplete="off">
+                    <p class="hint">Synced across your devices.</p>
                 </div>
                 <div class="option">
-                    <button type="button" id="clearWclScoreCache">Clear cached scores</button>
-                    <span id="wclRateLimitStatus" style="font-size:12px;margin-left:8px;color:#f09020;"></span>
-                    <p class="hint" id="wclCloudflareHint" style="display:none;color:#f09020;">WarcraftLogs is challenging API requests (Cloudflare). Open <strong>warcraftlogs.com</strong> in a tab and complete the check &mdash; RaidScout retries as soon as that page loads.</p>
-                    <p class="hint">Scores are cached to limit API calls. Clear if you want fresh data immediately.</p>
+                    <label for="wclClientSecret">Client secret</label>
+                    <input type="password" id="wclClientSecret" placeholder="WarcraftLogs API client secret" autocomplete="off">
+                    <p class="hint">Stored on this device only — never synced.</p>
+                </div>
+                <div class="option option--wide option--actions">
+                    <button type="button" class="ghost" id="testWclCredentials">Test connection</button>
+                    <span id="wclTestStatus" class="inline-status"></span>
+                </div>
+                </div>
+            </section>
+            <section class="card" id="card-thresholds">
+                <h3 class="card-title">Parse thresholds</h3>
+                <p class="card-desc">Set these once. They drive parse filtering on WoWProgress, Raider.IO and Guilds of WoW, the pre-flight check, and Scout.</p>
+                <div class="card-grid">
+                <div class="threshold-grid option--wide">
+                    <span class="tg-head"></span>
+                    <span class="tg-head">Min best %</span>
+                    <span class="tg-head">Min median %</span>
+
+                    <span class="tg-role role-dps">DPS</span>
+                    <input type="number" id="bestParseThreshold" min="0" max="100" step="1" placeholder="e.g. 60"
+                           aria-label="Minimum best DPS parse percent">
+                    <input type="number" id="parseThreshold" min="0" max="100" step="1" placeholder="e.g. 50"
+                           aria-label="Minimum median DPS parse percent">
+
+                    <span class="tg-role role-tank">Tank</span>
+                    <input type="number" id="wclMinBestTank" min="0" max="100" step="1" placeholder="Uses DPS"
+                           aria-label="Minimum best tank parse percent">
+                    <input type="number" id="wclMinMedianTank" min="0" max="100" step="1" placeholder="Uses DPS"
+                           aria-label="Minimum median tank parse percent">
+
+                    <span class="tg-role role-healer">Healer</span>
+                    <input type="number" id="wclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60"
+                           aria-label="Minimum best healer parse percent">
+                    <input type="number" id="wclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50"
+                           aria-label="Minimum median healer parse percent">
+                </div>
+                <div class="option option--wide">
+                    <p class="hint"><strong>Best</strong> is the highest single parse on any fight; <strong>median</strong> is the middle one. DPS and tanks are measured on damage, healers on healing — RaidScout picks the metric per character. Leave Tank blank to reuse the DPS row. Characters with no logs count as below every threshold; characters whose lookup <em>failed</em> are always kept, so a misconfiguration can never empty a page.</p>
+                </div>
+                <div class="option">
+                    <label for="wclDifficulty">Compare parses from</label>
+                    <select id="wclDifficulty">
+                        <option value="">Highest difficulty logged (default)</option>
+                        <option value="4">Heroic only</option>
+                        <option value="5">Mythic only</option>
+                    </select>
+                    <p class="hint">By default anyone with a single mythic kill is judged on mythic parses while everyone else is judged on heroic. <strong>Heroic only</strong> compares everyone on the same footing.</p>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="wclSortByParse">Sort lists by parse</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="wclSortByParse">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Ranks candidates by parse on every site with parse filtering on, mythic ahead of heroic.</p>
+                </div>
+                </div>
+            </section>
+            <section class="card">
+                <h3 class="card-title">Scouting</h3>
+                <div class="card-grid">
+                <div class="option toggle-inline">
+                    <label for="scoutPreflight">Check parses before opening a tab</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="scoutPreflight">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">When you visit a candidate on WoWProgress or Raider.IO, score them through the API <em>first</em> and only open their WarcraftLogs tab if they pass — rejected candidates never have to clear WarcraftLogs’ Cloudflare check. If a lookup fails the tab opens and is checked again there; with no credentials every tab opens.</p>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="scoutOpenInBackground">Open scouted tabs in the background</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="scoutOpenInBackground">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Opens WarcraftLogs tabs without switching to them, so browsing a list isn’t interrupted.</p>
+                </div>
+                </div>
+            </section>
+            <section class="card">
+                <h3 class="card-title">Recruitment search</h3>
+                <p class="card-desc">Filters for warcraftlogs.com’s own recruitment page.</p>
+                <div class="card-grid">
+                <div class="option">
+                    <label for="wclSearchParseThreshold">Min parse %</label>
+                    <input type="number" id="wclSearchParseThreshold" min="0" max="100" step="1" placeholder="Any">
+                    <p class="hint">Hides recruits on the WarcraftLogs recruitment search below this parse.</p>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="wclSearchProactive">Use role-aware API scoring</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="wclSearchProactive">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Adds the role-aware thresholds above and inline parse badges to the search, on top of the flat minimum. Needs credentials.</p>
+                </div>
+                <div class="option">
+                    <label for="wclMinMythicKills">Mythic kills</label>
+                    <div class="range-inputs">
+                        <input type="number" id="wclMinMythicKills" min="0" max="99" step="1" placeholder="Min" aria-label="Minimum mythic kills">
+                        <span class="range-sep" aria-hidden="true">–</span>
+                        <input type="number" id="wclMaxMythicKills" min="0" max="99" step="1" placeholder="Max" aria-label="Maximum mythic kills">
+                    </div>
+                    <p class="hint">Current-tier mythic boss kills. A maximum hides raiders already further than your guild — an 8/8 player is unlikely to join a 4/8 team.</p>
+                </div>
+                <div class="option-group">
+                    <div class="group-head">
+                        <span class="group-title">Region</span>
+                        <span class="group-hint">None selected shows every region</span>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip"><input type="checkbox" class="wclRegionFilter" value="EU"><span>EU</span></label>
+                        <label class="chip"><input type="checkbox" class="wclRegionFilter" value="US"><span>US</span></label>
+                        <label class="chip"><input type="checkbox" class="wclRegionFilter" value="OC"><span>OC</span></label>
+                        <label class="chip"><input type="checkbox" class="wclRegionFilter" value="KR"><span>KR</span></label>
+                        <label class="chip"><input type="checkbox" class="wclRegionFilter" value="TW"><span>TW</span></label>
+                    </div>
+                </div>
+                <div class="option-group option--wide">
+                    <div class="group-head">
+                        <span class="group-title">Class</span>
+                        <span class="group-hint">None selected shows every class</span>
+                        <button type="button" class="link-btn" id="clearWclClasses">Clear</button>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip warrior"><input type="checkbox" class="wclClassFilter" value="warrior"><span class="chip-swatch"></span><span>Warrior</span></label>
+                        <label class="chip paladin"><input type="checkbox" class="wclClassFilter" value="paladin"><span class="chip-swatch"></span><span>Paladin</span></label>
+                        <label class="chip hunter"><input type="checkbox" class="wclClassFilter" value="hunter"><span class="chip-swatch"></span><span>Hunter</span></label>
+                        <label class="chip rogue"><input type="checkbox" class="wclClassFilter" value="rogue"><span class="chip-swatch"></span><span>Rogue</span></label>
+                        <label class="chip priest"><input type="checkbox" class="wclClassFilter" value="priest"><span class="chip-swatch"></span><span>Priest</span></label>
+                        <label class="chip shaman"><input type="checkbox" class="wclClassFilter" value="shaman"><span class="chip-swatch"></span><span>Shaman</span></label>
+                        <label class="chip mage"><input type="checkbox" class="wclClassFilter" value="mage"><span class="chip-swatch"></span><span>Mage</span></label>
+                        <label class="chip warlock"><input type="checkbox" class="wclClassFilter" value="warlock"><span class="chip-swatch"></span><span>Warlock</span></label>
+                        <label class="chip monk"><input type="checkbox" class="wclClassFilter" value="monk"><span class="chip-swatch"></span><span>Monk</span></label>
+                        <label class="chip druid"><input type="checkbox" class="wclClassFilter" value="druid"><span class="chip-swatch"></span><span>Druid</span></label>
+                        <label class="chip deathknight"><input type="checkbox" class="wclClassFilter" value="deathknight"><span class="chip-swatch"></span><span>Death Knight</span></label>
+                        <label class="chip demon_hunter"><input type="checkbox" class="wclClassFilter" value="demon_hunter"><span class="chip-swatch"></span><span>Demon Hunter</span></label>
+                        <label class="chip evoker"><input type="checkbox" class="wclClassFilter" value="evoker"><span class="chip-swatch"></span><span>Evoker</span></label>
+                    </div>
+                </div>
+                </div>
+            </section>
+            <details class="advanced card">
+                <summary>
+                    <span class="card-title">Advanced</span>
+                    <span class="summary-desc">Caching, diagnostics and request rate</span>
+                </summary>
+                <div class="card-grid">
+                <div class="option">
+                    <label for="wclCacheTtlHours">Score cache lifetime (hours)</label>
+                    <input type="number" id="wclCacheTtlHours" min="0.5" max="48" step="0.5" placeholder="6">
+                    <p class="hint">How long each parse is cached. Lower is fresher but costs more API calls. Default 6.</p>
+                </div>
+                <div class="option">
+                    <label for="wclConcurrency">Max concurrent lookups</label>
+                    <input type="number" id="wclConcurrency" min="1" max="8" step="1" placeholder="4">
+                    <p class="hint">Parallel API requests when scoring a list. Default 4.</p>
+                </div>
+                <div class="option option--actions">
+                    <button type="button" class="ghost" id="clearWclScoreCache">Clear cached scores</button>
+                    <span id="wclRateLimitStatus" class="inline-status inline-status--warn"></span>
+                    <p class="hint hint--warn" id="wclCloudflareHint" style="display:none;">WarcraftLogs is challenging API requests (Cloudflare). Open <strong>warcraftlogs.com</strong> in a tab and complete the check — RaidScout retries as soon as that page loads.</p>
+                    <p class="hint">Fetch fresh scores immediately instead of waiting for the cache.</p>
                 </div>
                 <div class="option toggle-inline">
                     <label for="wclDebug">Debug logging</label>
@@ -82,506 +224,424 @@
                         <input type="checkbox" id="wclDebug">
                         <span class="toggle-slider"></span>
                     </label>
-                    <p class="hint">Logs WCL API queries and scores to the browser console (service worker). Useful for troubleshooting.</p>
-                </div>
-                <div class="option">
-                    <label for="wclConcurrency">Max concurrent score lookups</label>
-                    <input type="number" id="wclConcurrency" min="1" max="8" step="1" placeholder="4">
-                    <p class="hint">How many WarcraftLogs API requests to run in parallel when scoring a list page. Lower = less API pressure, higher = faster results. Default 4.</p>
+                    <p class="hint">Logs API queries and scores to the service-worker console.</p>
                 </div>
                 </div>
             </details>
-            <p class="subsection-label">Proactive Score Filter (all sites)</p>
-            <p class="hint">Set your parse thresholds once here. They drive proactive WCL filtering on WoWProgress, Raider.IO and Guilds of WoW — switch it on per-site in each section. The DPS values also auto-close a WarcraftLogs character tab opened from those sites when the parse is below threshold.</p>
-            <div class="threshold-grid">
-                <span class="tg-head"></span>
-                <span class="tg-head">Min. Best %</span>
-                <span class="tg-head">Min. Median %</span>
-
-                <span class="tg-role role-dps">DPS</span>
-                <input type="number" id="bestParseThreshold" min="0" max="100" step="1" placeholder="e.g. 60"
-                       aria-label="Minimum best DPS parse percent">
-                <input type="number" id="parseThreshold" min="0" max="100" step="1" placeholder="e.g. 50"
-                       aria-label="Minimum median DPS parse percent">
-
-                <span class="tg-role role-tank">Tank</span>
-                <input type="number" id="wclMinBestTank" min="0" max="100" step="1" placeholder="↑ uses DPS"
-                       aria-label="Minimum best tank parse percent">
-                <input type="number" id="wclMinMedianTank" min="0" max="100" step="1" placeholder="↑ uses DPS"
-                       aria-label="Minimum median tank parse percent">
-
-                <span class="tg-role role-healer">Healer</span>
-                <input type="number" id="wclMinBestHealer" min="0" max="100" step="1" placeholder="e.g. 60"
-                       aria-label="Minimum best healer parse percent">
-                <input type="number" id="wclMinMedianHealer" min="0" max="100" step="1" placeholder="e.g. 50"
-                       aria-label="Minimum median healer parse percent">
-            </div>
-            <div class="option option--wide">
-                <label for="wclDifficulty">Compare parses from</label>
-                <select id="wclDifficulty">
-                    <option value="">Highest difficulty logged (WarcraftLogs default)</option>
-                    <option value="4">Heroic only</option>
-                    <option value="5">Mythic only</option>
-                </select>
-                <p class="hint">By default WarcraftLogs reports each character's parses from the hardest difficulty
-                they have logs on, so anyone with a single mythic kill is judged on mythic parses while everyone
-                else is judged on heroic. <strong>Heroic only</strong> compares everyone on the same footing.
-                A character with no logs on the chosen difficulty counts as having no logs. Applies to every site
-                and to Scout; badges show <em>H</em> or <em>M</em> when a difficulty is pinned.</p>
-            </div>
-            <div class="option toggle-inline option--wide">
-                <label for="wclSortByParse">Sort lists by parse</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wclSortByParse">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Ranks candidates by parse (highest first) on every site with proactive filtering on,
-                instead of only hiding those below your thresholds. Previously this was three separate per-site
-                toggles; your existing choice carries over.</p>
-            </div>
-            <div class="option option--wide">
-                <p class="hint"><strong>Best</strong> is the highest single parse on any fight; <strong>Median</strong> is
-                the middle parse across all of them. DPS and Tank are measured on damage, Healers on healing (HPS) —
-                RaidScout picks the right metric per character automatically. Leave Tank blank to reuse the DPS row.</p>
-                <p class="hint">Characters WarcraftLogs has no parse data for are treated as below every threshold and
-                hidden — an unparsed raider can't be judged against a parse minimum. Characters whose lookup
-                <em>failed</em> (no credentials, rate limit, timeout) are always left visible, so a misconfiguration can
-                never empty a page.</p>
-            </div>
-            <p class="subsection-label">Recruitment Search</p>
-            <div class="option">
-                <label for="wclSearchParseThreshold">Min. Parse %</label>
-                <input type="number" id="wclSearchParseThreshold" min="0" max="100" step="1" placeholder="e.g. 50">
-                <p class="hint">Hides recruits on the recruitment search below this parse %</p>
-            </div>
-            <div class="option toggle-inline">
-                <label for="wclSearchProactive">Use role-aware API scoring</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wclSearchProactive">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Adds the same WarcraftLogs API scoring used on WoWProgress/Raider.IO/GoW to this page: role-aware thresholds (DPS, Healer HPS, Tank — configured above) and inline parse badges, on top of the flat Min. Parse % filter. Requires API credentials.</p>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Region</span>
-                </div>
-                <p class="hint">Leave all unchecked to show all regions</p>
-                <div class="region-checks">
-                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="EU"> EU</label>
-                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="US"> US</label>
-                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="OC"> OC</label>
-                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="KR"> KR</label>
-                    <label class="inline-check"><input type="checkbox" class="wclRegionFilter" value="TW"> TW</label>
-                </div>
-            </div>
-            <div class="option">
-                <label for="wclMinMythicKills">Mythic Kills</label>
-                <div class="range-inputs">
-                    <input type="number" id="wclMinMythicKills" min="0" max="99" step="1" placeholder="Min" aria-label="Minimum mythic kills">
-                    <span class="range-sep">–</span>
-                    <input type="number" id="wclMaxMythicKills" min="0" max="99" step="1" placeholder="Max" aria-label="Maximum mythic kills">
-                </div>
-                <p class="hint">Current-tier mythic boss kills. A maximum hides raiders already further than your guild — an 8/8 player is unlikely to join a 4/8 team.</p>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Class Filter</span>
-                    <button type="button" id="clearWclClasses">Clear all</button>
-                </div>
-                <p class="hint">Leave all unchecked to show every class</p>
-                <div class="class-grid">
-                    <label class="class-label warrior"><input type="checkbox" class="wclClassFilter" value="warrior"> Warrior</label>
-                    <label class="class-label paladin"><input type="checkbox" class="wclClassFilter" value="paladin"> Paladin</label>
-                    <label class="class-label hunter"><input type="checkbox" class="wclClassFilter" value="hunter"> Hunter</label>
-                    <label class="class-label rogue"><input type="checkbox" class="wclClassFilter" value="rogue"> Rogue</label>
-                    <label class="class-label priest"><input type="checkbox" class="wclClassFilter" value="priest"> Priest</label>
-                    <label class="class-label shaman"><input type="checkbox" class="wclClassFilter" value="shaman"> Shaman</label>
-                    <label class="class-label mage"><input type="checkbox" class="wclClassFilter" value="mage"> Mage</label>
-                    <label class="class-label warlock"><input type="checkbox" class="wclClassFilter" value="warlock"> Warlock</label>
-                    <label class="class-label monk"><input type="checkbox" class="wclClassFilter" value="monk"> Monk</label>
-                    <label class="class-label druid"><input type="checkbox" class="wclClassFilter" value="druid"> Druid</label>
-                    <label class="class-label deathknight"><input type="checkbox" class="wclClassFilter" value="deathknight"> Death Knight</label>
-                    <label class="class-label demon_hunter"><input type="checkbox" class="wclClassFilter" value="demon_hunter"> Demon Hunter</label>
-                    <label class="class-label evoker"><input type="checkbox" class="wclClassFilter" value="evoker"> Evoker</label>
-                </div>
-            </div>
         </div>
 
-        <!-- WoWProgress Settings -->
         <div class="category-content" id="wowprogress">
             <div class="section-header">
-                <h2>WoWProgress</h2>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wowprogressEnabled">
+                <div>
+                    <h2>WoWProgress</h2>
+                    <p class="section-desc">Filters the looking-for-guild table at wowprogress.com/gearscore.</p>
+                </div>
+                <label class="toggle-switch toggle-switch--lg" title="Enable WoWProgress">
+                    <input type="checkbox" id="wowprogressEnabled" aria-label="Enable WoWProgress">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
-            <div class="option">
-                <input type="checkbox" id="openWarcraftLogsTab">
-                <label for="openWarcraftLogsTab">Auto-open WarcraftLogs on character visit</label>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Region</span>
-                </div>
-                <p class="hint">Leave all unchecked to show all regions</p>
-                <div class="region-checks">
-                    <label class="inline-check"><input type="checkbox" class="regionFilter" value="EU"> EU</label>
-                    <label class="inline-check"><input type="checkbox" class="regionFilter" value="US"> US</label>
-                    <label class="inline-check"><input type="checkbox" class="regionFilter" value="OC"> OC</label>
-                </div>
-            </div>
-            <div class="option">
-                <label>Item Level</label>
-                <div class="range-inputs">
-                    <input type="number" id="minIlvl" min="0" step="0.01" placeholder="Min">
-                    <span class="range-sep">–</span>
-                    <input type="number" id="maxIlvl" min="0" step="0.01" placeholder="Max">
-                </div>
-            </div>
-            <div class="option">
-                <label for="wpMaxListedDays">Listed Within</label>
-                <select id="wpMaxListedDays">
-                    <option value="">Any age</option>
-                    <option value="1">Last 24 hours</option>
-                    <option value="3">Last 3 days</option>
-                    <option value="7">Last week</option>
-                    <option value="14">Last 2 weeks</option>
-                    <option value="30">Last 30 days</option>
-                    <option value="90">Last 90 days</option>
-                </select>
-                <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date cannot be read is kept.</p>
-            </div>
-            <div class="option">
-                <label for="guildFilter">Guild Status</label>
-                <select id="guildFilter">
-                    <option value="any">Any</option>
-                    <option value="in">In a guild</option>
-                    <option value="out">Not in a guild</option>
-                </select>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Class Filter</span>
-                    <button type="button" id="clearClasses">Clear all</button>
-                </div>
-                <p class="hint">Leave all unchecked to show every class</p>
-                <div class="class-grid">
-                    <label class="class-label warrior"><input type="checkbox" class="classFilter" value="warrior"> Warrior</label>
-                    <label class="class-label paladin"><input type="checkbox" class="classFilter" value="paladin"> Paladin</label>
-                    <label class="class-label hunter"><input type="checkbox" class="classFilter" value="hunter"> Hunter</label>
-                    <label class="class-label rogue"><input type="checkbox" class="classFilter" value="rogue"> Rogue</label>
-                    <label class="class-label priest"><input type="checkbox" class="classFilter" value="priest"> Priest</label>
-                    <label class="class-label shaman"><input type="checkbox" class="classFilter" value="shaman"> Shaman</label>
-                    <label class="class-label mage"><input type="checkbox" class="classFilter" value="mage"> Mage</label>
-                    <label class="class-label warlock"><input type="checkbox" class="classFilter" value="warlock"> Warlock</label>
-                    <label class="class-label monk"><input type="checkbox" class="classFilter" value="monk"> Monk</label>
-                    <label class="class-label druid"><input type="checkbox" class="classFilter" value="druid"> Druid</label>
-                    <label class="class-label deathknight"><input type="checkbox" class="classFilter" value="deathknight"> Death Knight</label>
-                    <label class="class-label demon_hunter"><input type="checkbox" class="classFilter" value="demon_hunter"> Demon Hunter</label>
-                    <label class="class-label evoker"><input type="checkbox" class="classFilter" value="evoker"> Evoker</label>
-                </div>
-            </div>
-            <p class="subsection-label">WarcraftLogs Score Filter</p>
-            <div class="option toggle-inline">
-                <label for="wpWclEnabled">Enable proactive WCL filtering</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="wpWclEnabled">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Looks up each listed character's parse via the WarcraftLogs API and hides those below your thresholds. Parse thresholds (DPS, Healer HPS, Tank) are configured once in the <strong>WarcraftLogs</strong> section and require API credentials there.</p>
-            </div>
-        </div>
-
-        <!-- Raider.IO Settings -->
-        <div class="category-content" id="raiderio">
-            <div class="section-header">
-                <h2>Raider.IO</h2>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="raiderioEnabled">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="option">
-                <input type="checkbox" id="openWarcraftLogsFromRaiderIO">
-                <label for="openWarcraftLogsFromRaiderIO">Auto-open WarcraftLogs on character visit</label>
-            </div>
-            <div class="option">
-                <input type="checkbox" id="hideRaiderIoAds">
-                <label for="hideRaiderIoAds">Remove Raider.IO Ads</label>
-            </div>
-            <div class="option">
-                <label for="rioMinIlvl">Min. Item Level</label>
-                <input type="number" id="rioMinIlvl" min="0" step="0.01" placeholder="e.g. 280">
-                <p class="hint">Hides recruits on the search table below this item level</p>
-            </div>
-            <div class="option">
-                <label for="rioMaxListedDays">Listed Within</label>
-                <select id="rioMaxListedDays">
-                    <option value="">Any age</option>
-                    <option value="1">Last 24 hours</option>
-                    <option value="3">Last 3 days</option>
-                    <option value="7">Last week</option>
-                    <option value="14">Last 2 weeks</option>
-                    <option value="30">Last 30 days</option>
-                    <option value="90">Last 90 days</option>
-                </select>
-                <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date cannot be read is kept.</p>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Region</span>
-                </div>
-                <p class="hint">Leave all unchecked to show all regions</p>
-                <div class="region-checks">
-                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="EU"> EU</label>
-                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="US"> US</label>
-                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="OC"> OC</label>
-                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="KR"> KR</label>
-                    <label class="inline-check"><input type="checkbox" class="rioRegionFilter" value="TW"> TW</label>
-                </div>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Role Filter</span>
-                </div>
-                <p class="hint">Leave all unchecked to show all roles</p>
-                <div class="region-checks">
-                    <label class="inline-check role-tank"><input type="checkbox" class="rioRoleFilter" value="tank"> Tank</label>
-                    <label class="inline-check role-healer"><input type="checkbox" class="rioRoleFilter" value="healer"> Healer</label>
-                    <label class="inline-check role-dps"><input type="checkbox" class="rioRoleFilter" value="dps"> DPS</label>
-                </div>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Class Filter</span>
-                    <button type="button" id="clearRioClasses">Clear all</button>
-                </div>
-                <p class="hint">Leave all unchecked to show every class</p>
-                <div class="class-grid">
-                    <label class="class-label warrior"><input type="checkbox" class="rioClassFilter" value="warrior"> Warrior</label>
-                    <label class="class-label paladin"><input type="checkbox" class="rioClassFilter" value="paladin"> Paladin</label>
-                    <label class="class-label hunter"><input type="checkbox" class="rioClassFilter" value="hunter"> Hunter</label>
-                    <label class="class-label rogue"><input type="checkbox" class="rioClassFilter" value="rogue"> Rogue</label>
-                    <label class="class-label priest"><input type="checkbox" class="rioClassFilter" value="priest"> Priest</label>
-                    <label class="class-label shaman"><input type="checkbox" class="rioClassFilter" value="shaman"> Shaman</label>
-                    <label class="class-label mage"><input type="checkbox" class="rioClassFilter" value="mage"> Mage</label>
-                    <label class="class-label warlock"><input type="checkbox" class="rioClassFilter" value="warlock"> Warlock</label>
-                    <label class="class-label monk"><input type="checkbox" class="rioClassFilter" value="monk"> Monk</label>
-                    <label class="class-label druid"><input type="checkbox" class="rioClassFilter" value="druid"> Druid</label>
-                    <label class="class-label deathknight"><input type="checkbox" class="rioClassFilter" value="deathknight"> Death Knight</label>
-                    <label class="class-label demon_hunter"><input type="checkbox" class="rioClassFilter" value="demon_hunter"> Demon Hunter</label>
-                    <label class="class-label evoker"><input type="checkbox" class="rioClassFilter" value="evoker"> Evoker</label>
-                </div>
-            </div>
-            <p class="subsection-label">WarcraftLogs Score Filter</p>
-            <div class="option toggle-inline">
-                <label for="rioWclEnabled">Enable proactive WCL filtering</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="rioWclEnabled">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Looks up each search row's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the search row — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
-            </div>
-        </div>
-
-        <!-- Guilds of WoW Settings -->
-        <div class="category-content" id="guildsofwow">
-            <div class="section-header">
-                <h2>Guilds of WoW</h2>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="guildsofwowEnabled">
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-            <div class="option">
-                <label for="gowMinIlvl">Min. Item Level</label>
-                <input type="number" id="gowMinIlvl" min="0" step="1" placeholder="e.g. 280">
-            </div>
-            <div class="option">
-                <label for="gowMinMythicKills">Mythic Kills</label>
-                <div class="range-inputs">
-                    <input type="number" id="gowMinMythicKills" min="0" max="99" step="1" placeholder="Min" aria-label="Minimum mythic kills">
-                    <span class="range-sep">–</span>
-                    <input type="number" id="gowMaxMythicKills" min="0" max="99" step="1" placeholder="Max" aria-label="Maximum mythic kills">
-                </div>
-                <p class="hint">Current-tier mythic boss kills. A maximum hides raiders already further than your guild — an 8/8 player is unlikely to join a 4/8 team.</p>
-            </div>
-            <div class="option">
-                <label for="gowMinMythicPlusScore">Min. M+ Score</label>
-                <input type="number" id="gowMinMythicPlusScore" min="0" step="1" placeholder="e.g. 2000">
-            </div>
-            <div class="option">
-                <label for="gowMaxListedDays">Listed Within</label>
-                <select id="gowMaxListedDays">
-                    <option value="">Any age</option>
-                    <option value="1">Last 24 hours</option>
-                    <option value="3">Last 3 days</option>
-                    <option value="7">Last week</option>
-                    <option value="14">Last 2 weeks</option>
-                    <option value="30">Last 30 days</option>
-                    <option value="90">Last 90 days</option>
-                </select>
-                <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date cannot be read is kept.</p>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Role Filter</span>
-                </div>
-                <p class="hint">Leave all unchecked to show all roles</p>
-                <div class="region-checks">
-                    <label class="inline-check role-tank"><input type="checkbox" class="roleFilter" value="tank"> Tank</label>
-                    <label class="inline-check role-healer"><input type="checkbox" class="roleFilter" value="healer"> Healer</label>
-                    <label class="inline-check role-dps"><input type="checkbox" class="roleFilter" value="dps"> DPS</label>
-                </div>
-            </div>
-            <div class="option-group">
-                <div class="option-group-header">
-                    <span>Class Filter</span>
-                    <button type="button" id="clearGowClasses">Clear all</button>
-                </div>
-                <p class="hint">Leave all unchecked to show every class</p>
-                <div class="class-grid">
-                    <label class="class-label warrior"><input type="checkbox" class="gowClassFilter" value="warrior"> Warrior</label>
-                    <label class="class-label paladin"><input type="checkbox" class="gowClassFilter" value="paladin"> Paladin</label>
-                    <label class="class-label hunter"><input type="checkbox" class="gowClassFilter" value="hunter"> Hunter</label>
-                    <label class="class-label rogue"><input type="checkbox" class="gowClassFilter" value="rogue"> Rogue</label>
-                    <label class="class-label priest"><input type="checkbox" class="gowClassFilter" value="priest"> Priest</label>
-                    <label class="class-label shaman"><input type="checkbox" class="gowClassFilter" value="shaman"> Shaman</label>
-                    <label class="class-label mage"><input type="checkbox" class="gowClassFilter" value="mage"> Mage</label>
-                    <label class="class-label warlock"><input type="checkbox" class="gowClassFilter" value="warlock"> Warlock</label>
-                    <label class="class-label monk"><input type="checkbox" class="gowClassFilter" value="monk"> Monk</label>
-                    <label class="class-label druid"><input type="checkbox" class="gowClassFilter" value="druid"> Druid</label>
-                    <label class="class-label deathknight"><input type="checkbox" class="gowClassFilter" value="deathknight"> Death Knight</label>
-                    <label class="class-label demon_hunter"><input type="checkbox" class="gowClassFilter" value="demon_hunter"> Demon Hunter</label>
-                    <label class="class-label evoker"><input type="checkbox" class="gowClassFilter" value="evoker"> Evoker</label>
-                </div>
-            </div>
-            <p class="subsection-label">WarcraftLogs Score Filter</p>
-            <div class="option toggle-inline">
-                <label for="gowWclEnabled">Enable proactive WCL filtering</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="gowWclEnabled">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Looks up each recruit's parse via the WarcraftLogs API and hides those below your thresholds. Role is read from the recruit card — healers use HPS metric automatically. Parse thresholds are configured once in the <strong>WarcraftLogs</strong> section.</p>
-            </div>
-        </div>
-
-        <!-- Scout Settings -->
-        <div class="category-content" id="scout">
-            <div class="section-header">
-                <h2>Scout</h2>
-            </div>
-            <div class="option">
-                <p class="hint">Scout gathers candidates from every site below in one pass and merges them into a single
-                de-duplicated list, so you don't have to open four tabs and read four layouts. Each site is filtered by
-                <strong>its own settings</strong> from the tabs above, then every unique player is scored once against your
-                WarcraftLogs thresholds. Open it from the extension popup.</p>
-            </div>
-
-            <p class="subsection-label">Sources</p>
-            <div class="option option--wide">
-                <div class="region-checks">
-                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="wowprogress"> WoWProgress</label>
-                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="raiderio"> Raider.IO</label>
-                    <label class="inline-check"><input type="checkbox" class="scoutSourceFilter" value="guildsofwow"> Guilds of WoW</label>
-                </div>
-                <p class="hint">WoWProgress is read directly over the network. The other two render their listings in the
-                browser, so Scout opens each one in a background tab for a few seconds, reads the filtered results and closes
-                it again — you never have to look at them.</p>
-                <p class="hint">WarcraftLogs is not a source. Its recruitment page sits behind Cloudflare, and its v2 API
-                has no recruitment data to ask for instead — the schema covers characters, guilds, reports and rankings only.
-                It stays what it is best at: the parse data every candidate here is ranked by.</p>
-            </div>
-
-            <p class="subsection-label">Limits</p>
-            <div class="option">
-                <label for="scoutMaxCandidates">Max candidates per run</label>
-                <input type="number" id="scoutMaxCandidates" min="1" max="1000" step="10">
-                <p class="hint">Every candidate past the de-duplication step costs one WarcraftLogs API lookup. The WCL API
-                allows roughly 3,600 points per hour, so a cap around 150 keeps a run comfortably inside it. Scores are cached
-                for <strong>6 hours</strong>, which makes a repeat run of the same candidates nearly free.</p>
-            </div>
-            <div class="option">
-                <label for="scoutPagesPerSource">WoWProgress pages per run</label>
-                <input type="number" id="scoutPagesPerSource" min="1" max="10" step="1">
-                <p class="hint">How many pages of the WoWProgress listing to pull. Only applies to WoWProgress — the
-                background-tab sources always harvest whatever their first page renders.</p>
-            </div>
-
-            <p class="subsection-label">Scoring</p>
-            <div class="option toggle-inline">
-                <label for="scoutWclEnabled">Fetch WarcraftLogs parses</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="scoutWclEnabled">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Uses the same API credentials, role-aware metrics and cache as proactive filtering. With no
-                credentials saved, Scout still lists everyone — it just can't rank them by parse.</p>
-            </div>
-            <div class="option toggle-inline">
-                <label for="scoutEnrichRaiderio">Cross-reference stats with Raider.IO</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="scoutEnrichRaiderio">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Looks every candidate up on Raider.IO's public character API to fill in M+ score,
-                mythic progress and item level. Each listing publishes a different subset — a WoWProgress row carries
-                an item level and nothing else — so without this those columns read “—” because of where the recruit
-                advertised, not because of how they play. Needs no API key.</p>
-            </div>
-            <div class="option toggle-inline">
-                <label for="scoutHideBelowThresholds">Hide candidates below thresholds</label>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="scoutHideBelowThresholds">
-                    <span class="toggle-slider"></span>
-                </label>
-                <p class="hint">Applies the parse thresholds from the WarcraftLogs tab. <strong>Candidates WarcraftLogs has
-                no logs for are hidden too</strong> — a Scout run is meant to be a finished shortlist, and an unparsed raider
-                can't be judged against a parse threshold. Candidates that <em>couldn't be scored</em> (no credentials,
-                scoring off, rate limit, lookup error) are always shown, so a misconfiguration can never empty the list.
-                You can also toggle this directly on the Scout page.</p>
-            </div>
-
-            <details class="advanced">
-                <summary>Listing URLs &mdash; point a source at a different search</summary>
-                <div class="details-body">
-    <div class="option">
-                    <p class="hint">Leave blank to use the defaults. Set these to the exact listing you normally browse — a
-                    specific realm, region or role filter — and Scout will harvest that instead. These also let you repoint Scout
-                    yourself if a site moves its recruitment page.</p>
+            <section class="card">
+                <h3 class="card-title">Listing filters</h3>
+                <div class="card-grid">
+                <div class="option-group">
+                    <div class="group-head">
+                        <span class="group-title">Region</span>
+                        <span class="group-hint">None selected shows every region</span>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip"><input type="checkbox" class="regionFilter" value="EU"><span>EU</span></label>
+                        <label class="chip"><input type="checkbox" class="regionFilter" value="US"><span>US</span></label>
+                        <label class="chip"><input type="checkbox" class="regionFilter" value="OC"><span>OC</span></label>
+                    </div>
                 </div>
                 <div class="option">
+                    <label for="guildFilter">Guild status</label>
+                    <select id="guildFilter">
+                        <option value="any">Any</option>
+                        <option value="in">In a guild</option>
+                        <option value="out">Not in a guild</option>
+                    </select>
+                </div>
+                <div class="option">
+                    <label for="minIlvl">Item level</label>
+                    <div class="range-inputs">
+                        <input type="number" id="minIlvl" min="0" step="0.01" placeholder="Min" aria-label="Minimum item level">
+                        <span class="range-sep" aria-hidden="true">–</span>
+                        <input type="number" id="maxIlvl" min="0" step="0.01" placeholder="Max" aria-label="Maximum item level">
+                    </div>
+                </div>
+                <div class="option">
+                    <label for="wpMaxListedDays">Listed within</label>
+                    <select id="wpMaxListedDays">
+                            <option value="">Any age</option>
+                            <option value="1">Last 24 hours</option>
+                            <option value="3">Last 3 days</option>
+                            <option value="7">Last week</option>
+                            <option value="14">Last 2 weeks</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                        </select>
+                    <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date can’t be read is kept.</p>
+                </div>
+                <div class="option-group option--wide">
+                    <div class="group-head">
+                        <span class="group-title">Class</span>
+                        <span class="group-hint">None selected shows every class</span>
+                        <button type="button" class="link-btn" id="clearClasses">Clear</button>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip warrior"><input type="checkbox" class="classFilter" value="warrior"><span class="chip-swatch"></span><span>Warrior</span></label>
+                        <label class="chip paladin"><input type="checkbox" class="classFilter" value="paladin"><span class="chip-swatch"></span><span>Paladin</span></label>
+                        <label class="chip hunter"><input type="checkbox" class="classFilter" value="hunter"><span class="chip-swatch"></span><span>Hunter</span></label>
+                        <label class="chip rogue"><input type="checkbox" class="classFilter" value="rogue"><span class="chip-swatch"></span><span>Rogue</span></label>
+                        <label class="chip priest"><input type="checkbox" class="classFilter" value="priest"><span class="chip-swatch"></span><span>Priest</span></label>
+                        <label class="chip shaman"><input type="checkbox" class="classFilter" value="shaman"><span class="chip-swatch"></span><span>Shaman</span></label>
+                        <label class="chip mage"><input type="checkbox" class="classFilter" value="mage"><span class="chip-swatch"></span><span>Mage</span></label>
+                        <label class="chip warlock"><input type="checkbox" class="classFilter" value="warlock"><span class="chip-swatch"></span><span>Warlock</span></label>
+                        <label class="chip monk"><input type="checkbox" class="classFilter" value="monk"><span class="chip-swatch"></span><span>Monk</span></label>
+                        <label class="chip druid"><input type="checkbox" class="classFilter" value="druid"><span class="chip-swatch"></span><span>Druid</span></label>
+                        <label class="chip deathknight"><input type="checkbox" class="classFilter" value="deathknight"><span class="chip-swatch"></span><span>Death Knight</span></label>
+                        <label class="chip demon_hunter"><input type="checkbox" class="classFilter" value="demon_hunter"><span class="chip-swatch"></span><span>Demon Hunter</span></label>
+                        <label class="chip evoker"><input type="checkbox" class="classFilter" value="evoker"><span class="chip-swatch"></span><span>Evoker</span></label>
+                    </div>
+                </div>
+                </div>
+            </section>
+            <section class="card">
+                <h3 class="card-title">Behaviour</h3>
+                <div class="card-grid">
+                <div class="option toggle-inline">
+                    <label for="openWarcraftLogsTab">Auto-open WarcraftLogs on character visit</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="openWarcraftLogsTab">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Opens the candidate’s WarcraftLogs page when you open their WoWProgress profile.</p>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="wpWclEnabled">Filter by WarcraftLogs parse</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="wpWclEnabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Scores each listed character through the API and hides those below the thresholds in the WarcraftLogs tab.</p>
+                </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="category-content" id="raiderio">
+            <div class="section-header">
+                <div>
+                    <h2>Raider.IO</h2>
+                    <p class="section-desc">Filters the recruitment search and links character pages to WarcraftLogs.</p>
+                </div>
+                <label class="toggle-switch toggle-switch--lg" title="Enable Raider.IO">
+                    <input type="checkbox" id="raiderioEnabled" aria-label="Enable Raider.IO">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <section class="card">
+                <h3 class="card-title">Search filters</h3>
+                <div class="card-grid">
+                <div class="option-group">
+                    <div class="group-head">
+                        <span class="group-title">Region</span>
+                        <span class="group-hint">None selected shows every region</span>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip"><input type="checkbox" class="rioRegionFilter" value="EU"><span>EU</span></label>
+                        <label class="chip"><input type="checkbox" class="rioRegionFilter" value="US"><span>US</span></label>
+                        <label class="chip"><input type="checkbox" class="rioRegionFilter" value="OC"><span>OC</span></label>
+                        <label class="chip"><input type="checkbox" class="rioRegionFilter" value="KR"><span>KR</span></label>
+                        <label class="chip"><input type="checkbox" class="rioRegionFilter" value="TW"><span>TW</span></label>
+                    </div>
+                </div>
+                <div class="option-group">
+                    <div class="group-head">
+                        <span class="group-title">Role</span>
+                        <span class="group-hint">None selected shows every role</span>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip role-tank"><input type="checkbox" class="rioRoleFilter" value="tank"><span class="chip-swatch"></span><span>Tank</span></label>
+                        <label class="chip role-healer"><input type="checkbox" class="rioRoleFilter" value="healer"><span class="chip-swatch"></span><span>Healer</span></label>
+                        <label class="chip role-dps"><input type="checkbox" class="rioRoleFilter" value="dps"><span class="chip-swatch"></span><span>DPS</span></label>
+                    </div>
+                </div>
+                <div class="option">
+                    <label for="rioMinIlvl">Min item level</label>
+                    <input type="number" id="rioMinIlvl" min="0" step="0.01" placeholder="Any">
+                    <p class="hint">Hides rows on the search table below this item level.</p>
+                </div>
+                <div class="option">
+                    <label for="rioMaxListedDays">Listed within</label>
+                    <select id="rioMaxListedDays">
+                            <option value="">Any age</option>
+                            <option value="1">Last 24 hours</option>
+                            <option value="3">Last 3 days</option>
+                            <option value="7">Last week</option>
+                            <option value="14">Last 2 weeks</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                        </select>
+                    <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date can’t be read is kept.</p>
+                </div>
+                <div class="option-group option--wide">
+                    <div class="group-head">
+                        <span class="group-title">Class</span>
+                        <span class="group-hint">None selected shows every class</span>
+                        <button type="button" class="link-btn" id="clearRioClasses">Clear</button>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip warrior"><input type="checkbox" class="rioClassFilter" value="warrior"><span class="chip-swatch"></span><span>Warrior</span></label>
+                        <label class="chip paladin"><input type="checkbox" class="rioClassFilter" value="paladin"><span class="chip-swatch"></span><span>Paladin</span></label>
+                        <label class="chip hunter"><input type="checkbox" class="rioClassFilter" value="hunter"><span class="chip-swatch"></span><span>Hunter</span></label>
+                        <label class="chip rogue"><input type="checkbox" class="rioClassFilter" value="rogue"><span class="chip-swatch"></span><span>Rogue</span></label>
+                        <label class="chip priest"><input type="checkbox" class="rioClassFilter" value="priest"><span class="chip-swatch"></span><span>Priest</span></label>
+                        <label class="chip shaman"><input type="checkbox" class="rioClassFilter" value="shaman"><span class="chip-swatch"></span><span>Shaman</span></label>
+                        <label class="chip mage"><input type="checkbox" class="rioClassFilter" value="mage"><span class="chip-swatch"></span><span>Mage</span></label>
+                        <label class="chip warlock"><input type="checkbox" class="rioClassFilter" value="warlock"><span class="chip-swatch"></span><span>Warlock</span></label>
+                        <label class="chip monk"><input type="checkbox" class="rioClassFilter" value="monk"><span class="chip-swatch"></span><span>Monk</span></label>
+                        <label class="chip druid"><input type="checkbox" class="rioClassFilter" value="druid"><span class="chip-swatch"></span><span>Druid</span></label>
+                        <label class="chip deathknight"><input type="checkbox" class="rioClassFilter" value="deathknight"><span class="chip-swatch"></span><span>Death Knight</span></label>
+                        <label class="chip demon_hunter"><input type="checkbox" class="rioClassFilter" value="demon_hunter"><span class="chip-swatch"></span><span>Demon Hunter</span></label>
+                        <label class="chip evoker"><input type="checkbox" class="rioClassFilter" value="evoker"><span class="chip-swatch"></span><span>Evoker</span></label>
+                    </div>
+                </div>
+                </div>
+            </section>
+            <section class="card">
+                <h3 class="card-title">Behaviour</h3>
+                <div class="card-grid">
+                <div class="option toggle-inline">
+                    <label for="openWarcraftLogsFromRaiderIO">Auto-open WarcraftLogs on character visit</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="openWarcraftLogsFromRaiderIO">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Opens the candidate’s WarcraftLogs page when you open their Raider.IO profile.</p>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="hideRaiderIoAds">Remove ads</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="hideRaiderIoAds">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="rioWclEnabled">Filter by WarcraftLogs parse</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="rioWclEnabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Scores each search row through the API and hides those below your thresholds. Role is read from the row’s spec, so healers are measured on HPS.</p>
+                </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="category-content" id="guildsofwow">
+            <div class="section-header">
+                <div>
+                    <h2>Guilds of WoW</h2>
+                    <p class="section-desc">Filters recruit cards at guildsofwow.com/recruits.</p>
+                </div>
+                <label class="toggle-switch toggle-switch--lg" title="Enable Guilds of WoW">
+                    <input type="checkbox" id="guildsofwowEnabled" aria-label="Enable Guilds of WoW">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <section class="card">
+                <h3 class="card-title">Recruit filters</h3>
+                <div class="card-grid">
+                <div class="option-group">
+                    <div class="group-head">
+                        <span class="group-title">Role</span>
+                        <span class="group-hint">None selected shows every role</span>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip role-tank"><input type="checkbox" class="roleFilter" value="tank"><span class="chip-swatch"></span><span>Tank</span></label>
+                        <label class="chip role-healer"><input type="checkbox" class="roleFilter" value="healer"><span class="chip-swatch"></span><span>Healer</span></label>
+                        <label class="chip role-dps"><input type="checkbox" class="roleFilter" value="dps"><span class="chip-swatch"></span><span>DPS</span></label>
+                    </div>
+                </div>
+                <div class="option">
+                    <label for="gowMinIlvl">Min item level</label>
+                    <input type="number" id="gowMinIlvl" min="0" step="1" placeholder="Any">
+                </div>
+                <div class="option">
+                    <label for="gowMinMythicKills">Mythic kills</label>
+                    <div class="range-inputs">
+                        <input type="number" id="gowMinMythicKills" min="0" max="99" step="1" placeholder="Min" aria-label="Minimum mythic kills">
+                        <span class="range-sep" aria-hidden="true">–</span>
+                        <input type="number" id="gowMaxMythicKills" min="0" max="99" step="1" placeholder="Max" aria-label="Maximum mythic kills">
+                    </div>
+                    <p class="hint">Current-tier mythic boss kills. A maximum hides raiders already further than your guild — an 8/8 player is unlikely to join a 4/8 team.</p>
+                </div>
+                <div class="option">
+                    <label for="gowMinMythicPlusScore">Min M+ score</label>
+                    <input type="number" id="gowMinMythicPlusScore" min="0" step="1" placeholder="Any">
+                </div>
+                <div class="option">
+                    <label for="gowMaxListedDays">Listed within</label>
+                    <select id="gowMaxListedDays">
+                            <option value="">Any age</option>
+                            <option value="1">Last 24 hours</option>
+                            <option value="3">Last 3 days</option>
+                            <option value="7">Last week</option>
+                            <option value="14">Last 2 weeks</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                        </select>
+                    <p class="hint">Hides listings posted or last bumped longer ago than this. A listing whose date can’t be read is kept.</p>
+                </div>
+                <div class="option-group option--wide">
+                    <div class="group-head">
+                        <span class="group-title">Class</span>
+                        <span class="group-hint">None selected shows every class</span>
+                        <button type="button" class="link-btn" id="clearGowClasses">Clear</button>
+                    </div>
+                    <div class="chip-group">
+                        <label class="chip warrior"><input type="checkbox" class="gowClassFilter" value="warrior"><span class="chip-swatch"></span><span>Warrior</span></label>
+                        <label class="chip paladin"><input type="checkbox" class="gowClassFilter" value="paladin"><span class="chip-swatch"></span><span>Paladin</span></label>
+                        <label class="chip hunter"><input type="checkbox" class="gowClassFilter" value="hunter"><span class="chip-swatch"></span><span>Hunter</span></label>
+                        <label class="chip rogue"><input type="checkbox" class="gowClassFilter" value="rogue"><span class="chip-swatch"></span><span>Rogue</span></label>
+                        <label class="chip priest"><input type="checkbox" class="gowClassFilter" value="priest"><span class="chip-swatch"></span><span>Priest</span></label>
+                        <label class="chip shaman"><input type="checkbox" class="gowClassFilter" value="shaman"><span class="chip-swatch"></span><span>Shaman</span></label>
+                        <label class="chip mage"><input type="checkbox" class="gowClassFilter" value="mage"><span class="chip-swatch"></span><span>Mage</span></label>
+                        <label class="chip warlock"><input type="checkbox" class="gowClassFilter" value="warlock"><span class="chip-swatch"></span><span>Warlock</span></label>
+                        <label class="chip monk"><input type="checkbox" class="gowClassFilter" value="monk"><span class="chip-swatch"></span><span>Monk</span></label>
+                        <label class="chip druid"><input type="checkbox" class="gowClassFilter" value="druid"><span class="chip-swatch"></span><span>Druid</span></label>
+                        <label class="chip deathknight"><input type="checkbox" class="gowClassFilter" value="deathknight"><span class="chip-swatch"></span><span>Death Knight</span></label>
+                        <label class="chip demon_hunter"><input type="checkbox" class="gowClassFilter" value="demon_hunter"><span class="chip-swatch"></span><span>Demon Hunter</span></label>
+                        <label class="chip evoker"><input type="checkbox" class="gowClassFilter" value="evoker"><span class="chip-swatch"></span><span>Evoker</span></label>
+                    </div>
+                </div>
+                </div>
+            </section>
+            <section class="card">
+                <h3 class="card-title">Behaviour</h3>
+                <div class="card-grid">
+                <div class="option toggle-inline">
+                    <label for="gowWclEnabled">Filter by WarcraftLogs parse</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="gowWclEnabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Scores each recruit through the API and hides those below your thresholds. Role is read from the card, so healers are measured on HPS.</p>
+                </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="category-content" id="scout">
+            <div class="section-header">
+                <div>
+                    <h2>Scout</h2>
+                    <p class="section-desc">Gathers candidates from every site in one pass, merges duplicates, and ranks everyone by parse. Open it from the toolbar popup.</p>
+                </div>
+            </div>
+            <section class="card">
+                <h3 class="card-title">Sources</h3>
+                <div class="card-grid">
+                <div class="option-group option--wide">
+                    <div class="chip-group">
+                        <label class="chip site-wowprogress"><input type="checkbox" class="scoutSourceFilter" value="wowprogress"><span class="chip-swatch"></span><span>WoWProgress</span></label>
+                        <label class="chip site-raiderio"><input type="checkbox" class="scoutSourceFilter" value="raiderio"><span class="chip-swatch"></span><span>Raider.IO</span></label>
+                        <label class="chip site-guildsofwow"><input type="checkbox" class="scoutSourceFilter" value="guildsofwow"><span class="chip-swatch"></span><span>Guilds of WoW</span></label>
+                    </div>
+                    <p class="hint">Each site is filtered by its own settings from the tabs above. WoWProgress is read over the network; the other two render in the browser, so Scout opens each briefly in a background tab and closes it again. WarcraftLogs isn’t a source — its recruitment page sits behind Cloudflare and its API has no recruitment data — it supplies the parses everyone is ranked by.</p>
+                </div>
+                </div>
+            </section>
+            <section class="card">
+                <h3 class="card-title">Run limits</h3>
+                <div class="card-grid">
+                <div class="option">
+                    <label for="scoutMaxCandidates">Max candidates per run</label>
+                    <input type="number" id="scoutMaxCandidates" min="1" max="1000" step="10">
+                    <p class="hint">Each candidate is one WarcraftLogs lookup. Around 150 keeps a run well inside the API’s hourly budget; cached scores make repeats nearly free.</p>
+                </div>
+                <div class="option">
+                    <label for="scoutPagesPerSource">WoWProgress pages per run</label>
+                    <input type="number" id="scoutPagesPerSource" min="1" max="10" step="1">
+                    <p class="hint">Listing pages pulled per run and per “Load more”. WoWProgress only.</p>
+                </div>
+                </div>
+            </section>
+            <section class="card">
+                <h3 class="card-title">Scoring</h3>
+                <div class="card-grid">
+                <div class="option toggle-inline">
+                    <label for="scoutWclEnabled">Fetch WarcraftLogs parses</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="scoutWclEnabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Uses the same credentials, metrics and cache as parse filtering. Without credentials Scout still lists everyone, unranked.</p>
+                </div>
+                <div class="option toggle-inline">
+                    <label for="scoutEnrichRaiderio">Cross-reference stats with Raider.IO</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="scoutEnrichRaiderio">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Fills in M+ score, mythic progress and item level for every candidate from Raider.IO’s public API, whichever site they advertised on. Needs no key.</p>
+                </div>
+                <div class="option toggle-inline option--wide">
+                    <label for="scoutHideBelowThresholds">Hide candidates below thresholds</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="scoutHideBelowThresholds">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <p class="hint">Also hides candidates with no logs. Anyone who <em>couldn’t</em> be scored is always shown. Also switchable on the Scout page.</p>
+                </div>
+                </div>
+            </section>
+            <details class="advanced card">
+                <summary>
+                    <span class="card-title">Listing URLs</span>
+                    <span class="summary-desc">Point a source at a different search</span>
+                </summary>
+                <div class="card-grid">
+                <div class="option option--wide">
+                    <p class="hint">Leave blank for the defaults. Paste the exact listing you normally browse — a realm, region or role filter — and Scout harvests that instead.</p>
+                </div>
+                <div class="option option--wide">
                     <label for="scoutUrlWowprogress">WoWProgress</label>
                     <input type="text" id="scoutUrlWowprogress" placeholder="https://www.wowprogress.com/gearscore/?lfg=1&amp;sortby=ts&amp;raids_week=2&amp;lang=en" autocomplete="off">
                 </div>
-                <div class="option">
+                <div class="option option--wide">
                     <label for="scoutUrlRaiderio">Raider.IO</label>
                     <input type="text" id="scoutUrlRaiderio" placeholder="https://raider.io/search?type=character&amp;…recruitment.guild_raids…" autocomplete="off">
                 </div>
-                <div class="option">
+                <div class="option option--wide">
                     <label for="scoutUrlGuildsofwow">Guilds of WoW</label>
                     <input type="text" id="scoutUrlGuildsofwow" placeholder="https://guildsofwow.com/recruits" autocomplete="off">
                 </div>
                 </div>
             </details>
         </div>
+    </div>
 
-        <div class="save-area">
-            <button id="saveButton">Save</button>
-            <p id="statusMessage"></p>
+    <!-- Sticky action bar. Save is the one primary action on the page; the
+         status reads beside it, and the settings-file tools are secondary. -->
+    <div class="save-area">
+        <div class="save-inner">
+            <button id="saveButton" class="primary">Save changes</button>
+            <p id="statusMessage" role="status" aria-live="polite"></p>
+            <span class="spacer"></span>
             <div class="settings-tools">
-                <button type="button" id="exportSettings">Export Settings</button>
-                <button type="button" id="importSettings">Import Settings</button>
+                <button type="button" class="ghost" id="exportSettings"><svg class="icon"><use href="#i-download"/></svg>Export</button>
+                <button type="button" class="ghost" id="importSettings"><svg class="icon"><use href="#i-upload"/></svg>Import</button>
                 <input type="file" id="importFile" accept=".json" hidden>
             </div>
-            <div class="support-row">
-                <span class="footer-note">RaidScout is free and open source.</span>
-                <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">☕ Support development</a>
-                <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">▶ YouTube</a>
-            </div>
+        </div>
+        <div class="support-row">
+            <span class="footer-note">RaidScout is free and open source.</span>
+            <a class="support-link" id="linkDonate"  target="_blank" rel="noopener noreferrer">Support development</a>
+            <a class="support-link" id="linkYoutube" target="_blank" rel="noopener noreferrer">YouTube</a>
         </div>
     </div>
 

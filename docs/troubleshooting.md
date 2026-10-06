@@ -7,7 +7,7 @@
 ## Filtering
 
 **Proactive filtering isn't hiding anyone**
-- Check that **Enable proactive WCL filtering** is on for the relevant site in Full Settings
+- Check that **Filter by WarcraftLogs parse** is on for the relevant site in Full Settings
 - Click **Test connection** in the WarcraftLogs tab to confirm your credentials work
 - Check that you've set at least one threshold — all zeros means no filtering
 - If the popup shows "🚦 WCL rate limited" or "☁ Cloudflare check", wait for the cooldown or click **Clear cached scores**

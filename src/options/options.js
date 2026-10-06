@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function startBackoffCountdown(state, remainingMs) {
         const el   = document.getElementById('wclRateLimitStatus');
         const hint = document.getElementById('wclCloudflareHint');
-        const label = state === 'cloudflare' ? '☁ Cloudflare check' : '⚠ Rate limited';
+        const label = state === 'cloudflare' ? 'Cloudflare check' : 'Rate limited';
         clearInterval(backoffTimer);
         if (hint) hint.style.display = state === 'cloudflare' ? '' : 'none';
 

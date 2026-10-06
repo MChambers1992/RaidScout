@@ -71,7 +71,7 @@ and every change saves itself.
 **Parse filtering** — needs a free WarcraftLogs API key:
 
 1. Follow the [API setup guide](docs/warcraftlogs-api.md) (about two minutes)
-2. Set your thresholds once, then switch on **Enable proactive WCL filtering** per site
+2. Set your thresholds once, then switch on **Filter by WarcraftLogs parse** per site
 3. Below-threshold candidates are now hidden before you ever click, and everyone
    else carries a parse badge
 

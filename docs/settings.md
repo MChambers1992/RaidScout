@@ -2,7 +2,7 @@
 
 [← Back to README](../README.md)
 
-Every setting in **⚙ Full Settings**, by tab. Blank defaults (`—`) mean the
+Every setting in **Full settings**, by tab. Blank defaults (`—`) mean the
 filter is off — a zero minimum excludes nobody.
 
 All settings sync across Chrome devices via Chrome Sync, **except** the
@@ -47,7 +47,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Listed Within | Any age | Hide listings posted or last bumped longer ago than 24 hours / 3 days / a week / 2 weeks / 30 / 90 days. A listing whose date can't be read is kept |
 | Guild Status | Any | Filter by in a guild / not in a guild / any |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold players. Thresholds are set once in the **WarcraftLogs** tab |
+| Filter by WarcraftLogs parse | Off | Look up parse scores and hide below-threshold players. Thresholds are set once in the **WarcraftLogs** tab |
 
 ## Raider.IO tab
 
@@ -61,7 +61,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Region Filter | All | Show only selected regions (uncheck all for any) |
 | Role Filter | All | Show only Tank / Healer / DPS rows (uncheck all for any) |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold rows. Thresholds are set once in the **WarcraftLogs** tab |
+| Filter by WarcraftLogs parse | Off | Look up parse scores and hide below-threshold rows. Thresholds are set once in the **WarcraftLogs** tab |
 
 ## Guilds of WoW tab
 
@@ -74,7 +74,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 | Listed Within | Any age | Hide listings posted or last bumped longer ago than 24 hours / 3 days / a week / 2 weeks / 30 / 90 days. A listing whose date can't be read is kept |
 | Class Filter | All | Show only selected classes (uncheck all for any) |
 | Role Filter | All | Show only Tank / Healer / DPS cards (uncheck all for any) |
-| Enable proactive WCL filtering | Off | Look up parse scores and hide below-threshold cards. Thresholds are set once in the **WarcraftLogs** tab |
+| Filter by WarcraftLogs parse | Off | Look up parse scores and hide below-threshold cards. Thresholds are set once in the **WarcraftLogs** tab |
 
 ## Scout tab
 
@@ -94,7 +94,7 @@ WarcraftLogs Client Secret and the score cache, which are machine-local.
 
 The popup shows the most-used settings per site and **auto-saves** 400ms after
 you change anything — no Save button. Full Settings has everything and saves on
-an explicit **Save** click.
+an explicit **Save changes** click.
 
 The popup writes back every setting it read, including the ones it doesn't
 display (class filters, API keys), so using it never clobbers a selection you

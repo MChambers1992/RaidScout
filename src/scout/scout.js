@@ -988,7 +988,7 @@ function buildChips(container, items, groupName) {
     container.innerHTML = '';
     for (const { value, label, colour } of items) {
         const chip = document.createElement('label');
-        chip.className = 'filter-chip';
+        chip.className = 'chip';
         if (colour) chip.style.setProperty('--chip-colour', colour);
 
         const input = document.createElement('input');
